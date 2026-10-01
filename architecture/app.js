@@ -57,6 +57,7 @@ function showSection(){
 }
 function refreshVisuals(){renderActiveDiagram();if(activeSection==='costs'){updateCosts();updateSupabase();}}
 window.addEventListener('hashchange',showSection);
+window.addEventListener('sf-theme-change',refreshVisuals);
 mq.addEventListener('change',refreshVisuals);
 
 // A fixed illustration, deliberately independent of any real room or harness.
