@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>How it works | :o</title>
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="report.html">:o</a>
+      <nav aria-label="Pages">
+        <a href="report.html" aria-current="page">How it works</a>
+        <a href="tests.html">Tests</a>
+        <a href="md.html">MD</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="markdown-drawer" aria-label="Markdown files">
+      <h2>Markdown files</h2>
+      <ul class="file-list">
+        <li><a href="AGENTS.md" target="_blank" rel="noopener">AGENTS.md</a></li>
+        <li><a href="FEATURE_WISHLIST.md" target="_blank" rel="noopener">FEATURE_WISHLIST.md</a></li>
+        <li><a href="README.md" target="_blank" rel="noopener">README.md</a></li>
+        <li><a href="Research/chat-ux-and-agent-orchestration.md" target="_blank" rel="noopener">Research/chat-ux-and-agent-orchestration.md</a></li>
+        <li><a href="Research/hordes.md" target="_blank" rel="noopener">Research/hordes.md</a></li>
+        <li><a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">Research/cli-middleware-feasibility.md</a></li>
+        <li><a href="Research/shared-chat-ideas.md" target="_blank" rel="noopener">Research/shared-chat-ideas.md</a></li>
+        <li><a href=".agents/skills/visual-dev-console/SKILL.md" target="_blank" rel="noopener">.agents/skills/visual-dev-console/SKILL.md</a></li>
+      </ul>
+    </aside>
+
+    <main class="page">
+      <h1>How it works</h1>
+      <ul><li>Workspaces, channels, and direct chats for people and their local agents.</li><li>UI submissions pass through the owner's local bridge to the shared room. The bridge also manages their harnesses.</li><li><a href="architecture/index.html">Architecture diagrams and costs</a> / <a href="interface-designs/index.html">Interface images</a> / <a href="landing/index.html">Landing variants</a></li></ul>
+
+      <section>
+        <h2>Agent modes</h2><ul><li>Mentions only by default. A tag or deliberate action requests a run; owner permissions still apply.</li><li>Optional owner-configured conditions: scope, actions, context, budget, cooldown, and concurrency.</li><li>Ignore agent messages as triggers by default. Show the cause of each run and offer pause/stop.</li></ul></section><section><h2>Message routes</h2>
+        <table class="route-table">
+          <thead>
+            <tr><th scope="col">Entry</th><th scope="col">Path</th><th scope="col">Harness</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Chat-only message</th><td>:o stores it in the shared conversation and delivers it to other :o clients.</td><td>Not contacted</td></tr>
+            <tr><th scope="row">Agent request</th><td>:o adds selected shared-chat context, sends it through the selected adapter, and copies available results back.</td><td>Runs and stores its native session</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Order</h2><ul><li>Drafts stay local until Send. The room saves messages with a server-assigned order.</li><li>Save an empty agent reply before generation; streaming or final output fills it in place.</li><li>Keep the exact context snapshot. Later messages do not silently change an active run.</li><li>Replay saved events after disconnects. Each local cache has one writer.</li></ul></section><section><h2>Message data</h2>
+        <ul>
+          <li>Humans use role <code>user</code>; assistants use role <code>assistant</code>.</li>
+          <li>Each record has a participant ID, name, and origin.</li>
+          <li>Assistant records also include owner, model, harness, and run context.</li>
+          <li>When an agent is called, :o can include selected shared messages with their speakers and IDs in the prompt.</li>
+          <li>Copy available turn records and associated data without changing the native session.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Harness UI</h2>
+        <ul>
+          <li>The shared composer sends a human message to the chat, or sends an agent request through a harness adapter. :o can add selected chat messages to that request.</li>
+          <li>A native terminal pane runs the harness UI in a PTY and renders it through a terminal emulator. It keeps native settings and commands available when that harness supports interactive PTY use.</li>
+          <li>Input from the focused pane reaches :o first. :o forwards it to that harness PTY, where the harness interprets its own controls. A generic PTY cannot distinguish a slash command from a model prompt.</li>
+          <li>Use the shared composer for messages to people and agent requests. Input in the native pane is handled by the selected harness.</li>
+          <li>PTY output shows the terminal screen. Structured events or a session reader are needed to copy conversation records. See the <a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">feasibility report</a>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Harness interfaces</h2>
+        <table class="route-table">
+          <thead>
+            <tr><th scope="col">Harness</th><th scope="col">Adapter interface</th><th scope="col">Native controls</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><a href="https://pi.dev/docs/latest/rpc-commands">Pi</a></th><td>JSONL RPC for prompts, session state, models, thinking level, and discoverable extension commands. Settings and keybindings are documented in config files.</td><td><code>/settings</code> and <code>/hotkeys</code> screens are not RPC commands. :o can implement their controls from the API and config schema, with the PTY as fallback.</td></tr>
+            <tr><th scope="row"><a href="https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration">Hermes</a></th><td>TUI Gateway JSON-RPC for a custom host, including command dispatch and configuration.</td><td>Keep the PTY pane for native UI behavior the adapter does not expose.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md">Codex</a></th><td>App Server JSON-RPC for threads, turns, events, approvals, configuration, and models.</td><td>No promise of a complete slash-command catalog. Use the PTY pane for uncovered commands.</td></tr>
+            <tr><th scope="row"><a href="https://code.claude.com/docs/en/cli-usage">Claude Code</a></th><td>Print mode with JSON or stream-JSON input and output.</td><td>Print mode is separate from the interactive TUI. Keep the PTY pane available for native controls.</td></tr>
+          </tbody>
+        </table>
+        <p>:o can keep one outer layout for chat and routing. Use a versioned adapter manifest for known built-ins and query runtime catalogs where available. Do not scrape the TUI for its menu. More detail and source links are in the <a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">feasibility report</a>.</p>
+      </section>
+
+      <section>
+        <h2>Other participants</h2>
+        <ul>
+          <li>Other :o clients receive shared messages and agent results.</li>
+          <li>Their native harness sessions are not edited by chat sync.</li>
+          <li>When they invoke an agent, :o can pass selected shared messages as context.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Repository and execution</h2>
+        <ul>
+          <li>Link repositories, branches, issues, commits, and PRs. Provide a collaborator invitation action through the host.</li><li>Each person associates their local checkout and harness sessions with the project.</li><li>Agents can create/edit music, GIFs, and other files. Upload private artifacts, attach exact versions, and show authorized previews/downloads.</li><li>Offer adding accepted outputs to a repository branch or PR.</li>
+          <li>Writing to a chat does not run commands on another participant's machine.</li>
+        </ul>
+      </section>
+    <section><h2>Groups and hordes</h2><ul><li>Channels can contain many humans and agents. A direct chat is one use case.</li><li>Hordes contribute token budgets, models, and compute to missions with task rooms, claims, handoffs, and review.</li><li>The pilot has three people and initially two connected agents. People and agents are counted separately.</li></ul></section></main>
+  </div>
+</body>
+</html>

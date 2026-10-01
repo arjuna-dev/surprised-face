@@ -1,0 +1,116 @@
+{
+  "created": "2026-10-01",
+  "generator": "image_gen",
+  "skill": "mono-color",
+  "images": [
+    {
+      "key": "ui-cobalt-red",
+      "title": "Audio workspace",
+      "file": "cobalt-red.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-557fadfb-a3e2-469d-b6ed-8c8cc9868915.png",
+      "prompt": "prompts/ui-cobalt-red.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C83232"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "interface design concept",
+      "layout": "left navigation / central chat and bottom composer / right drawer",
+      "process": "clean type and medium screening in illustrations",
+      "status": "generated concept",
+      "content": "Fictional messages and results; no implemented software evidence.",
+      "width": 1672,
+      "height": 941,
+      "ratio": "16:9 (generated pixel ratio)",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "functional sans with monospace metadata",
+      "focal_event": "audio attachment"
+    },
+    {
+      "key": "ui-mint-charcoal",
+      "title": "Research workspace",
+      "file": "mint-charcoal.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-7ffc7e76-afb3-42f6-a3d4-907a88d875c3.png",
+      "prompt": "prompts/ui-mint-charcoal.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#5EB783",
+        "#302D2E"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "interface design concept",
+      "layout": "left navigation / central chat and bottom composer / right drawer",
+      "process": "clean type and medium screening in illustrations",
+      "status": "generated concept",
+      "content": "Fictional messages and results; no implemented software evidence.",
+      "width": 1672,
+      "height": 941,
+      "ratio": "16:9 (generated pixel ratio)",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "functional sans with monospace metadata",
+      "focal_event": "research conversation"
+    },
+    {
+      "key": "ui-cobalt-terracotta",
+      "title": "Animation workspace, initial version",
+      "file": "cobalt-terracotta-initial.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-79e15790-8b08-43bb-bdfe-3601dad22309.png",
+      "prompt": "prompts/ui-cobalt-terracotta.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C65F38"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "interface design concept",
+      "layout": "left navigation / central chat and bottom composer / right drawer",
+      "process": "clean type and medium screening in illustrations",
+      "status": "preserved initial version with extra green dots",
+      "content": "Fictional messages and results; no implemented software evidence.",
+      "width": 1672,
+      "height": 941,
+      "ratio": "16:9 (generated pixel ratio)",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "functional sans with monospace metadata",
+      "focal_event": "two-frame GIF preview"
+    },
+    {
+      "key": "ui-cobalt-terracotta-corrected",
+      "title": "Animation workspace, corrected two-ink version",
+      "file": "cobalt-terracotta.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-6c147c62-0805-442f-8c2d-7fb6837c3454.png",
+      "prompt": "prompts/ui-cobalt-terracotta-corrected.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C65F38"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "interface design concept",
+      "layout": "left navigation / central chat and bottom composer / right drawer",
+      "process": "clean type and medium screening in illustrations",
+      "status": "generated concept",
+      "content": "Fictional messages and results; no implemented software evidence.",
+      "reference": "cobalt-terracotta-initial.png",
+      "width": 1672,
+      "height": 941,
+      "ratio": "16:9 (generated pixel ratio)",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "functional sans with monospace metadata",
+      "focal_event": "two-frame GIF preview"
+    }
+  ]
+}

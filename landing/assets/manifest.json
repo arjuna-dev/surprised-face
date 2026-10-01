@@ -1,0 +1,113 @@
+{
+  "created": "2026-10-01",
+  "generator": "image_gen",
+  "skill": "mono-color",
+  "images": [
+    {
+      "key": "original",
+      "title": "Original friends artwork",
+      "file": "brand-print.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-ccb42b19-e5ca-490c-9450-43d37fa3018a.png",
+      "prompt": "artwork-prompt.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C83232"
+      ],
+      "mode": "controlled two-ink",
+      "layout": "oversized :o with red orbit",
+      "process": "medium halftone",
+      "status": "preserved original",
+      "width": 1448,
+      "height": 1086,
+      "ratio": "4:3",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "HTML sans headline, raster artwork without display text",
+      "focal_event": "oversized blue :o with red orbit"
+    },
+    {
+      "key": "red-dots",
+      "title": "Red dots, blue o",
+      "file": "red-dots.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-800fdb1f-cfa6-465d-acf1-27aa47f5ec5f.png",
+      "prompt": "prompts/red-dots.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C83232"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "abstract print artwork",
+      "layout": "editorial artwork with open upper area",
+      "process": "clean type and medium screening in illustrations",
+      "status": "generated concept",
+      "content": "Landing artwork exploration.",
+      "width": 1448,
+      "height": 1086,
+      "ratio": "4:3",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "red colon dots"
+      },
+      "type": "HTML sans headline, raster artwork without display text",
+      "focal_event": "red colon dots beside oversized blue o"
+    },
+    {
+      "key": "collaboration",
+      "title": "Project collaboration",
+      "file": "collaboration.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-f34b8d29-05ea-4805-85c7-c9caa4f8c7d5.png",
+      "prompt": "prompts/collaboration.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C83232"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "abstract print artwork",
+      "layout": "editorial artwork with open upper area",
+      "process": "clean type and medium screening in illustrations",
+      "status": "generated concept",
+      "content": "Landing artwork exploration.",
+      "width": 1448,
+      "height": 1086,
+      "ratio": "4:3",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "HTML sans headline, raster artwork without display text",
+      "focal_event": "two hands joining a construction drawing"
+    },
+    {
+      "key": "hordes",
+      "title": "Community hordes",
+      "file": "hordes.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-2f387915-62f4-4b7a-b238-e171295da133.png",
+      "prompt": "prompts/hordes.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C83232"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "abstract print artwork",
+      "layout": "editorial artwork with open upper area",
+      "process": "clean type and medium screening in illustrations",
+      "status": "generated concept",
+      "content": "Landing artwork exploration.",
+      "width": 1448,
+      "height": 1086,
+      "ratio": "4:3",
+      "plate_roles": {
+        "dominant": "structure, type, and main reproduced image",
+        "accent": "single visual annotation or selected attachment"
+      },
+      "type": "HTML sans headline, raster artwork without display text",
+      "focal_event": "many marks approaching an unfinished structure"
+    }
+  ]
+}

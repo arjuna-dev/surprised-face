@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="surprised-face :o. A shared chat for people and their local LLM harnesses.">
+  <meta name="color-scheme" content="light dark">
+  <title>surprised-face :o</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('sf-theme')||'system'}catch(e){}</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header>
+    <a class="wordmark" href="index.html" aria-label="surprised-face home"><span class="face">:o</span><span>surprised-face</span></a>
+    <nav aria-label="Project"><label class="variant-label">Page <select id="landing-variant" aria-label="Landing page exploration"><option value="index.html" selected>Friends / original</option><option value="friends-red-dots.html">Friends / red dots</option><option value="collaboration.html">Projects</option><option value="hordes.html">Hordes</option></select></label><a href="../interface-designs/index.html">Interfaces</a><a href="../architecture/index.html">How it works</a><a href="../design-system/index.html">Design rules</a><button id="theme" type="button">Theme</button></nav>
+  </header>
+  <main id="main">
+    <section class="poster" aria-labelledby="headline">
+      <img class="art" src="assets/brand-print.png" width="1448" height="1086" alt="" fetchpriority="high">
+      <div class="headline">
+        <p class="eyebrow">Open source / local harnesses</p>
+        <h1 id="headline">Your LLM harness,<br>but collaborative.</h1>
+      </div>
+      <p class="caption">A chat for you, your friends,<br>and your local agents.</p>
+      <p class="edition">surprised-face <span>:o</span></p>
+    </section>
+    <section class="details" aria-label="The idea">
+      <div><span class="number">01</span><h2>Chat with people.</h2><p>Share a conversation with a friend. Human messages stay in the shared chat.</p></div>
+      <div><span class="number">02</span><h2>Ask an agent to act.</h2><p>Tag your agent in the conversation. Its work and replies appear where everyone can see them.</p></div>
+      <div><span class="number">03</span><h2>Use your own harness.</h2><p>Keep your harness, model, and tools. Each person runs their agent with their own token budget.</p></div>
+    </section>
+  </main>
+  <footer><span>:o is the name, the face, and the CLI command.</span><a href="../architecture/index.html#mvp">Group pilot</a></footer>
+  <script>
+    document.getElementById("landing-variant").addEventListener("change",event=>{location.href=event.target.value});
+    const control=document.getElementById('theme');
+    function label(){const t=document.documentElement.dataset.theme||'system';control.textContent='Theme: '+t;control.setAttribute('aria-label','Color theme '+t+'. Click to change.');}
+    control.addEventListener('click',()=>{const modes=['system','light','dark'];const t=modes[(modes.indexOf(document.documentElement.dataset.theme||'system')+1)%3];document.documentElement.dataset.theme=t;try{localStorage.setItem('sf-theme',t)}catch(e){}label()});label();
+  </script>
+</body>
+</html>
