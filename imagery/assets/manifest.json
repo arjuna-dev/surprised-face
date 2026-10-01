@@ -57,7 +57,42 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "35b71de7b63940c6c586f19cfb0ef2e4a9c411b139cf73b5a6cf30d855d77080"
+      "sha256": "6ab0dc4c6a3d96a88ea380e214857c9d3ee38504c0eff83d28eb3249777f45ab",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "35b71de7b63940c6c586f19cfb0ef2e4a9c411b139cf73b5a6cf30d855d77080",
+        "caption_regions": [
+          [
+            50,
+            1220,
+            523,
+            82
+          ],
+          [
+            76,
+            1298,
+            357,
+            82
+          ],
+          [
+            50,
+            1380,
+            40,
+            32
+          ]
+        ],
+        "paper_sample": [
+          30,
+          30,
+          550,
+          220
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 86024
+      }
     },
     {
       "key": "woman-and-robot",
@@ -112,7 +147,30 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "e2f3c1feed7f5e0a4a2e9eb5dc4ec9771317868bc009ba5d15555b93703c074c"
+      "sha256": "8b8afdbc8851c6a4a27897cea0dfa3c791920fc29efac08f2e452e584050f12c",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "e2f3c1feed7f5e0a4a2e9eb5dc4ec9771317868bc009ba5d15555b93703c074c",
+        "caption_regions": [
+          [
+            80,
+            305,
+            278,
+            143
+          ]
+        ],
+        "paper_sample": [
+          50,
+          40,
+          300,
+          200
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 46477
+      }
     },
     {
       "key": "radio-lemonade",
@@ -167,7 +225,30 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "983dbb71777ab7b8f4a7e23b9b314de0f092ae8e8cd4c782f968ee43222afd50"
+      "sha256": "f9ba014959fcc53c3555539a805b324bc0bd5452690d43134417d7d7cc4078a7",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "983dbb71777ab7b8f4a7e23b9b314de0f092ae8e8cd4c782f968ee43222afd50",
+        "caption_regions": [
+          [
+            530,
+            1180,
+            545,
+            250
+          ]
+        ],
+        "paper_sample": [
+          20,
+          20,
+          430,
+          240
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 119089
+      }
     },
     {
       "key": "red-stars",
@@ -222,7 +303,30 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "868601d8f4848899ac4b69ec1e4d2a102ff485b6b8ab768df88ca88eabee7fca"
+      "sha256": "735930191ecabe19ff8d52aa4c2ef524ce0034ba9a57b4bf5998658b6ece9d7b",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "868601d8f4848899ac4b69ec1e4d2a102ff485b6b8ab768df88ca88eabee7fca",
+        "caption_regions": [
+          [
+            400,
+            1334,
+            650,
+            80
+          ]
+        ],
+        "paper_sample": [
+          735,
+          60,
+          300,
+          180
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 65823
+      }
     },
     {
       "key": "holding-hands-cobalt-red",
@@ -277,7 +381,30 @@
       },
       "width": 1672,
       "height": 941,
-      "sha256": "ddb1509ad2636f7b78519adb7d2bcd9f37a3e35429cb966f6989401ff1ee8384"
+      "sha256": "09e175be6ccfac06f6ab5df235887bd1f0d2d4c9c21c95ef762fdee9086be17d",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "ddb1509ad2636f7b78519adb7d2bcd9f37a3e35429cb966f6989401ff1ee8384",
+        "caption_regions": [
+          [
+            60,
+            112,
+            980,
+            151
+          ]
+        ],
+        "paper_sample": [
+          60,
+          10,
+          1000,
+          85
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 153780
+      }
     },
     {
       "key": "dancing-circle-cobalt-red",
@@ -332,7 +459,30 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "7c5d57503cb2de20947d3f3ef2a53795ca5b44731bd7b802c1729b50c78c4977"
+      "sha256": "ae26dd3bd47e702d43bbf4670726da97fb042d4685cb9185ed2bf0b1c598158b",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "7c5d57503cb2de20947d3f3ef2a53795ca5b44731bd7b802c1729b50c78c4977",
+        "caption_regions": [
+          [
+            95,
+            205,
+            275,
+            173
+          ]
+        ],
+        "paper_sample": [
+          480,
+          30,
+          290,
+          200
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 51944
+      }
     },
     {
       "key": "holding-hands-botanical-oxblood",
@@ -387,7 +537,30 @@
       },
       "width": 1672,
       "height": 941,
-      "sha256": "0c22059168afa476e0992be31a67c625e926caadf260bdf5c89ae075d0e0ba08"
+      "sha256": "b99bd73846dc21718a45b43f3fedc897b2466d65f2f2e092851858d8ca3a4109",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "0c22059168afa476e0992be31a67c625e926caadf260bdf5c89ae075d0e0ba08",
+        "caption_regions": [
+          [
+            60,
+            112,
+            980,
+            151
+          ]
+        ],
+        "paper_sample": [
+          60,
+          10,
+          1000,
+          85
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 162266
+      }
     },
     {
       "key": "dancing-circle-botanical-oxblood",
@@ -442,7 +615,30 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "86545d8b86e02c092f4d57f8ed6b69664a8cd5e32f5a4c7f10d78054806bcf4b"
+      "sha256": "2097c074cc0e682d6a12fd23be91ba81ba8072892da58341a31be10ddf12befd",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "86545d8b86e02c092f4d57f8ed6b69664a8cd5e32f5a4c7f10d78054806bcf4b",
+        "caption_regions": [
+          [
+            95,
+            205,
+            275,
+            173
+          ]
+        ],
+        "paper_sample": [
+          480,
+          30,
+          290,
+          200
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 51600
+      }
     },
     {
       "key": "holding-hands-ultramarine-orange",
@@ -497,7 +693,30 @@
       },
       "width": 1672,
       "height": 941,
-      "sha256": "6855a6ba6b30611214bfec8fc7a0c81f1673f507fcac546c954b33cace06cafa"
+      "sha256": "b5bce39e3a4b1485b3cf50c2f496d7f71aa17fd86765692f3d04b287e811fe9c",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "6855a6ba6b30611214bfec8fc7a0c81f1673f507fcac546c954b33cace06cafa",
+        "caption_regions": [
+          [
+            60,
+            112,
+            980,
+            151
+          ]
+        ],
+        "paper_sample": [
+          60,
+          10,
+          1000,
+          85
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 169125
+      }
     },
     {
       "key": "dancing-circle-ultramarine-orange",
@@ -552,7 +771,30 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "651536a377d95ecda394336315c74a4338be2bcecb4656b006d45b4a4cef5b1e"
+      "sha256": "e662032f3842d7a41bc0c08472f45e2a442d06fc5f103dec86afe33dcaf32854",
+      "embedded_caption": null,
+      "post_processing": {
+        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "uses_generation": false,
+        "original_git_revision": "cc273ea",
+        "original_sha256": "651536a377d95ecda394336315c74a4338be2bcecb4656b006d45b4a4cef5b1e",
+        "caption_regions": [
+          [
+            95,
+            205,
+            275,
+            173
+          ]
+        ],
+        "paper_sample": [
+          480,
+          30,
+          290,
+          200
+        ],
+        "feather_pixels": 16,
+        "changed_pixels": 51256
+      }
     }
   ]
 }
