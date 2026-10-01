@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>:o / Imagery</title>
+  <link rel="stylesheet" href="../shared/project-header.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="../shared/project-header.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to images</a>
+  <header data-project-header></header>
+  <div class="shell">
+    <aside>
+      <nav aria-label="Image scenes">
+        <a href="#people" aria-current="page">People and robots</a>
+        <a href="#lemonade">Lemonade</a>
+        <a href="#stars">Stars</a>
+        <a href="#groups">Holding hands</a>
+      </nav>
+    </aside>
+    <main id="content">
+      <h1 id="scene-title">People and robots</h1>
+      <div class="legend" aria-label="Ink roles">
+        <span><i id="human-ink" aria-hidden="true" style="background:#2148B8"></i><span id="human-label">Human / Cobalt</span></span>
+        <span><i id="agent-ink" aria-hidden="true" style="background:#C83232"></i><span id="agent-label">Agent / Signal Red</span></span>
+      </div>
+      <section id="people" data-imagery-panel data-title="People and robots" aria-label="People and robots">
+        <div class="pair">
+          <figure>
+            <a href="assets/man-and-robot.png"><img src="assets/man-and-robot.png" alt="A blue man and red retro robot looking over a rocket drawing." width="1086" height="1448"></a>
+            <figcaption><span>Man and robot</span><a href="assets/prompts/man-and-robot.txt">Prompt</a></figcaption>
+          </figure>
+          <figure>
+            <a href="assets/woman-and-robot.png"><img src="assets/woman-and-robot.png" alt="A blue woman showing a folded paper shape to a red retro robot." width="1086" height="1448"></a>
+            <figcaption><span>Woman and robot</span><a href="assets/prompts/woman-and-robot.txt">Prompt</a></figcaption>
+          </figure>
+        </div>
+      </section>
+      <section id="lemonade" data-imagery-panel data-title="Lemonade" aria-label="Lemonade" hidden>
+        <figure class="portrait">
+          <a href="assets/radio-lemonade.png"><img src="assets/radio-lemonade.png" alt="A red 1960s radio with arms and legs serving lemonade to a reclining blue human." width="1086" height="1448" loading="lazy"></a>
+          <figcaption><span>Radio and lemonade</span><a href="assets/prompts/radio-lemonade.txt">Prompt</a></figcaption>
+        </figure>
+      </section>
+      <section id="stars" data-imagery-panel data-title="Stars" aria-label="Stars" hidden>
+        <figure class="portrait">
+          <a href="assets/red-stars.png"><img src="assets/red-stars.png" alt="A blue human looking into a blue night sky filled with red stars." width="1086" height="1448" loading="lazy"></a>
+          <figcaption><span>Blue sky, red stars</span><a href="assets/prompts/red-stars.txt">Prompt</a></figcaption>
+        </figure>
+      </section>
+      <section id="groups" data-imagery-panel data-title="Holding hands" aria-label="Holding hands" hidden>
+        <div class="controls">
+          <label for="layout">Arrangement
+            <select id="layout">
+              <option value="line">Line</option>
+              <option value="circle">Circle</option>
+            </select>
+          </label>
+          <label for="palette">Colors
+            <select id="palette">
+              <option value="cobalt-red">Cobalt / Signal Red</option>
+              <option value="botanical-oxblood">Botanical Green / Oxblood</option>
+              <option value="ultramarine-orange">Ultramarine / Safety Orange</option>
+            </select>
+          </label>
+        </div>
+        <figure id="group-figure" data-layout="line">
+          <a href="assets/holding-hands-cobalt-red.png"><img id="group-image" src="assets/holding-hands-cobalt-red.png" alt="Blue people and distinct red robots holding hands and taking cheerful strides across the page." width="1672" height="941" loading="lazy"></a>
+          <figcaption><span id="group-caption">Taking strides</span><a id="group-prompt" href="assets/prompts/holding-hands-cobalt-red.txt">Prompt</a></figcaption>
+        </figure>
+      </section>
+      <p class="recipe-link"><a href="assets/manifest.json">Image recipes</a></p>
+    </main>
+  </div>
+  <script src="assets/catalog.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

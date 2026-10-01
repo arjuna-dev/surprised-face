@@ -1,0 +1,558 @@
+{
+  "collection": "surprised-face imagery",
+  "generator": "image_gen",
+  "skill": "mono-color",
+  "recipes_are_prompt_intent": true,
+  "images": [
+    {
+      "key": "man-and-robot",
+      "title": "Man and robot",
+      "file": "assets/man-and-robot.png",
+      "prompt": "assets/prompts/man-and-robot.txt",
+      "alt": "A blue man and red retro robot looking over a rocket drawing.",
+      "source": "exec-98866d41-7d11-4dbc-9b30-11b19897b284.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Man and robot",
+        "intent": "playful editorial illustration",
+        "exact_text": "An afternoon together",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Human and robot working on one sheet",
+        "release_zone": "open upper paper",
+        "unresolved_edge": "lower scene crop",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "one lower scene crop",
+        "imperfection_seed": "e46243635b67dbb1",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Ink roles follow the two characters rather than decorative accents.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "35b71de7b63940c6c586f19cfb0ef2e4a9c411b139cf73b5a6cf30d855d77080"
+    },
+    {
+      "key": "woman-and-robot",
+      "title": "Woman and robot",
+      "file": "assets/woman-and-robot.png",
+      "prompt": "assets/prompts/woman-and-robot.txt",
+      "alt": "A blue woman showing a folded paper shape to a red retro robot.",
+      "source": "exec-389db6f0-0ff9-4c37-ac45-2c881500c331.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Woman and robot",
+        "intent": "playful editorial illustration",
+        "exact_text": "A small discovery",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Woman and distinct retro robot examining an object",
+        "release_zone": "open upper paper",
+        "unresolved_edge": "lower scene crop",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_literary",
+        "disruption": "one lower scene crop",
+        "imperfection_seed": "78596ad5126143c2",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Ink roles follow the two characters rather than decorative accents.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "e2f3c1feed7f5e0a4a2e9eb5dc4ec9771317868bc009ba5d15555b93703c074c"
+    },
+    {
+      "key": "radio-lemonade",
+      "title": "Radio and lemonade",
+      "file": "assets/radio-lemonade.png",
+      "prompt": "assets/prompts/radio-lemonade.txt",
+      "alt": "A red 1960s radio with arms and legs serving lemonade to a reclining blue human.",
+      "source": "exec-25b03570-4613-4850-9286-3b6de265aa26.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Radio and lemonade",
+        "intent": "playful editorial illustration",
+        "exact_text": "Lemonade at three",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Radio robot handing lemonade to a reclining human",
+        "release_zone": "open upper paper",
+        "unresolved_edge": "lower scene crop",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_literary",
+        "disruption": "one lower scene crop",
+        "imperfection_seed": "692f9bec110572e4",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Ink roles follow the two characters rather than decorative accents.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "983dbb71777ab7b8f4a7e23b9b314de0f092ae8e8cd4c782f968ee43222afd50"
+    },
+    {
+      "key": "red-stars",
+      "title": "Blue sky, red stars",
+      "file": "assets/red-stars.png",
+      "prompt": "assets/prompts/red-stars.txt",
+      "alt": "A blue human looking into a blue night sky filled with red stars.",
+      "source": "exec-9248412b-364a-4538-ad9f-ec51080e529d.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Blue sky, red stars",
+        "intent": "playful editorial illustration",
+        "exact_text": "Looking a little farther",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "stars",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Small blue observer beneath expansive blue sky with red stars",
+        "release_zone": "open upper-right sky",
+        "unresolved_edge": "hill at the lower edge",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "one lower scene crop",
+        "imperfection_seed": "c99f8662ff3e9450",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Blue carries the scene, red is confined to stars.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "868601d8f4848899ac4b69ec1e4d2a102ff485b6b8ab768df88ca88eabee7fca"
+    },
+    {
+      "key": "holding-hands-cobalt-red",
+      "title": "Taking strides",
+      "file": "assets/holding-hands-cobalt-red.png",
+      "prompt": "assets/prompts/holding-hands-cobalt-red.txt",
+      "alt": "Blue people and distinct red robots holding hands and taking cheerful strides across the page.",
+      "source": "exec-a27d1577-a25c-440f-9e51-17c9a1f2402e.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Taking strides",
+        "intent": "playful editorial illustration",
+        "exact_text": "An afternoon out",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "One continuous hand-holding line leaving both edges",
+        "release_zone": "broad upper strip of paper",
+        "unresolved_edge": "procession continues beyond both side edges",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "figures cropped at both side edges",
+        "imperfection_seed": "d2a6e3243affff0a",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Both inks carry alternating participants, so the robot ink can exceed the usual accent share.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1672,
+      "height": 941,
+      "sha256": "ddb1509ad2636f7b78519adb7d2bcd9f37a3e35429cb966f6989401ff1ee8384"
+    },
+    {
+      "key": "dancing-circle-cobalt-red",
+      "title": "Dancing circle",
+      "file": "assets/dancing-circle-cobalt-red.png",
+      "prompt": "assets/prompts/dancing-circle-cobalt-red.txt",
+      "alt": "Blue men and women holding hands with distinct red humanoid robots in a cheerful dancing circle.",
+      "source": "exec-48f9e367-7c08-48d7-b69f-b92c881e614a.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Dancing circle",
+        "intent": "playful editorial illustration",
+        "exact_text": "Another turn around",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Closed circle of different robots and humans dancing",
+        "release_zone": "open center of the circle and upper paper",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "alternating feet and hands around one ring",
+        "imperfection_seed": "42bf942347ff7ff0",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Both inks carry alternating participants, so the robot ink can exceed the usual accent share.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "7c5d57503cb2de20947d3f3ef2a53795ca5b44731bd7b802c1729b50c78c4977"
+    },
+    {
+      "key": "holding-hands-botanical-oxblood",
+      "title": "Taking strides",
+      "file": "assets/holding-hands-botanical-oxblood.png",
+      "prompt": "assets/prompts/holding-hands-botanical-oxblood.txt",
+      "alt": "Botanical Green people and distinct Oxblood robots holding hands and taking cheerful strides across the page.",
+      "source": "exec-ca8ae3cc-65e5-402d-8182-0f6a56b4ae74.png",
+      "parent": "holding-hands-cobalt-red",
+      "recipe": {
+        "subject": "Taking strides",
+        "intent": "playful editorial illustration",
+        "exact_text": "An afternoon out",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "botanical-oxblood",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Botanical Green",
+            "hex": "#008A4B"
+          },
+          {
+            "role": "agent",
+            "name": "Oxblood",
+            "hex": "#8F3434"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "One continuous hand-holding line leaving both edges",
+        "release_zone": "broad upper strip of paper",
+        "unresolved_edge": "procession continues beyond both side edges",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "figures cropped at both side edges",
+        "imperfection_seed": "d8e07050d5afd904",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Both inks carry alternating participants, so the robot ink can exceed the usual accent share.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1672,
+      "height": 941,
+      "sha256": "0c22059168afa476e0992be31a67c625e926caadf260bdf5c89ae075d0e0ba08"
+    },
+    {
+      "key": "dancing-circle-botanical-oxblood",
+      "title": "Dancing circle",
+      "file": "assets/dancing-circle-botanical-oxblood.png",
+      "prompt": "assets/prompts/dancing-circle-botanical-oxblood.txt",
+      "alt": "Botanical Green men and women holding hands with distinct Oxblood humanoid robots in a cheerful dancing circle.",
+      "source": "exec-6be49549-ce5e-4e10-9513-ac9803d8ccf2.png",
+      "parent": "dancing-circle-cobalt-red",
+      "recipe": {
+        "subject": "Dancing circle",
+        "intent": "playful editorial illustration",
+        "exact_text": "Another turn around",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "botanical-oxblood",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Botanical Green",
+            "hex": "#008A4B"
+          },
+          {
+            "role": "agent",
+            "name": "Oxblood",
+            "hex": "#8F3434"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Closed circle of different robots and humans dancing",
+        "release_zone": "open center of the circle and upper paper",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "alternating feet and hands around one ring",
+        "imperfection_seed": "932af167c1ec87f5",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Both inks carry alternating participants, so the robot ink can exceed the usual accent share.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "86545d8b86e02c092f4d57f8ed6b69664a8cd5e32f5a4c7f10d78054806bcf4b"
+    },
+    {
+      "key": "holding-hands-ultramarine-orange",
+      "title": "Taking strides",
+      "file": "assets/holding-hands-ultramarine-orange.png",
+      "prompt": "assets/prompts/holding-hands-ultramarine-orange.txt",
+      "alt": "Ultramarine people and distinct Safety Orange robots holding hands and taking cheerful strides across the page.",
+      "source": "exec-e96ff0aa-f13d-4bb6-b91c-3ee133d626d0.png",
+      "parent": "holding-hands-cobalt-red",
+      "recipe": {
+        "subject": "Taking strides",
+        "intent": "playful editorial illustration",
+        "exact_text": "An afternoon out",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "ultramarine-orange",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Ultramarine",
+            "hex": "#263E99"
+          },
+          {
+            "role": "agent",
+            "name": "Safety Orange",
+            "hex": "#E55D2B"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "One continuous hand-holding line leaving both edges",
+        "release_zone": "broad upper strip of paper",
+        "unresolved_edge": "procession continues beyond both side edges",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "figures cropped at both side edges",
+        "imperfection_seed": "25a63fbb872fff4f",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Both inks carry alternating participants, so the robot ink can exceed the usual accent share.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1672,
+      "height": 941,
+      "sha256": "6855a6ba6b30611214bfec8fc7a0c81f1673f507fcac546c954b33cace06cafa"
+    },
+    {
+      "key": "dancing-circle-ultramarine-orange",
+      "title": "Dancing circle",
+      "file": "assets/dancing-circle-ultramarine-orange.png",
+      "prompt": "assets/prompts/dancing-circle-ultramarine-orange.txt",
+      "alt": "Ultramarine men and women holding hands with distinct Safety Orange humanoid robots in a cheerful dancing circle.",
+      "source": "exec-45969db5-d3c6-4513-a261-7c29591b5099.png",
+      "parent": "dancing-circle-cobalt-red",
+      "recipe": {
+        "subject": "Dancing circle",
+        "intent": "playful editorial illustration",
+        "exact_text": "Another turn around",
+        "text_language": "English",
+        "representation": "faithful reproduction",
+        "ratio": "3:4",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "ultramarine-orange",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Ultramarine",
+            "hex": "#263E99"
+          },
+          {
+            "role": "agent",
+            "name": "Safety Orange",
+            "hex": "#E55D2B"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "Closed circle of different robots and humans dancing",
+        "release_zone": "open center of the circle and upper paper",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": "type_cultural_grotesk",
+        "disruption": "alternating feet and hands around one ring",
+        "imperfection_seed": "c34f39711b34bc76",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Both inks carry alternating participants, so the robot ink can exceed the usual accent share.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "width": 1086,
+      "height": 1448,
+      "sha256": "651536a377d95ecda394336315c74a4338be2bcecb4656b006d45b4a4cef5b1e"
+    }
+  ]
+}
