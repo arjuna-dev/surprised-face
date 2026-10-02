@@ -88,5 +88,41 @@ window.imageryCatalog = [
     "alt": "Ultramarine men and women holding hands with distinct Safety Orange humanoid robots in a cheerful dancing circle.",
     "width": 1086,
     "height": 1448
+  },
+  {
+    "key": "horde-engineering-1",
+    "title": "Engineering team 1",
+    "file": "assets/horde-engineering-1.png?v=f44fa069b8e5",
+    "prompt": "assets/prompts/horde-engineering-1.txt",
+    "alt": "A heroic 1960s engineering team of blue humans and distinct red humanoid robots, carrying tools and plans.",
+    "width": 1672,
+    "height": 941
+  },
+  {
+    "key": "horde-engineering-2",
+    "title": "Engineering team 2",
+    "file": "assets/horde-engineering-2.png?v=7d02d74d69e6",
+    "prompt": "assets/prompts/horde-engineering-2.txt",
+    "alt": "A heroic 1960s engineering team of blue humans and distinct red humanoid robots, carrying tools and plans.",
+    "width": 1672,
+    "height": 941
+  },
+  {
+    "key": "horde-space-warriors-1",
+    "title": "Space crew 1",
+    "file": "assets/horde-space-warriors-1.png?v=fbba28d30cbf",
+    "prompt": "assets/prompts/horde-space-warriors-1.txt",
+    "alt": "Blue human space warriors and distinct red humanoid robots preparing for a mission in a 1960s sci-fi illustration.",
+    "width": 1672,
+    "height": 941
+  },
+  {
+    "key": "horde-space-warriors-2",
+    "title": "Space crew 2",
+    "file": "assets/horde-space-warriors-2.png?v=05692ef95427",
+    "prompt": "assets/prompts/horde-space-warriors-2.txt",
+    "alt": "Blue human space warriors and distinct red humanoid robots preparing for a mission in a 1960s sci-fi illustration.",
+    "width": 1672,
+    "height": 941
   }
 ];

@@ -795,6 +795,234 @@
         "feather_pixels": 16,
         "changed_pixels": 51256
       }
+    },
+    {
+      "key": "horde-engineering-1",
+      "title": "Engineering team 1",
+      "category": "hordes",
+      "file": "assets/horde-engineering-1.png",
+      "prompt": "assets/prompts/horde-engineering-1.txt",
+      "alt": "A heroic 1960s engineering team of blue humans and distinct red humanoid robots, carrying tools and plans.",
+      "source": "exec-267383b5-2653-4e55-a04f-81847e6061e2.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Heroic engineering team",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Mixed human and robot team poised for one shared challenge",
+        "release_zone": "Broad quiet upper paper and gaps between the ensemble",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "Asymmetric team spacing",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Equal human and robot participation assigns comparable coverage to both plates.",
+        "seed_usage": "Recipe identifier only; independent image generations may vary.",
+        "imperfection_seed": "655c4743fe913dc7"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "f44fa069b8e5fe20233954b8ee27295d86bd33d5be7e11dbf17c86370e9d21ab"
+    },
+    {
+      "key": "horde-engineering-2",
+      "title": "Engineering team 2",
+      "category": "hordes",
+      "file": "assets/horde-engineering-2.png",
+      "prompt": "assets/prompts/horde-engineering-2.txt",
+      "alt": "A heroic 1960s engineering team of blue humans and distinct red humanoid robots, carrying tools and plans.",
+      "source": "exec-20e94073-2399-4734-bba0-4afe25114b4d.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Heroic engineering team",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Mixed human and robot team poised for one shared challenge",
+        "release_zone": "Broad quiet upper paper and gaps between the ensemble",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "Asymmetric team spacing",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Equal human and robot participation assigns comparable coverage to both plates.",
+        "seed_usage": "Recipe identifier only; independent image generations may vary.",
+        "imperfection_seed": "655c4743fe913dc7"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "7d02d74d69e628936f33403a64bb237c88196c239e1f3174e8d436f79e0b43a7"
+    },
+    {
+      "key": "horde-space-warriors-1",
+      "title": "Space crew 1",
+      "category": "hordes",
+      "file": "assets/horde-space-warriors-1.png",
+      "prompt": "assets/prompts/horde-space-warriors-1.txt",
+      "alt": "Blue human space warriors and distinct red humanoid robots preparing for a mission in a 1960s sci-fi illustration.",
+      "source": "exec-362793a6-0623-4bf9-bf14-0cba3f9b0d1e.png",
+      "parent": null,
+      "recipe": {
+        "subject": "1960s sci-fi warrior team",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Mixed human and robot team poised for one shared challenge",
+        "release_zone": "Broad quiet upper paper and gaps between the ensemble",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "Asymmetric team spacing",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Equal human and robot participation assigns comparable coverage to both plates.",
+        "seed_usage": "Recipe identifier only; independent image generations may vary.",
+        "imperfection_seed": "6e3c94bd2e93c08f"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "fbba28d30cbf183042a66ed49c0381674ba77d77909b98103be62a089670be67"
+    },
+    {
+      "key": "horde-space-warriors-2",
+      "title": "Space crew 2",
+      "category": "hordes",
+      "file": "assets/horde-space-warriors-2.png",
+      "prompt": "assets/prompts/horde-space-warriors-2.txt",
+      "alt": "Blue human space warriors and distinct red humanoid robots preparing for a mission in a 1960s sci-fi illustration.",
+      "source": "exec-2a521ed6-6a80-40a4-a499-e501ac226415.png",
+      "parent": null,
+      "recipe": {
+        "subject": "1960s sci-fi warrior team",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Mixed human and robot team poised for one shared challenge",
+        "release_zone": "Broad quiet upper paper and gaps between the ensemble",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "Asymmetric team spacing",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Equal human and robot participation assigns comparable coverage to both plates.",
+        "seed_usage": "Recipe identifier only; independent image generations may vary.",
+        "imperfection_seed": "6e3c94bd2e93c08f"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "05692ef95427e117c978a1259448b0e5b48602dc532a7a2f05aa90a692d843b6"
     }
   ]
 }

@@ -12,7 +12,7 @@
 | --- | --- |
 | [Landing pages](landing/index.html) | Projects by default, Friends, and community Hordes. Use the same header dropdown on every review page. |
 | [Interface images](interface-designs/index.html) | Three two-ink design concepts with left and right drawers and a central chat/composer. Fictional content, not a working app. |
-| [Imagery](imagery/index.html) | People, retro robots, lemonade, stars, and dancing groups in three palettes. |
+| [Imagery](imagery/index.html) | People, retro robots, lemonade, stars, dancing groups, and engineering / space hordes. |
 | [Design rules](design-system/index.html) | Name, colors, type, spacing, and readable controls. |
 | [Architecture](architecture/index.html) | Vue stack, local bridges, message order, agent modes, projects/media, hordes, backends, cost calculators, OpenAPPA, and group pilot. |
 | [How it works](report.html) | Concise routing and harness interface reference. |
