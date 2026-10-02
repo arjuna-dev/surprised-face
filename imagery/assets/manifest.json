@@ -1023,6 +1023,120 @@
       "width": 1672,
       "height": 941,
       "sha256": "05692ef95427e117c978a1259448b0e5b48602dc532a7a2f05aa90a692d843b6"
+    },
+    {
+      "key": "horde-engineering-front",
+      "title": "Engineering team / front",
+      "category": "hordes",
+      "file": "assets/horde-engineering-front.png",
+      "prompt": "assets/prompts/horde-engineering-front.txt",
+      "alt": "Blue human engineers and distinct red humanoid robots posing front-facing for a heroic 1960s group portrait.",
+      "source": "exec-155923f0-5ad0-4486-977b-16d8c8a07adb.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Front-facing engineering group portrait",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Entire mixed team posing front-facing and looking at the viewer",
+        "release_zone": "Broad quiet upper paper",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "Subtly staggered group rows",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Comparable human and robot presence assigns coverage by character role.",
+        "seed_usage": "Recipe identifier only; image generation is not deterministic.",
+        "imperfection_seed": "248f3dd503798286"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "405c7f2bfea6bbf84cda1608fa03a0a1da21cb74c35b0067121d02ed8a83e4c3"
+    },
+    {
+      "key": "horde-space-warriors-front",
+      "title": "Space crew / front",
+      "category": "hordes",
+      "file": "assets/horde-space-warriors-front.png",
+      "prompt": "assets/prompts/horde-space-warriors-front.txt",
+      "alt": "Blue human space warriors and distinct red humanoid robots looking directly at the viewer in a posed 1960s group portrait.",
+      "source": "exec-323ba131-8d93-4e64-8675-2fc9dfcac0af.png",
+      "parent": null,
+      "recipe": {
+        "subject": "Front-facing space crew group portrait",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Entire mixed team posing front-facing and looking at the viewer",
+        "release_zone": "Broad quiet upper paper",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "Subtly staggered group rows",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Comparable human and robot presence assigns coverage by character role.",
+        "seed_usage": "Recipe identifier only; image generation is not deterministic.",
+        "imperfection_seed": "52b854d5b21c3c78"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "97ba0187c83b4a1e757944988e73500fc155ca8ec6829cebd37ddfa1256836c7"
     }
   ]
 }

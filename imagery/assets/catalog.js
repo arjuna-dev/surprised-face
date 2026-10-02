@@ -124,5 +124,23 @@ window.imageryCatalog = [
     "alt": "Blue human space warriors and distinct red humanoid robots preparing for a mission in a 1960s sci-fi illustration.",
     "width": 1672,
     "height": 941
+  },
+  {
+    "key": "horde-engineering-front",
+    "title": "Engineering team / front",
+    "file": "assets/horde-engineering-front.png?v=405c7f2bfea6",
+    "prompt": "assets/prompts/horde-engineering-front.txt",
+    "alt": "Blue human engineers and distinct red humanoid robots posing front-facing for a heroic 1960s group portrait.",
+    "width": 1672,
+    "height": 941
+  },
+  {
+    "key": "horde-space-warriors-front",
+    "title": "Space crew / front",
+    "file": "assets/horde-space-warriors-front.png?v=97ba0187c83b",
+    "prompt": "assets/prompts/horde-space-warriors-front.txt",
+    "alt": "Blue human space warriors and distinct red humanoid robots looking directly at the viewer in a posed 1960s group portrait.",
+    "width": 1672,
+    "height": 941
   }
 ];
