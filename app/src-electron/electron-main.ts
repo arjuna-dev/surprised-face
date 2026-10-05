@@ -19,11 +19,10 @@ import { SheepBridge } from './sheep-bridge';
 import { isSafeAppNavigation } from './navigation-policy';
 import { projectsForUi, sortProjectsByRecent } from './local-projects';
 import { displayTranscriptMessages } from '../src/lib/native-transcript';
+import { configureAppProfile } from './app-data-path';
 
 const currentDir = fileURLToPath(new URL('.', import.meta.url));
-if (!app.isPackaged && process.env.SURPRISED_FACE_DEV_DATA) {
-  app.setPath('userData', process.env.SURPRISED_FACE_DEV_DATA);
-}
+configureAppProfile(app, process.env.SURPRISED_FACE_DEV_DATA);
 const ownsSingleInstanceLock = app.requestSingleInstanceLock();
 let mainWindow: BrowserWindow | undefined;
 let localStore: LocalStore;
@@ -116,10 +115,12 @@ function bindEvents(): void {
 function registerHandlers(): void {
   safeIpc('app:settings', () => settingsStore.get());
   safeIpc('app:update-settings', async (_event, input) => {
+    const previous = await settingsStore.get();
     const settings = await settingsStore.update(input as Parameters<SettingsStore['update']>[0]);
-    if (settings.connected) {
-      const rooms = await roomService.rooms();
-      void agentRunner.resumePending(rooms.map((room) => room.id));
+    if (settings.connected && settings.allowRemoteAgentRequests && !previous.allowRemoteAgentRequests) {
+      void roomService.rooms()
+        .then((rooms) => agentRunner.resumePending(rooms.map((room) => room.id)))
+        .catch((error: unknown) => sendToRenderer('app:error', error instanceof Error ? error.message : String(error)));
     }
     return settings;
   });

@@ -1,7 +1,7 @@
 <template>
   <div
     class="app-shell"
-    :data-theme="settingsOpen ? settingsDraft.theme : settings.theme"
+    :data-theme="settingsDraft.theme"
     :class="{
       'left-collapsed': !leftOpen,
       'right-collapsed': !rightOpen || settingsOpen || (!selectedNative && !selectedRoom && !selectedProject),
@@ -85,7 +85,6 @@
             >
               <RefreshCw :size="14" />
             </button>
-            <button class="small-icon-button" aria-label="Join a chat" title="Join a chat" @click="joinChat"><UserPlus :size="15" /></button>
             <button class="small-icon-button" aria-label="New chat" title="New chat" @click="newRoom()"><Plus :size="15" /></button></div>
           </div>
           <template v-if="projectsExpanded">
@@ -187,6 +186,9 @@
       </aside>
 
       <main class="main-panel" :class="{ 'main-panel-settings': settingsOpen }">
+        <div v-if="settingsSaveError && !settingsOpen" class="settings-save-warning" role="alert">
+          <span>{{ settingsSaveError }}</span><button class="text-button" :disabled="settingsSaving" @click="saveGeneralSettings">Retry saving</button>
+        </div>
         <template v-if="settingsOpen">
           <div class="settings-page">
             <div class="settings-header">
@@ -201,10 +203,9 @@
                   <label
                     >Your name<input v-model="settingsDraft.displayName" placeholder="Name"
                   /></label>
-                  <template v-if="!settings.connected">
                     <div class="connection-forms">
                       <div class="connection-card">
-                        <strong>Have a chat code?</strong
+                        <strong>Join a chat</strong
                         ><label
                           >Invite code<input
                             v-model="inviteCode"
@@ -219,8 +220,7 @@
                         </button>
                       </div>
                     </div>
-                  </template>
-                  <div v-else class="connected-account">
+                  <div v-if="settings.connected" class="connected-account">
                     <span class="status-dot online"></span
                     ><span
                       >{{ settings.member?.name }}<small>Ready to share chats</small></span
@@ -318,14 +318,18 @@
                 </section>
                 <section class="settings-section">
                   <h3>Harness status</h3>
-                  <div class="harness-status-row">
+                  <div class="harness-status-row codex-account-row">
                     <span class="harness-mark harness-codex">C</span
                     ><span
-                      >Codex<small>{{ codexStatus }}</small></span
-                    ><button class="text-button" @click="checkCodex">
-                      {{ codexStatus && codexStatus !== 'Sign in required' ? 'Check status' : 'Sign in' }}
-                    </button>
+                      >Codex<small>{{ codexStatus }}</small></span>
+                    <div class="harness-account-actions">
+                      <button class="text-button" :disabled="!!codexBusy" @click="checkCodex()"><LoaderCircle v-if="codexBusy === 'checking'" :size="14" class="spin" />Check status</button>
+                      <button v-if="codexAccountState === 'signed-in'" class="text-button" :disabled="!!codexBusy" @click="signOutCodex"><LoaderCircle v-if="codexBusy === 'signing-out'" :size="14" class="spin" />Sign out</button>
+                      <button v-if="codexAccountState === 'signed-out'" class="text-button" :disabled="!!codexBusy || codexLoginPending" @click="signInCodex"><LoaderCircle v-if="codexBusy === 'signing-in' || codexLoginPending" :size="14" class="spin" />Sign in</button>
+                    </div>
                   </div>
+                  <p v-if="codexFeedback" class="harness-account-feedback" role="status" aria-live="polite">{{ codexFeedback }}</p>
+                  <p v-if="codexError" class="error-text" role="alert">{{ codexError }}</p>
                   <div class="harness-status-row">
                     <span class="harness-mark harness-hermes">H</span
                     ><span
@@ -347,9 +351,9 @@
               </div>
             </div>
             <div class="settings-footer">
-              <button class="primary-button" @click="saveGeneralSettings">
-                <Check :size="15" />Save settings</button
-              ><span v-if="settingsSaved">Saved</span>
+              <span v-if="settingsSaveError" class="error-text" role="alert">{{ settingsSaveError }}</span>
+              <span v-else role="status" aria-live="polite"><LoaderCircle v-if="settingsSaving" :size="15" class="spin" />{{ settingsSaving ? 'Saving settings...' : settingsSaved ? 'Settings saved automatically' : 'Changes save automatically' }}</span>
+              <button v-if="settingsSaveError" class="outline-button" :disabled="settingsSaving" @click="saveGeneralSettings">Retry saving</button>
             </div>
           </div>
         </template>
@@ -360,7 +364,8 @@
               <p v-if="selectedProject" class="subheading">{{ projectName(selectedProject) }}</p>
             </div>
             <div class="room-actions">
-              <button v-if="selectedNative" class="icon-button" aria-label="Invite friend" title="Invite friend" :disabled="nativeLoading || nativeSending || inviting || !nativeChatSupported || !selectedNative.path" @click="shareNativeConversation"><LoaderCircle v-if="inviting" :size="18" class="spin" /><UserPlus v-else :size="18" /></button>
+              <button class="primary-button chat-action" aria-label="Invite friend" :title="selectedNative ? 'Invite friend' : 'Send a message before inviting a friend'" :disabled="!selectedNative || nativeLoading || nativeSending || inviting || !nativeChatSupported || !selectedNative.path" @click="shareNativeConversation"><LoaderCircle v-if="inviting" :size="17" class="spin" /><UserPlus v-else :size="17" />Invite friend</button>
+              <button class="outline-button chat-action" aria-label="Join a chat" @click="joinChat"><LogIn :size="17" />Join a chat</button>
             </div>
           </div>
           <div ref="nativeViewport" class="native-content">
@@ -415,7 +420,8 @@
                 ><span class="status-dot queued"></span
                 >{{ queuedAgentNames.join(', ') }} queued</span
               >
-              <button class="icon-button" aria-label="Invite friend" title="Invite friend" :disabled="inviting" @click="createRoomInvite"><LoaderCircle v-if="inviting" :size="18" class="spin" /><UserPlus v-else :size="18" /></button>
+              <button class="primary-button chat-action" aria-label="Invite friend" :disabled="inviting" @click="createRoomInvite"><LoaderCircle v-if="inviting" :size="17" class="spin" /><UserPlus v-else :size="17" />Invite friend</button>
+              <button class="outline-button chat-action" aria-label="Join a chat" @click="joinChat"><LogIn :size="17" />Join a chat</button>
             </div>
           </div>
 
@@ -578,15 +584,36 @@
       </aside>
     </div>
 
-    <div v-if="joinOpen" class="modal-backdrop" @click.self="joinOpen = false">
-      <form class="permission-modal join-modal" aria-label="Join chat" @submit.prevent="submitJoinChat">
-        <h2>Join chat</h2>
-        <label>Invite code<input v-model="joinDraft" aria-label="Invite code" autofocus required /></label>
-        <label v-if="!settings.connected">Name<input v-model="joinName" aria-label="Your name" required /></label>
-        <p v-if="joinError" class="error-text" role="alert">{{ joinError }}</p>
-        <div class="modal-actions"><button type="button" class="outline-button" :disabled="joining" @click="joinOpen = false">Cancel</button><button type="submit" class="primary-button" :disabled="joining || !joinDraft.trim() || (!settings.connected && !joinName.trim())">{{ joining ? 'Joining...' : 'Join chat' }}</button></div>
+    <ChatDialog v-if="inviteOpen" title="Invite friend" return-focus=".room-actions [aria-label='Invite friend']" @close="inviteOpen = false">
+      <div class="invite-content">
+        <p class="dialog-context">{{ inviteChatTitle }}</p>
+        <p>Copy this code and send it to your friend. They can paste it into Join a chat.</p>
+        <p v-if="inviting" class="dialog-context" role="status"><LoaderCircle :size="15" class="spin" />Creating invite code...</p>
+        <label v-if="inviteKey">Chat invite code
+          <div class="invite-code-row">
+            <input :value="inviteKey" aria-label="Chat invite code" readonly spellcheck="false" />
+            <button type="button" class="primary-button" :disabled="inviteCopying" @click="copyInviteCode">
+              <Check v-if="inviteCopied" :size="15" /><Copy v-else :size="15" />{{ inviteCopied ? 'Copied' : 'Copy code' }}
+            </button>
+          </div>
+        </label>
+        <span class="sr-only" role="status" aria-live="polite">{{ inviteCopied ? 'Invite code copied to your clipboard' : '' }}</span>
+        <p v-if="inviteError" class="dialog-error" role="alert">{{ inviteError }}</p>
+        <button v-if="inviteError && !inviteKey" type="button" class="outline-button invite-retry" :disabled="inviting" @click="retryInvite">Try again</button>
+      </div>
+    </ChatDialog>
+
+    <ChatDialog v-if="joinOpen" title="Join chat" return-focus=".room-actions [aria-label='Join a chat']" @close="joinOpen = false">
+      <form class="join-form" aria-label="Join chat" @submit.prevent="submitJoinChat">
+        <label>Invite code<input v-model="joinDraft" aria-label="Invite code" autocomplete="off" autofocus required /></label>
+        <label v-if="!settings.connected">Name<input v-model="joinName" aria-label="Your name" autocomplete="name" required /></label>
+        <p v-if="joinError" class="dialog-error" role="alert">{{ joinError }}</p>
+        <div class="dialog-actions">
+          <button type="button" class="outline-button" @click="joinOpen = false">Cancel</button>
+          <button type="submit" class="primary-button" :disabled="joining || !joinDraft.trim() || (!settings.connected && !joinName.trim())">{{ joining ? 'Joining...' : 'Join chat' }}</button>
+        </div>
       </form>
-    </div>
+    </ChatDialog>
 
     <div v-if="permissionRequest" class="modal-backdrop">
       <section class="permission-modal">
@@ -617,8 +644,10 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   FolderOpen,
   LoaderCircle,
+  LogIn,
   MessageSquare,
   PanelRightClose,
   PanelRightOpen,
@@ -630,6 +659,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-vue-next';
+import ChatDialog from '../components/ChatDialog.vue';
 import { filterLocalConversations } from '../lib/catalog-filters';
 import { projectPathForConversation } from '../lib/project-chats';
 import { displayTranscriptMessages } from '../lib/native-transcript';
@@ -684,6 +714,10 @@ const catalogQuery = ref('');
 const harnessFilter = ref('');
 const agentFilter = ref('');
 const settingsSaved = ref(false);
+const settingsSaving = ref(false);
+const settingsSaveError = ref('');
+let settingsReady = false;
+let settingsSaveTimer: ReturnType<typeof setTimeout> | undefined;
 const rooms = ref<SharedRoom[]>([]);
 const members = ref<SharedMember[]>([]);
 const agents = ref<SharedAgent[]>([]);
@@ -728,6 +762,12 @@ const connectionError = ref('');
 const harnessError = ref('');
 const inviteCode = ref('');
 const inviting = ref(false);
+const inviteOpen = ref(false);
+const inviteKey = ref('');
+const inviteChatTitle = ref('');
+const inviteError = ref('');
+const inviteCopying = ref(false);
+const inviteCopied = ref(false);
 const joinOpen = ref(false);
 const joinDraft = ref('');
 const joinName = ref('');
@@ -760,7 +800,15 @@ const queuedAgentNames = computed(() =>
 );
 const permissionRequest = ref<PermissionRequest | null>(null);
 const notice = ref('');
-const codexStatus = ref('');
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+const codexStatus = ref('Not checked');
+const codexAccountState = ref<'unknown' | 'signed-in' | 'signed-out' | 'not-required'>('unknown');
+const codexBusy = ref<'' | 'checking' | 'signing-in' | 'signing-out'>('');
+const codexFeedback = ref('');
+const codexError = ref('');
+const codexLoginPending = ref(false);
+let codexLoginId = '';
+let codexRefreshPending = false;
 const hermesStatusText = ref('');
 const messageViewport = ref<HTMLElement | null>(null);
 const unsubscribers: (() => void)[] = [];
@@ -858,7 +906,7 @@ const activeAgentDraft = computed(() => agentDrafts.value[selectedAgentDraft.val
 const canJoin = computed(() =>
   Boolean(
     settingsDraft.value.backendUrl.trim() &&
-    settingsDraft.value.displayName.trim() &&
+    (settings.value.connected || settingsDraft.value.displayName.trim()) &&
     inviteCode.value.trim(),
   ),
 );
@@ -888,12 +936,13 @@ const themeOptions = [
   { value: 'classic', label: 'Classic' },
 ] as const;
 
-watch(
-  () => settings.value.theme,
-  (theme) => {
-    settingsDraft.value.theme = theme;
-  },
-);
+watch([() => settingsDraft.value.theme, () => settingsDraft.value.displayName, allowAgentRuns], () => {
+  if (!settingsReady || !generalSettingsChanged()) return;
+  settingsSaved.value = false;
+  if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = setTimeout(() => void saveGeneralSettings(), 250);
+});
+watch(settingsOpen, (open) => { if (open) void checkCodex(false, false); });
 watch([catalogQuery, harnessFilter, agentFilter, selectedProject], () => {
   visibleProjectCount.value = 80;
   visibleConversationCount.value = 80;
@@ -912,6 +961,7 @@ onMounted(async () => {
       theme: settings.value.theme,
     };
     allowAgentRuns.value = settings.value.allowRemoteAgentRequests;
+    settingsReady = true;
     agentDrafts.value = settings.value.agents.length
       ? settings.value.agents.map((agent) => ({ ...agent }))
       : [blankAgent(settings.value.displayName)];
@@ -932,13 +982,18 @@ onMounted(async () => {
   unsubscribers.push(api.onAppError(showError));
   unsubscribers.push(api.onAgentActivity(handleAgentActivity));
   unsubscribers.push(api.onCodexRequest(handleCodexRequest));
+  unsubscribers.push(api.onCodexEvent(handleCodexAccountEvent));
   unsubscribers.push(api.onHermesRequest(handleHermesRequest));
   unsubscribers.push(api.onNativeChatEvent(handleNativeChatEvent));
+  window.addEventListener('focus', refreshCodexOnFocus);
 });
 
 onUnmounted(() => {
   for (const unsubscribe of unsubscribers) unsubscribe();
   if (catalogTimer) window.clearInterval(catalogTimer);
+  if (noticeTimer) clearTimeout(noticeTimer);
+  if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+  window.removeEventListener('focus', refreshCodexOnFocus);
 });
 let catalogTimer: number | null = null;
 
@@ -1123,7 +1178,7 @@ async function shareNativeConversation(): Promise<void> {
     nativeError.value = 'This chat needs a Codex or Hermes session with a working folder before inviting.';
     return;
   }
-  inviting.value = true;
+  beginInvite(conversation.title || 'Chat');
   nativeError.value = '';
   try {
     if (!settings.value.connected) {
@@ -1138,8 +1193,8 @@ async function shareNativeConversation(): Promise<void> {
     });
     rooms.value = [...rooms.value.filter((room) => room.id !== result.room.id), result.room];
     await selectRoom(result.room);
-    await copyInviteCode(result.invite?.code);
-  } catch (error) { showError(error); }
+    setInviteCode(result.invite?.code);
+  } catch (error) { inviteError.value = messageOf(error); }
   finally { inviting.value = false; }
 }
 
@@ -1377,37 +1432,81 @@ async function submitJoinChat(): Promise<void> {
   finally { joining.value = false; }
 }
 
-async function createRoomInvite(): Promise<void> {
-  if (!selectedRoom.value) return;
+function beginInvite(title: string): void {
+  inviteChatTitle.value = title;
+  inviteKey.value = '';
+  inviteError.value = '';
+  inviteCopied.value = false;
+  inviteOpen.value = true;
   inviting.value = true;
+}
+
+function setInviteCode(code: string | undefined): void {
+  if (!code?.trim()) throw new Error('Could not create an invite code. Try again.');
+  inviteKey.value = code;
+}
+
+async function createRoomInvite(): Promise<void> {
+  const room = selectedRoom.value;
+  if (!room || inviting.value) return;
+  beginInvite(room.name || 'Chat');
   try {
-    const invite = (await api.createInvites(selectedRoom.value.id))[0];
-    await copyInviteCode(invite?.code);
-  } catch (error) { showError(error); }
+    const invite = (await api.createInvites(room.id))[0];
+    setInviteCode(invite?.code);
+  } catch (error) { inviteError.value = messageOf(error); }
   finally { inviting.value = false; }
 }
 
-async function copyInviteCode(code: string | undefined): Promise<void> {
-  if (!code?.trim()) throw new Error('Could not create an invite code. Try again.');
-  const result = await api.copyText(code);
-  if (!result.ok) throw new Error('Could not copy the invite code. Try again.');
-  showNotice('Invite code copied');
+async function retryInvite(): Promise<void> {
+  if (selectedNative.value) await shareNativeConversation();
+  else await createRoomInvite();
+}
+
+async function copyInviteCode(): Promise<void> {
+  if (!inviteKey.value || inviteCopying.value) return;
+  const code = inviteKey.value;
+  inviteCopying.value = true;
+  inviteError.value = '';
+  try {
+    const result = await api.copyText(code);
+    if (!result.ok) throw new Error('Could not copy the invite code. Try again.');
+    if (inviteKey.value === code) inviteCopied.value = true;
+  } catch (error) {
+    if (inviteKey.value === code) inviteError.value = messageOf(error);
+  } finally { inviteCopying.value = false; }
+}
+
+function generalSettingsInput() {
+  return {
+    displayName: settingsDraft.value.displayName.trim().replace(/\s+/g, ' '),
+    theme: settingsDraft.value.theme,
+    allowRemoteAgentRequests: allowAgentRuns.value,
+  };
+}
+
+function generalSettingsChanged(): boolean {
+  const input = generalSettingsInput();
+  return input.displayName !== settings.value.displayName || input.theme !== settings.value.theme ||
+    input.allowRemoteAgentRequests !== settings.value.allowRemoteAgentRequests;
 }
 
 async function saveGeneralSettings(): Promise<void> {
+  if (!settingsReady || settingsSaving.value) return;
+  if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+  settingsSaving.value = true;
+  settingsSaveError.value = '';
+  settingsSaved.value = false;
   try {
-    settings.value = await api.updateSettings({
-      backendUrl: settingsDraft.value.backendUrl,
-      displayName: settingsDraft.value.displayName,
-      theme: settingsDraft.value.theme,
-      allowRemoteAgentRequests: allowAgentRuns.value,
-    });
+    // Serialize writes and keep changes made while a previous save is in flight.
+    while (generalSettingsChanged()) {
+      const input = generalSettingsInput();
+      settings.value = await api.updateSettings(input);
+    }
     settingsSaved.value = true;
-    setTimeout(() => {
-      settingsSaved.value = false;
-    }, 1600);
   } catch (error) {
-    connectionError.value = messageOf(error);
+    settingsSaveError.value = messageOf(error);
+  } finally {
+    settingsSaving.value = false;
   }
 }
 
@@ -1451,19 +1550,119 @@ async function chooseWorkingFolder(): Promise<void> {
   if (folder) activeAgentDraft.value.workingDirectory = folder;
 }
 
-async function checkCodex(): Promise<void> {
-  harnessError.value = '';
-  try {
-    const account = object(await api.codexAccount(true));
-    const user = object(account?.account);
-    codexStatus.value = account?.requiresAuthentication
-      ? 'Sign in required'
-      : string(user?.email) || 'Signed in';
-    if (account?.requiresAuthentication) await api.codexLogin();
-  } catch (error) {
-    harnessError.value = messageOf(error);
-    codexStatus.value = 'Unavailable';
+async function readCodexAccount(refresh: boolean): Promise<void> {
+  const response = object(await api.codexAccount(refresh));
+  if (!response) throw new Error('Could not read the Codex account. Try checking status again.');
+  const account = object(response.account);
+  if (account) {
+    codexAccountState.value = 'signed-in';
+    codexStatus.value = account.type === 'apiKey' ? 'Signed in with an API key'
+      : string(account.email) ? `Signed in as ${string(account.email)}` : 'Signed in';
+    codexLoginPending.value = false;
+  } else if (response.requiresOpenaiAuth === false) {
+    codexAccountState.value = 'not-required';
+    codexStatus.value = 'Authentication not required';
+  } else {
+    codexAccountState.value = 'signed-out';
+    codexStatus.value = 'Not signed in';
   }
+}
+
+function finishCodexAction(): void {
+  codexBusy.value = '';
+  if (codexRefreshPending) {
+    codexRefreshPending = false;
+    void checkCodex(false, false);
+  }
+}
+
+async function checkCodex(refresh = true, feedback = true): Promise<void> {
+  if (codexBusy.value) {
+    if (!feedback) codexRefreshPending = true;
+    return;
+  }
+  codexBusy.value = 'checking';
+  codexError.value = '';
+  if (feedback) codexFeedback.value = 'Checking Codex status...';
+  try {
+    await readCodexAccount(refresh);
+    if (feedback) codexFeedback.value = codexAccountState.value === 'signed-in'
+      ? 'Codex status checked. You are signed in.'
+      : codexAccountState.value === 'not-required' ? 'Codex status checked. Authentication is not required.'
+      : codexLoginPending.value ? 'Complete Codex sign-in in your browser.'
+      : 'Codex status checked. You are not signed in.';
+  } catch (error) {
+    codexError.value = messageOf(error);
+    codexStatus.value = 'Status unavailable';
+    codexAccountState.value = 'unknown';
+    codexFeedback.value = '';
+  } finally {
+    finishCodexAction();
+  }
+}
+
+async function signInCodex(): Promise<void> {
+  if (codexBusy.value || codexLoginPending.value) return;
+  codexBusy.value = 'signing-in';
+  codexError.value = '';
+  codexFeedback.value = 'Opening Codex sign-in...';
+  try {
+    const result = object(await api.codexLogin());
+    codexLoginId = string(result?.loginId);
+    codexLoginPending.value = Boolean(codexLoginId);
+    codexFeedback.value = 'Complete Codex sign-in in your browser.';
+    await readCodexAccount(false);
+    if (codexAccountState.value === 'signed-in') codexFeedback.value = 'Signed in to Codex.';
+  } catch (error) {
+    codexError.value = messageOf(error);
+    codexLoginPending.value = false;
+    codexFeedback.value = '';
+  } finally {
+    finishCodexAction();
+  }
+}
+
+async function signOutCodex(): Promise<void> {
+  if (codexBusy.value) return;
+  codexBusy.value = 'signing-out';
+  codexError.value = '';
+  codexFeedback.value = 'Signing out of Codex...';
+  try {
+    await api.codexLogout();
+    codexLoginPending.value = false;
+    codexLoginId = '';
+    codexAccountState.value = 'signed-out';
+    codexStatus.value = 'Not signed in';
+    codexFeedback.value = 'Signed out of Codex.';
+  } catch (error) {
+    codexError.value = messageOf(error);
+    codexFeedback.value = '';
+  } finally {
+    finishCodexAction();
+  }
+}
+
+function handleCodexAccountEvent(value: unknown): void {
+  const event = object(value);
+  const params = object(event?.params);
+  if (event?.method === 'account/login/completed') {
+    if (codexLoginId && params?.loginId && params.loginId !== codexLoginId) return;
+    codexLoginPending.value = false;
+    codexLoginId = '';
+    if (params?.success) {
+      codexFeedback.value = 'Signed in to Codex.';
+      void checkCodex(false, false);
+    } else {
+      codexError.value = string(params?.error) || 'Codex sign-in did not complete. Try again.';
+      codexFeedback.value = '';
+    }
+  } else if (event?.method === 'account/updated') {
+    void checkCodex(false, false);
+  }
+}
+
+function refreshCodexOnFocus(): void {
+  if (settingsOpen.value || codexLoginPending.value) void checkCodex(false, false);
 }
 
 async function checkHermes(): Promise<void> {
@@ -1581,9 +1780,10 @@ function showError(error: unknown): void {
   showNotice(currentError.value);
 }
 function showNotice(value: string): void {
+  if (noticeTimer) clearTimeout(noticeTimer);
   notice.value = value;
-  setTimeout(() => {
-    if (notice.value === value) notice.value = '';
+  noticeTimer = setTimeout(() => {
+    notice.value = '';
   }, 4200);
 }
 </script>
@@ -1876,6 +2076,7 @@ button:disabled {
 }
 .room-heading,
 .view-header {
+  order: -2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1909,10 +2110,17 @@ button:disabled {
   white-space: nowrap;
 }
 .room-actions {
+  flex-shrink: 0;
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 10px;
 }
+.room-heading > div:first-child,
+.view-header > div:first-child { min-width: 0; flex: 1; }
+.room-heading h1,
+.view-header h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-action { min-height: 36px; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
 .native-status {
   margin: 8px 28px;
   flex: none;
@@ -3370,7 +3578,29 @@ button:disabled {
 .composer-controls select:first-child { flex: 1; width: 0; max-width: 240px; }
 .composer-controls > span { white-space: nowrap; }
 .send-button { flex-shrink: 0; }
-.join-modal label { display: grid; gap: 6px; margin-top: 16px; }
-.join-modal input { min-width: 0; width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); }
+/* Shared dialog contents use the same spacing and type in every theme. */
+.invite-content, .join-form { display: grid; gap: 16px; font-size: 14px; line-height: 1.5; }
+.invite-content p, .join-form p { margin: 0; }
+.dialog-context { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.invite-content label, .join-form label { display: grid; gap: 8px; font-size: 13px; font-weight: 400; }
+.invite-content input, .join-form input {
+  box-sizing: border-box; min-width: 0; width: 100%; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text);
+  font: 400 14px/20px Arial, sans-serif;
+}
+.invite-code-row { display: flex; align-items: stretch; gap: 8px; }
+.invite-code-row input { flex: 1; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.invite-content .primary-button, .invite-content .outline-button, .join-form .primary-button, .join-form .outline-button { flex: none; font: 400 13px/1.5 Arial, sans-serif; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog-error { color: var(--red); font-size: 13px; overflow-wrap: anywhere; }
+.invite-retry { justify-self: start; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (hover: none) { .project-new-chat { opacity: 1; } }
+.harness-account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.harness-account-actions button, .settings-footer > span { display: inline-flex; align-items: center; gap: 6px; }
+.codex-account-row { flex-wrap: wrap; padding: 8px 0; }
+.harness-account-feedback { font-size: 12px; line-height: 1.5; margin: 8px 0 12px; color: var(--text); }
+.settings-footer > span { font-size: 12px; }
+.settings-footer > .error-text { color: var(--red); }
+.settings-save-warning { order: -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; padding: 12px 24px; border-bottom: 1px solid var(--line); color: var(--red); font-size: 13px; }
 </style>

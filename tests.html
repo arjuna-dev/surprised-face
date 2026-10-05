@@ -39,10 +39,14 @@
     <main class="page">
       <h1>Tests</h1>
       <!-- TEST_REPORT_START -->
-      <p class="run-meta">2026-10-05T12:13:53.693Z UTC · 22 passed · 0 failed</p>
+      <p class="run-meta">2026-10-05T15:27:39.880Z UTC · 26 passed · 0 failed</p>
       <table class="route-table">
         <thead><tr><th scope="col">Check</th><th scope="col">Input</th><th scope="col">Result</th><th scope="col">Status</th></tr></thead>
-        <tbody><tr><th scope="row">Human message identity</th><td>event 1: member-1, Maya, &quot;Hello&quot;</td><td>SQLite keeps the participant ID and name. Replaying the event adds no duplicate.</td><td>Pass</td></tr>
+        <tbody><tr><th scope="row">Bundled Sheep native import</th><td>Synthetic Pi user/assistant turns; disposable Codex destination; stubbed Codex CLI launch.</td><td>The actual bundled helper creates a separate Codex session, leaves the source byte-for-byte unchanged, discovers both chats, returns both readable turns and paged native records. The JSON bridge rejects an import operation because that operation is not implemented.</td><td>Pass</td></tr>
+<tr><th scope="row">Credential identity</th><td>Development startup reads credentials saved by the packaged app.</td><td>The app sets its surprised-face identity before its profile path and credential storage are used.</td><td>Pass</td></tr>
+<tr><th scope="row">App profile</th><td>Development and packaged startup under the same operating system app-data folder.</td><td>Both select surprised-face. The preview does not inherit a stale local Worker connection from the generic Electron profile.</td><td>Pass</td></tr>
+<tr><th scope="row">Isolated development profile</th><td>SURPRISED_FACE_DEV_DATA points to /tmp/chat-check.</td><td>Only a development run selects the isolated folder; the installed app keeps its dedicated profile.</td><td>Pass</td></tr>
+<tr><th scope="row">Human message identity</th><td>event 1: member-1, Maya, &quot;Hello&quot;</td><td>SQLite keeps the participant ID and name. Replaying the event adds no duplicate.</td><td>Pass</td></tr>
 <tr><th scope="row">Room event order</th><td>WebSocket event 2 arrives before event 1.</td><td>Local events apply in sequence 1, 2; the cursor ends at 2.</td><td>Pass</td></tr>
 <tr><th scope="row">Queued sends</th><td>Two pending messages; two flush requests start together.</td><td>The mocked API receives each message once, in saved order, with one active send. An acknowledgement notification refreshes the UI after the pending copies are removed.</td><td>Pass</td></tr>
 <tr><th scope="row">Room service default</th><td>A new settings file has no saved room service URL.</td><td>Disconnected installs use the managed hosted URL; an explicit local development override can use a local Worker.</td><td>Pass</td></tr>
@@ -66,165 +70,222 @@
 <tr><th scope="row">Window navigation</th><td>Hash route, local file, and external web URL navigation attempts.</td><td>Only the loaded app document and its hash routes are allowed.</td><td>Pass</td></tr></tbody>
       </table>
       <details><summary>Runner output</summary><pre>TAP version 13
-# Subtest: local chat search combines project, harness, agent, and text filters
-ok 1 - local chat search combines project, harness, agent, and text filters
+# Subtest: development and installed apps use the same dedicated profile instead of Electron settings
+ok 1 - development and installed apps use the same dedicated profile instead of Electron settings
   ---
-  duration_ms: 0.62025
+  duration_ms: 0.337041
+  type: &#39;test&#39;
+  ...
+# Subtest: isolated development profiles are explicit and never affect the installed app
+ok 2 - isolated development profiles are explicit and never affect the installed app
+  ---
+  duration_ms: 0.065708
+  type: &#39;test&#39;
+  ...
+# Subtest: app identity is set before opening the shared profile and its encrypted credentials
+ok 3 - app identity is set before opening the shared profile and its encrypted credentials
+  ---
+  duration_ms: 0.339541
+  type: &#39;test&#39;
+  ...
+# Subtest: local chat search combines project, harness, agent, and text filters
+ok 4 - local chat search combines project, harness, agent, and text filters
+  ---
+  duration_ms: 0.625125
   type: &#39;test&#39;
   ...
 # Subtest: project filtering tolerates local chats without a working folder
-ok 2 - project filtering tolerates local chats without a working folder
+ok 5 - project filtering tolerates local chats without a working folder
   ---
-  duration_ms: 0.078917
+  duration_ms: 0.077083
   type: &#39;test&#39;
   ...
 # Subtest: project list skips stale and internal discovered folders
-ok 3 - project list skips stale and internal discovered folders
+ok 6 - project list skips stale and internal discovered folders
   ---
-  duration_ms: 3.460292
+  duration_ms: 1.446291
   type: &#39;test&#39;
   ...
 # Subtest: projects sort by the latest chat activity rather than alphabetically
-ok 4 - projects sort by the latest chat activity rather than alphabetically
+ok 7 - projects sort by the latest chat activity rather than alphabetically
   ---
-  duration_ms: 0.249667
+  duration_ms: 0.193125
   type: &#39;test&#39;
   ...
 # Subtest: a nested project owns its chats and activity instead of its parent
-ok 5 - a nested project owns its chats and activity instead of its parent
+ok 8 - a nested project owns its chats and activity instead of its parent
   ---
-  duration_ms: 0.085708
+  duration_ms: 0.080584
   type: &#39;test&#39;
   ...
 # Subtest: new app chats remain in the local catalog after restarting
-ok 6 - new app chats remain in the local catalog after restarting
+ok 9 - new app chats remain in the local catalog after restarting
   ---
-  duration_ms: 13.192334
+  duration_ms: 9.054959
   type: &#39;test&#39;
   ...
 # Subtest: stores the human participant name with the committed message
-ok 7 - stores the human participant name with the committed message
+ok 10 - stores the human participant name with the committed message
   ---
-  duration_ms: 4.194
+  duration_ms: 4.153333
   type: &#39;test&#39;
   ...
 # Subtest: imported agent history keeps its author and original time in the local copy
-ok 8 - imported agent history keeps its author and original time in the local copy
+ok 11 - imported agent history keeps its author and original time in the local copy
   ---
-  duration_ms: 4.337416
+  duration_ms: 3.527417
   type: &#39;test&#39;
   ...
 # Subtest: a new project chat creates a native session and sends its first message without resuming it
-ok 9 - a new project chat creates a native session and sends its first message without resuming it
+ok 12 - a new project chat creates a native session and sends its first message without resuming it
   ---
-  duration_ms: 0.911709
+  duration_ms: 1.642292
   type: &#39;test&#39;
   ...
 # Subtest: a new Hermes project chat keeps the selected folder and rejects a missing project
-ok 10 - a new Hermes project chat keeps the selected folder and rejects a missing project
+ok 13 - a new Hermes project chat keeps the selected folder and rejects a missing project
   ---
-  duration_ms: 0.977958
+  duration_ms: 0.336542
   type: &#39;test&#39;
   ...
 # Subtest: an opened Codex chat resumes its native session and streams a reply
-ok 11 - an opened Codex chat resumes its native session and streams a reply
+ok 14 - an opened Codex chat resumes its native session and streams a reply
   ---
-  duration_ms: 0.2505
+  duration_ms: 0.237958
   type: &#39;test&#39;
   ...
 # Subtest: a Hermes local chat streams its own reply and releases the session
-ok 12 - a Hermes local chat streams its own reply and releases the session
+ok 15 - a Hermes local chat streams its own reply and releases the session
   ---
-  duration_ms: 0.168959
+  duration_ms: 0.161459
   type: &#39;test&#39;
   ...
 # Subtest: reopening a new Codex chat hides injected project instructions while keeping the actual conversation
-ok 13 - reopening a new Codex chat hides injected project instructions while keeping the actual conversation
+ok 16 - reopening a new Codex chat hides injected project instructions while keeping the actual conversation
   ---
-  duration_ms: 0.607333
+  duration_ms: 0.60775
   type: &#39;test&#39;
   ...
 # Subtest: a chat transcript shows conversation turns while leaving harness records out of the chat
-ok 14 - a chat transcript shows conversation turns while leaving harness records out of the chat
+ok 17 - a chat transcript shows conversation turns while leaving harness records out of the chat
   ---
-  duration_ms: 0.092375
+  duration_ms: 0.081458
   type: &#39;test&#39;
   ...
 # Subtest: desktop navigation stays on the app document or its hash routes
-ok 15 - desktop navigation stays on the app document or its hash routes
+ok 18 - desktop navigation stays on the app document or its hash routes
   ---
-  duration_ms: 0.629375
+  duration_ms: 0.321375
   type: &#39;test&#39;
   ...
 # Subtest: a chat belongs to the deepest matching project
-ok 16 - a chat belongs to the deepest matching project
+ok 19 - a chat belongs to the deepest matching project
   ---
-  duration_ms: 0.374291
+  duration_ms: 0.395792
   type: &#39;test&#39;
   ...
 # Subtest: applies out-of-order room events only after the missing sequence arrives
-ok 17 - applies out-of-order room events only after the missing sequence arrives
+ok 20 - applies out-of-order room events only after the missing sequence arrives
   ---
-  duration_ms: 2.468417
+  duration_ms: 0.676958
   type: &#39;test&#39;
   ...
 # Subtest: flushes pending sends once and in the outbox order
-ok 18 - flushes pending sends once and in the outbox order
+ok 21 - flushes pending sends once and in the outbox order
   ---
-  duration_ms: 12.240542
+  duration_ms: 11.510333
   type: &#39;test&#39;
   ...
 # Subtest: new installs use the deployed room service URL
-ok 19 - new installs use the deployed room service URL
+ok 22 - new installs use the deployed room service URL
   ---
-  duration_ms: 0.397708
+  duration_ms: 0.320458
   type: &#39;test&#39;
   ...
 # Subtest: appearance offers two reference themes and keeps the previous layout as Classic
-ok 20 - appearance offers two reference themes and keeps the previous layout as Classic
+ok 23 - appearance offers two reference themes and keeps the previous layout as Classic
   ---
-  duration_ms: 0.339833
+  duration_ms: 0.316542
+  type: &#39;test&#39;
+  ...
+# sheep bridge request &quot;conversations.import&quot;: unknown operation &quot;conversations.import&quot;
+# Subtest: bundled Sheep imports a synthetic Pi chat into a separate Codex session
+ok 24 - bundled Sheep imports a synthetic Pi chat into a separate Codex session
+  ---
+  duration_ms: 5055.325417
   type: &#39;test&#39;
   ...
 # Subtest: development finds the bundled helper beside the project, not inside Quasar output
-ok 21 - development finds the bundled helper beside the project, not inside Quasar output
+ok 25 - development finds the bundled helper beside the project, not inside Quasar output
   ---
-  duration_ms: 2.693666
+  duration_ms: 1.4095
   type: &#39;test&#39;
   ...
 # Subtest: packaged builds use their bundled resources directory
-ok 22 - packaged builds use their bundled resources directory
+ok 26 - packaged builds use their bundled resources directory
   ---
-  duration_ms: 0.082542
+  duration_ms: 0.076958
   type: &#39;test&#39;
   ...
-1..22
-# tests 22
+1..26
+# tests 26
 # suites 0
-# pass 22
+# pass 26
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 98.295959</pre></details><!-- TEST_REPORT_END -->
-<!-- UI_TEST_REPORT_START --><h2>Chat interface</h2><p class="run-meta">2026-10-05T12:12:34.560Z · npm run test:ui · 10 passed · 0 failed</p>
-<p>The actual Vue interface runs in Chromium with mocked Electron IPC. Project names, messages, agent replies, and invite codes are synthetic. window.prompt throws as it does in Electron. Assertions cover the rendered controls and API calls; hardware clipboard and live model calls are checked separately.</p>
+# duration_ms 5137.85375</pre></details><h2>Sheep source and bundle</h2><p>2026-10-05T17:26:25.225864+02:00 · <code>go test -json ./...</code> in the Sheep checkout · 179 passed · 0 failed · 2 skipped.</p><p>The existing darwin/arm64 bundle reports revision <code>6e44c568f0c04071859c5357b0565c83ddf4ed25</code> and vcs.modified=false in Go build metadata. It already contains the native import commit. This is an audit of committed behavior, not a new app export feature; no product behavior changed in this review. The bundled-helper regression above executes the converter with synthetic text and disposable target roots, then checks bridge discovery and reads. Harness launch is stubbed; other native import targets and a real harness resume were not exercised.</p><p><a href="output/sheep-source-results.jsonl">Go test events</a> · <a href="output/sheep-review.json">Bundle and test metadata</a></p><!-- TEST_REPORT_END -->
+<!-- UI_TEST_REPORT_START --><h2>Chat interface</h2><p class="run-meta">2026-10-05T15:43:19.280Z · npm run test:ui · 27 passed · 0 failed</p>
+<p>The actual Vue interface runs in Chromium with mocked Electron IPC. Project names, messages, agent replies, account identity, and invite codes are synthetic. window.prompt throws as it does in Electron. Assertions cover the rendered controls and API calls; hardware clipboard and live model calls are checked separately.</p>
 <table class="route-table"><thead><tr><th scope="col">Workflow</th><th scope="col">Result</th></tr></thead><tbody><tr><th scope="row">an empty chat view has no phantom invite and selecting a project enables its composer</th><td>Pass</td></tr>
 <tr><th scope="row">project plus and composer selectors create a Hermes chat and send its first message</th><td>Pass</td></tr>
 <tr><th scope="row">New chat survives Electron prompt restrictions and a failed first send keeps the draft for retry</th><td>Pass</td></tr>
-<tr><th scope="row">the local chat invite icon copies a real code with a short confirmation</th><td>Pass</td></tr>
-<tr><th scope="row">an existing chat uses the same invite icon and joining uses a working form</th><td>Pass</td></tr>
+<tr><th scope="row">inviting from a local chat shows its code in a modal and copies only on request</th><td>Pass</td></tr>
+<tr><th scope="row">an existing chat has invite and join dialogs with a working join form</th><td>Pass</td></tr>
+<tr><th scope="row">invite and join dialogs use consistent type and padding in mint-charcoal</th><td>Pass</td></tr>
+<tr><th scope="row">invite and join dialogs use consistent type and padding in cobalt-red</th><td>Pass</td></tr>
+<tr><th scope="row">invite and join dialogs use consistent type and padding in classic</th><td>Pass</td></tr>
+<tr><th scope="row">invite generation shows loading and lets a failed request retry inside the modal</th><td>Pass</td></tr>
+<tr><th scope="row">join dialog contains keyboard focus, closes on its backdrop, and accepts a new account name</th><td>Pass</td></tr>
 <tr><th scope="row">changing the composer project keeps the draft and New chat resets it</th><td>Pass</td></tr>
 <tr><th scope="row">a delivered chat message clears its sending copy without waiting for another message</th><td>Pass</td></tr>
 <tr><th scope="row">an invite emptyInvite shows an error instead of a false copy confirmation</th><td>Pass</td></tr>
 <tr><th scope="row">an invite failCopy shows an error instead of a false copy confirmation</th><td>Pass</td></tr>
-<tr><th scope="row">composer and project controls fit a smaller desktop window</th><td>Pass</td></tr></tbody></table>
+<tr><th scope="row">composer and project controls fit a smaller desktop window</th><td>Pass</td></tr>
+<tr><th scope="row">Settings accepts a chat invite for a connected account</th><td>Pass</td></tr>
+<tr><th scope="row">Settings accepts a chat invite for a new account</th><td>Pass</td></tr>
+<tr><th scope="row">the new chat header has distinct labeled invite and join actions</th><td>Pass</td></tr>
+<tr><th scope="row">the native chat header has distinct labeled invite and join actions</th><td>Pass</td></tr>
+<tr><th scope="row">the room chat header has distinct labeled invite and join actions</th><td>Pass</td></tr>
+<tr><th scope="row">appearance and general settings save automatically and stay selected after leaving Settings</th><td>Pass</td></tr>
+<tr><th scope="row">rapid appearance changes save in order without reverting the latest selection</th><td>Pass</td></tr>
+<tr><th scope="row">an automatic save failure is visible and Retry saves the chosen theme</th><td>Pass</td></tr>
+<tr><th scope="row">Settings reads the Codex account, checks status with feedback, and signs out</th><td>Pass</td></tr>
+<tr><th scope="row">checking a signed-out Codex account does not start login and login completion refreshes it</th><td>Pass</td></tr>
+<tr><th scope="row">Codex account changes refresh the status and failed sign-out keeps the account</th><td>Pass</td></tr>
+<tr><th scope="row">Codex check failures show an error and leave Check status available</th><td>Pass</td></tr></tbody></table>
 <details><summary>Before the fixes</summary><p>The first UI run reproduced the phantom empty invite field and the New chat recovery screen from Electron's unsupported prompt. Five of six checks failed; the viewport-only check passed. Native session creation and catalog persistence also failed before implementation.</p><a href="output/playwright/red-results.json">Original UI results</a><figure><img src="output/playwright/red-empty-invite.png" alt="Empty invite panel before the fix" style="width:100%;height:auto"></figure><figure><img src="output/playwright/red-new-chat.png" alt="New chat crash before the fix" style="width:100%;height:auto"></figure></details>
+<details><summary>Chat actions before this change</summary><p>Four UI assertions failed before the labeled header buttons and detailed confirmation were implemented. The Join action was beside Projects, and both actions used a person-plus icon. A placement check then caught a larger notification covering the header buttons. The intermediate implementation placed a large confirmation below the header. That banner has now been replaced by the invite dialog.</p><a href="output/playwright/red-chat-actions-results.json">Failing action checks</a> · <a href="output/playwright/red-confirmation-overlay-results.json">Failing placement check</a><figure><img src="output/playwright/red-chat-actions.png" alt="Icon-only invitation and sidebar join action before the change" style="width:100%;height:auto"></figure></details>
+<details><summary>Settings before automatic saving and account controls</summary><p>Seven new interface checks failed before this change. Appearance required Save settings, account status was not loaded on opening Settings, and no sign-out action or status-check feedback was shown. The current tests exercise debounced serial saving, leaving Settings immediately, retaining preferences after a reload, error and retry feedback, existing and absent Codex accounts, login completion, account changes, and successful and failed sign-out. The synthetic Codex response follows the installed app-server protocol: account identity determines sign-in state; requiresOpenaiAuth describes whether authentication is required.</p><a href="output/playwright/red-settings-account-results.json">Failing settings and account checks</a><figure><img src="output/playwright/red-settings-account.png" alt="Manual Save settings and unchecked Codex status before the fix" style="width:100%;height:auto"></figure></details>
+<details><summary>Sharing dialogs before this change</summary><p>The targeted red run failed in all three themes: Join chat inherited a 60px heading instead of the expected size of at most 20px. The initial invite checks also found no dialog and automatic clipboard copying. The current checks assert code presentation before copying, explicit Copy calls, errors without false confirmation, loading and retry, dismiss and reopen, focus restoration after importing a native chat, keyboard focus containment, a new account joining, 24px padding, and regular headings in every theme.</p><a href="output/playwright/red-sharing-dialog-results.json">Failing dialog typography checks</a> · <a href="output/playwright/red-dialog-focus-results.json">Failing keyboard focus check</a><figure><img src="output/playwright/red-invite-banner.png" alt="Large invite confirmation before the modal" style="width:100%;height:auto"><figcaption>Previous rendered invite banner, with synthetic chat data.</figcaption></figure><figure><img src="output/playwright/red-join-modal.png" alt="Oversized join heading and missing form padding before the fix" style="width:100%;height:auto"><figcaption>Previous rendered join form, with synthetic chat data.</figcaption></figure></details>
+<figure><img src="output/playwright/chat-header-actions.png" alt="Invite friend and Join a chat in the chat header" style="width:100%;height:auto"><figcaption>Invite friend and Join a chat in the chat header. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
 <figure><img src="output/playwright/project-composer.png" alt="Project selected, composer ready" style="width:100%;height:auto"><figcaption>Project selected, composer ready. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
 <figure><img src="output/playwright/new-chat-reply.png" alt="New Hermes chat with fixture reply" style="width:100%;height:auto"><figcaption>New Hermes chat with fixture reply. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
-<figure><img src="output/playwright/invite-copied.png" alt="Invite icon and copy confirmation" style="width:100%;height:auto"><figcaption>Invite icon and copy confirmation. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
-<figure><img src="output/playwright/small-project-composer.png" alt="Composer at 1000 x 680" style="width:100%;height:auto"><figcaption>Composer at 1000 x 680. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure><details><summary>Current structured results</summary><a href="output/playwright/results.json">Playwright results</a></details><!-- UI_TEST_REPORT_END -->
-      <h2>Desktop chat view</h2>
+<figure><img src="output/playwright/invite-copied.png" alt="Invite modal with code and explicit Copy button" style="width:100%;height:auto"><figcaption>Invite modal with code and explicit Copy button. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/join-modal-mint-charcoal.png" alt="Join dialog in Mint + charcoal" style="width:100%;height:auto"><figcaption>Join dialog in Mint + charcoal. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/join-modal-cobalt-red.png" alt="Join dialog in Cobalt + red" style="width:100%;height:auto"><figcaption>Join dialog in Cobalt + red. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/join-modal-classic.png" alt="Join dialog in Classic" style="width:100%;height:auto"><figcaption>Join dialog in Classic. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/small-project-composer.png" alt="Composer at 1000 x 680" style="width:100%;height:auto"><figcaption>Composer at 1000 x 680. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/settings-join-connected.png" alt="Join a chat from Settings while connected" style="width:100%;height:auto"><figcaption>Join a chat from Settings while connected. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/settings-join-new.png" alt="Join a chat from Settings on a new account" style="width:100%;height:auto"><figcaption>Join a chat from Settings on a new account. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/settings-codex-account.png" alt="Codex account status, Check status feedback, and Sign out" style="width:100%;height:auto"><figcaption>Codex account status, Check status feedback, and Sign out. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure><details><summary>Current structured results</summary><a href="output/playwright/results.json">Playwright results</a></details><!-- UI_TEST_REPORT_END -->
+      <h2>Desktop chat view</h2><p>2026-10-05: opened Join a chat in the running Electron app. The form showed its padded layout and regular heading, with Invite code focused. Escape closed the dialog and returned focus to Join a chat. Invite generation, copying, failure/retry, and modal keyboard behavior were exercised with synthetic service and clipboard responses in the automated interface run above.</p>
+<p>2026-10-05: opening Settings in the live Electron app detected the existing Codex account and displayed Sign out. Check status displayed Codex status checked. You are signed in. Selecting Mint automatically wrote mint-charcoal to the local settings file, and the chat retained that theme after Back to chat. The original Cobalt appearance was then restored. The live account was not signed out; logout success and failure were exercised with synthetic account responses in the interface tests above. Account identity is omitted from this report.</p>
+      <p>2026-10-05: connected accounts previously hid the Settings invite field. The regression UI check failed because the field was absent; the new-account case already passed. Settings now keeps Join a chat visible for both. Checked the connected live Electron Settings view and observed Invite code and Join chat.</p>
+      <details><summary>Missing Settings join field before the fix</summary><a href="output/playwright/red-settings-join-results.json">Failing UI result</a><figure><img src="output/playwright/red-settings-join.png" alt="Connected Settings without an invite field before the fix" style="width:100%;height:auto"></figure></details>
+      <p>2026-10-05: investigated a hosted invite failure. The running preview used the generic Electron profile, whose saved service was http://127.0.0.1:8790, with no local Worker running. Both curl and Node fetch returned HTTP 200 from the hosted health endpoint. After setting the app identity and dedicated profile, the preview loaded its existing hosted account and chat. Clicking Invite friend showed Invite code copied; pasting the system clipboard into Join a chat confirmed a nonempty code. No friend was contacted and no join was submitted.</p>
+      <details><summary>Profile regression before the fix</summary><p>The extracted old development path returned Electron instead of surprised-face. The regression assertion failed with those actual and expected paths. The current test command covers the corrected path, explicit development overrides, and startup identity order.</p><a href="output/profile-red.txt">Failing profile result</a></details>
       <ul>
         <li>2026-10-05: checked the Electron development preview with two isolated app profiles on one computer, the real local catalog, and a throwaway local Worker.</li>
         <li>Selected surprised-face, opened a new draft with the project plus button, and sent &quot;Reply with exactly: chat-ready. Do not use tools or change files.&quot; The app created a native Codex session and displayed its live answer, &quot;chat-ready&quot;. Reopening the new sidebar chat loaded the saved exchange without injected project setup instructions.</li>

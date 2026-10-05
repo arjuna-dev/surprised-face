@@ -60,7 +60,7 @@ flowchart TB
 - Implemented operations: `health`, `projects.list`, `conversations.list`, `conversations.read`, `conversations.readNative`, and `refresh`.
 - `conversations.readNative` accepts a harness, session ID, cursor, and page limit. Sheep resolves the session from its latest inventory; the caller cannot pass an arbitrary source path.
 - Sheep is Go; :o is TypeScript. This integration uses a compiled executable, rather than a TypeScript source import. A future Go consumer could use public packages, but Sheep's current `internal/` packages cannot be imported by an unrelated project. See [Go internal-package rules](https://go.dev/doc/go1.4#internalpackages).
-- Sheep's bridge and native reader changes are currently in the local Sheep checkout, and :o builds a compatible helper from that checkout. The checked-in app resource is specific to this macOS arm64 environment. Release packaging still needs a reproducible pinned Sheep revision and a matching binary for each supported OS/architecture. The pilot does not search for an arbitrary global Sheep installation.
+- Sheep's bridge, native reader, and native import changes are committed as `6e44c568f0c04071859c5357b0565c83ddf4ed25`. The bundled helper's Go build metadata identifies that clean revision; :o's build script currently rebuilds from the local Sheep checkout. The checked-in app resource is specific to this macOS arm64 environment. Release packaging still needs a reproducible pinned Sheep revision and a matching binary for each supported OS/architecture. The pilot does not search for an arbitrary global Sheep installation.
 - Keep live prompt submission, approvals, streaming, and stopping in the Codex/Hermes clients already available in the desktop base.
 - Do not have Sheep and :o independently launch or control the same native session at once.
 - Settings choose executable/config roots, default harness/model, and each named agent's working directory. The choice of a default harness does not filter out other harnesses' chats.
@@ -72,7 +72,8 @@ flowchart TB
 - [Conversation summaries](/Users/alejandrocamus/Documents/dev/sheep/internal/conversations/conversations.go): native session ID, harness, working directory, title, activity time, source location, and compaction status.
 - Stable key within the local registry: `harness:session_id`. :o must also include connection/device identity, since roots and devices can contain colliding IDs.
 - Portable messages remain the compact role/text/timestamp projection used for handoffs. They do not preserve the complete source event/tool/attachment structure or participant/model attribution.
-- Cross-harness checkout passes a rendered transcript to a new session. It is a context transfer, not migration of the complete native state.
+- Cross-harness checkout now imports the portable transcript into a separate native target session and resumes that target. Codex, Claude, and Pi have format writers; Hermes and OpenCode use their CLI import commands. Existing source sessions are untouched, and Sheep does not link or deduplicate the separate source and target conversations. Antigravity import returns an unsupported error. The conversion carries readable text, not the complete tool, media, or reasoning state.
+- The JSON bridge has no import operation. The current app uses its readers and cannot offer this checkout feature through its existing bridge calls. To add a chat-level harness switch, expose a structured import operation returning the target ID, harness, and working folder. Let :o use its native adapter to resume that target; shared participants, membership, and agent-turn routing must remain owned by :o.
 - These limitations belong to the portable projection, not necessarily to the source data. `ReadNative` now exposes source records separately, and live structured adapter events remain necessary for streaming and approvals.
 
 ### Reader changes in Sheep
@@ -80,7 +81,7 @@ flowchart TB
 | Output | Preserve | Consumer |
 | --- | --- | --- |
 | Session summary | Native ID, source, project path, title, activity, and known model/harness metadata. | Sheep listings and :o's private catalog. |
-| Portable transcript | Compact role/text history, including the existing handoff prompt budget. | Sheep's cross-harness checkout. |
+| Portable transcript | Readable role/text/timestamp history. | Sheep's native import converters; fallback transcript handoff. |
 | Rich session | Available messages/content blocks, tool calls/results, model/usage metadata, timestamps, event IDs, branches, and compaction records. Keep unknown native fields alongside normalized fields. | :o imports; possible Sheep detail/search/export views. |
 | Source records | Reader-dependent original JSON/JSONL records or session-scoped database rows, with source references. Do not discard records just because they have no visible message text. | Local archives, debugging readers, and future reprocessing. |
 | Artifact references | Referenced images/files, locations, available hashes, and whether the content is accessible. Load large content only when requested. | Preview/export, without putting every attachment into every JSON response. |
@@ -90,7 +91,7 @@ flowchart TB
 - Hermes currently flattens content blocks to text. Preserve whole records, including fields the typed parser does not know, before producing the text projection.
 - Database readers must select the requested session's records consistently. Do not export an entire database containing unrelated sessions. Preserve source row IDs and payloads; report paging limits and unsupported schema versions.
 - Pages report whether more records remain and can include reader notes. Coverage still varies by harness; missing artifacts and some unavailable metadata are not yet normalized into one completeness report. Data already deleted by a harness cannot be recovered by adding a reader.
-- Native files stay read-only. Shared participant IDs, friend permissions, room order, and cloud synchronization stay in :o.
+- Source native files stay read-only. Sheep's explicit import creates one new target session; it does not edit existing sessions. The current :o bridge only reads native files. Shared participant IDs, friend permissions, room order, and cloud synchronization stay in :o.
 - Rich data is useful in Sheep too: inspect tool activity, preview files, show model/usage when recorded, and export history without reducing everything to text. Keep this as an on-demand detail path so ordinary lists and the compact checkout stay readable.
 
 ### Performance
@@ -101,7 +102,7 @@ flowchart TB
 | Open a chat | Load that session on demand, with bounded pages. Reuse its parsed source records for the readable and rich views where practical. |
 | Follow a growing session | Use reader-specific cursors/checkpoints for append-only data; detect rewrites, compaction, and database updates before falling back to a reread. |
 | Export history/assets | Stream records with backpressure. Read large assets separately and make progress/cancellation available. |
-| Existing Sheep commands | Keep compact checkout as the default. Rich preservation/export is an additional path, not an eager full archive during every command. |
+| Existing Sheep commands | Same-harness checkout resumes natively. Cross-harness checkout converts the readable transcript into a new native session. Rich preservation/export remains a separate path. |
 
 - Rich reads add I/O, parsing, memory, and transfer cost when a person opens a selected session. The app requests them on demand and stores pages locally; it does not put the full native history into the project/chat list response. This keeps the default list path separate, but it is not a measured performance result.
 - A page limits the returned records, not necessarily all source work. Some file readers scan from the beginning to reach a later cursor, so opening many pages of a large session can reread earlier bytes. Optimize with byte-offset checkpoints or source-specific cursors if measurements show this matters.

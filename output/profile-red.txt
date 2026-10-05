@@ -1,0 +1,33 @@
+✖ development and installed apps use the same dedicated profile instead of Electron settings (0.631ms)
+✔ isolated development profiles are explicit and never affect the installed app (0.062875ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.27325
+
+✖ failing tests:
+
+test at tests/app-data-path.test.ts:6:1
+✖ development and installed apps use the same dedicated profile instead of Electron settings (0.631ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/user/Library/Application Support/Electron'
+  - '/user/Library/Application Support/surprised-face'
+  
+      at TestContext.<anonymous> (/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/app-data-path.test.ts:9:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/user/Library/Application Support/Electron',
+    expected: '/user/Library/Application Support/surprised-face',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

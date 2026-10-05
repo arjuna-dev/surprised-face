@@ -1,0 +1,361 @@
+{
+  "config": {
+    "configFile": "/Users/alejandrocamus/Documents/dev/surprised-face/app/playwright.config.ts",
+    "rootDir": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 15000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../output/playwright/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": {
+      "command": "SURPRISED_FACE_UI_TEST=1 npx quasar dev -p 9017 -H 127.0.0.1",
+      "url": "http://127.0.0.1:9017",
+      "reuseExistingServer": false,
+      "timeout": 60000
+    }
+  },
+  "suites": [
+    {
+      "title": "chat.spec.ts",
+      "file": "chat.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "the labeled local invite button copies a code and explains what to do next",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3534,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('status')\nExpected substring: \u001b[32m\"Invite code copied\u001b[7m to your clipboard\u001b[27m\"\u001b[39m\nReceived string:    \u001b[31m\"Invite code copied\"\u001b[39m\nTimeout: 3000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('status')\u001b[22m\n\u001b[2m    7 × locator resolved to <div class=\"toast\" role=\"status\" data-v-2373a833=\"\">Invite code copied</div>\u001b[22m\n\u001b[2m      - unexpected value \"Invite code copied\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('status')\nExpected substring: \u001b[32m\"Invite code copied\u001b[7m to your clipboard\u001b[27m\"\u001b[39m\nReceived string:    \u001b[31m\"Invite code copied\"\u001b[39m\nTimeout: 3000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('status')\u001b[22m\n\u001b[2m    7 × locator resolved to <div class=\"toast\" role=\"status\" data-v-2373a833=\"\">Invite code copied</div>\u001b[22m\n\u001b[2m      - unexpected value \"Invite code copied\"\u001b[22m\n\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:123:42",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 42,
+                      "line": 123
+                    },
+                    "snippet": "  121 |   await page.getByRole('button', { name: 'C Local design' }).click();\n  122 |   await page.getByRole('button', { name: 'Invite friend', exact: true }).click();\n> 123 |   await expect(page.getByRole('status')).toContainText('Invite code copied to your clipboard');\n      |                                          ^\n  124 |   await expect(page.getByRole('status')).toContainText('Paste it into a message and send it to your friend so they can join this chat.');\n  125 |   expect(await page.evaluate(() => (window as unknown as { uiFixture: { clipboard: string } }).uiFixture.clipboard)).toBe('fixture-chat-code');\n  126 |   await expect(page.getByRole('textbox', { name: 'Chat invite code' })).toHaveCount(0);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 42,
+                        "line": 123
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('status')\nExpected substring: \u001b[32m\"Invite code copied\u001b[7m to your clipboard\u001b[27m\"\u001b[39m\nReceived string:    \u001b[31m\"Invite code copied\"\u001b[39m\nTimeout: 3000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('status')\u001b[22m\n\u001b[2m    7 × locator resolved to <div class=\"toast\" role=\"status\" data-v-2373a833=\"\">Invite code copied</div>\u001b[22m\n\u001b[2m      - unexpected value \"Invite code copied\"\u001b[22m\n\n\n  121 |   await page.getByRole('button', { name: 'C Local design' }).click();\n  122 |   await page.getByRole('button', { name: 'Invite friend', exact: true }).click();\n> 123 |   await expect(page.getByRole('status')).toContainText('Invite code copied to your clipboard');\n      |                                          ^\n  124 |   await expect(page.getByRole('status')).toContainText('Paste it into a message and send it to your friend so they can join this chat.');\n  125 |   expect(await page.evaluate(() => (window as unknown as { uiFixture: { clipboard: string } }).uiFixture.clipboard)).toBe('fixture-chat-code');\n  126 |   await expect(page.getByRole('textbox', { name: 'Chat invite code' })).toHaveCount(0);\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:123:42"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T14:58:20.271Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-labeled-local-inv-d0955-nd-explains-what-to-do-next/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-labeled-local-inv-d0955-nd-explains-what-to-do-next/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 42,
+                    "line": 123
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-ec685c3caac3a104577e",
+          "file": "chat.spec.ts",
+          "line": 118,
+          "column": 1
+        },
+        {
+          "title": "the new chat header has distinct labeled invite and join actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3407,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nTimeout: 3000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nTimeout: 3000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:213:87",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 87,
+                      "line": 213
+                    },
+                    "snippet": "  211 |     }\n  212 |     const actions = page.locator('.room-actions');\n> 213 |     await expect(actions.getByRole('button', { name: 'Invite friend', exact: true })).toHaveText('Invite friend');\n      |                                                                                       ^\n  214 |     await expect(actions.getByRole('button', { name: 'Join a chat', exact: true })).toHaveText('Join a chat');\n  215 |     await expect(page.locator('.left-sidebar').getByRole('button', { name: 'Join a chat', exact: true })).toHaveCount(0);\n  216 |     await expect(actions.locator('.lucide-user-plus')).toHaveCount(1);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 87,
+                        "line": 213
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nTimeout: 3000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\n\n  211 |     }\n  212 |     const actions = page.locator('.room-actions');\n> 213 |     await expect(actions.getByRole('button', { name: 'Invite friend', exact: true })).toHaveText('Invite friend');\n      |                                                                                       ^\n  214 |     await expect(actions.getByRole('button', { name: 'Join a chat', exact: true })).toHaveText('Join a chat');\n  215 |     await expect(page.locator('.left-sidebar').getByRole('button', { name: 'Join a chat', exact: true })).toHaveCount(0);\n  216 |     await expect(actions.locator('.lucide-user-plus')).toHaveCount(1);\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:213:87"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T14:58:25.108Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-new-chat-header-h-c555c-led-invite-and-join-actions/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-new-chat-header-h-c555c-led-invite-and-join-actions/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 87,
+                    "line": 213
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-9683c1a32e7ba5036227",
+          "file": "chat.spec.ts",
+          "line": 206,
+          "column": 3
+        },
+        {
+          "title": "the native chat header has distinct labeled invite and join actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3446,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  3000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\u001b[2m    7 × locator resolved to <button data-v-2373a833=\"\" class=\"icon-button\" title=\"Invite friend\" aria-label=\"Invite friend\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  3000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\u001b[2m    7 × locator resolved to <button data-v-2373a833=\"\" class=\"icon-button\" title=\"Invite friend\" aria-label=\"Invite friend\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:213:87",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 87,
+                      "line": 213
+                    },
+                    "snippet": "  211 |     }\n  212 |     const actions = page.locator('.room-actions');\n> 213 |     await expect(actions.getByRole('button', { name: 'Invite friend', exact: true })).toHaveText('Invite friend');\n      |                                                                                       ^\n  214 |     await expect(actions.getByRole('button', { name: 'Join a chat', exact: true })).toHaveText('Join a chat');\n  215 |     await expect(page.locator('.left-sidebar').getByRole('button', { name: 'Join a chat', exact: true })).toHaveCount(0);\n  216 |     await expect(actions.locator('.lucide-user-plus')).toHaveCount(1);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 87,
+                        "line": 213
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  3000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\u001b[2m    7 × locator resolved to <button data-v-2373a833=\"\" class=\"icon-button\" title=\"Invite friend\" aria-label=\"Invite friend\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n\n\n  211 |     }\n  212 |     const actions = page.locator('.room-actions');\n> 213 |     await expect(actions.getByRole('button', { name: 'Invite friend', exact: true })).toHaveText('Invite friend');\n      |                                                                                       ^\n  214 |     await expect(actions.getByRole('button', { name: 'Join a chat', exact: true })).toHaveText('Join a chat');\n  215 |     await expect(page.locator('.left-sidebar').getByRole('button', { name: 'Join a chat', exact: true })).toHaveCount(0);\n  216 |     await expect(actions.locator('.lucide-user-plus')).toHaveCount(1);\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:213:87"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T14:58:29.573Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-native-chat-heade-7c3a1-led-invite-and-join-actions/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-native-chat-heade-7c3a1-led-invite-and-join-actions/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 87,
+                    "line": 213
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-a99cf8da2474e8c269be",
+          "file": "chat.spec.ts",
+          "line": 206,
+          "column": 3
+        },
+        {
+          "title": "the room chat header has distinct labeled invite and join actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 3398,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  3000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\u001b[2m    7 × locator resolved to <button data-v-2373a833=\"\" class=\"icon-button\" title=\"Invite friend\" aria-label=\"Invite friend\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  3000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\u001b[2m    7 × locator resolved to <button data-v-2373a833=\"\" class=\"icon-button\" title=\"Invite friend\" aria-label=\"Invite friend\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:213:87",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 87,
+                      "line": 213
+                    },
+                    "snippet": "  211 |     }\n  212 |     const actions = page.locator('.room-actions');\n> 213 |     await expect(actions.getByRole('button', { name: 'Invite friend', exact: true })).toHaveText('Invite friend');\n      |                                                                                       ^\n  214 |     await expect(actions.getByRole('button', { name: 'Join a chat', exact: true })).toHaveText('Join a chat');\n  215 |     await expect(page.locator('.left-sidebar').getByRole('button', { name: 'Join a chat', exact: true })).toHaveCount(0);\n  216 |     await expect(actions.locator('.lucide-user-plus')).toHaveCount(1);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 87,
+                        "line": 213
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\nExpected: \u001b[32m\"Invite friend\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  3000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 3000ms\u001b[22m\n\u001b[2m  - waiting for locator('.room-actions').getByRole('button', { name: 'Invite friend', exact: true })\u001b[22m\n\u001b[2m    7 × locator resolved to <button data-v-2373a833=\"\" class=\"icon-button\" title=\"Invite friend\" aria-label=\"Invite friend\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n\n\n  211 |     }\n  212 |     const actions = page.locator('.room-actions');\n> 213 |     await expect(actions.getByRole('button', { name: 'Invite friend', exact: true })).toHaveText('Invite friend');\n      |                                                                                       ^\n  214 |     await expect(actions.getByRole('button', { name: 'Join a chat', exact: true })).toHaveText('Join a chat');\n  215 |     await expect(page.locator('.left-sidebar').getByRole('button', { name: 'Join a chat', exact: true })).toHaveCount(0);\n  216 |     await expect(actions.locator('.lucide-user-plus')).toHaveCount(1);\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:213:87"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T14:58:34.264Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-room-chat-header--9b5fd-led-invite-and-join-actions/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-the-room-chat-header--9b5fd-led-invite-and-join-actions/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 87,
+                    "line": 213
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-7d7e29e478b049821a79",
+          "file": "chat.spec.ts",
+          "line": 206,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-05T14:58:17.945Z",
+    "duration": 20524.18,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}

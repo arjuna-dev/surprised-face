@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +18,30 @@ const results = new Map();
 for (const match of output.matchAll(/^(ok|not ok) \d+ - (.+)$/gm)) results.set(match[2], match[1] === 'ok');
 
 const checks = [
+  {
+    name: 'Bundled Sheep native import',
+    test: 'bundled Sheep imports a synthetic Pi chat into a separate Codex session',
+    input: 'Synthetic Pi user/assistant turns; disposable Codex destination; stubbed Codex CLI launch.',
+    result: 'The actual bundled helper creates a separate Codex session, leaves the source byte-for-byte unchanged, discovers both chats, returns both readable turns and paged native records. The JSON bridge rejects an import operation because that operation is not implemented.',
+  },
+  {
+    name: 'Credential identity',
+    test: 'app identity is set before opening the shared profile and its encrypted credentials',
+    input: 'Development startup reads credentials saved by the packaged app.',
+    result: 'The app sets its surprised-face identity before its profile path and credential storage are used.',
+  },
+  {
+    name: 'App profile',
+    test: 'development and installed apps use the same dedicated profile instead of Electron settings',
+    input: 'Development and packaged startup under the same operating system app-data folder.',
+    result: 'Both select surprised-face. The preview does not inherit a stale local Worker connection from the generic Electron profile.',
+  },
+  {
+    name: 'Isolated development profile',
+    test: 'isolated development profiles are explicit and never affect the installed app',
+    input: 'SURPRISED_FACE_DEV_DATA points to /tmp/chat-check.',
+    result: 'Only a development run selects the isolated folder; the installed app keeps its dedicated profile.',
+  },
   {
     name: 'Human message identity',
     test: 'stores the human participant name with the committed message',
@@ -157,13 +181,16 @@ const rows = checks.map((check) => {
   return `<tr><th scope="row">${escapeHtml(check.name)}</th><td>${escapeHtml(check.input)}</td><td>${escapeHtml(check.result)}</td><td>${success ? 'Pass' : 'Fail'}</td></tr>`;
 }).join('\n');
 const timestamp = new Date().toISOString();
+const sheepReviewPath = path.join(appRoot, '../output/sheep-review.json');
+const sheepReview = existsSync(sheepReviewPath) ? JSON.parse(readFileSync(sheepReviewPath, 'utf8')) : null;
+const sheepEvidence = sheepReview ? `<h2>Sheep source and bundle</h2><p>${escapeHtml(sheepReview.sourceTestTime)} · <code>go test -json ./...</code> in the Sheep checkout · ${sheepReview.sourceTests.pass} passed · ${sheepReview.sourceTests.fail} failed · ${sheepReview.sourceTests.skip} skipped.</p><p>The existing ${escapeHtml(sheepReview.platform)} bundle reports revision <code>${escapeHtml(sheepReview.revision)}</code> and vcs.modified=${escapeHtml(sheepReview.modified)} in Go build metadata. It already contains the native import commit. This is an audit of committed behavior, not a new app export feature; no product behavior changed in this review. The bundled-helper regression above executes the converter with synthetic text and disposable target roots, then checks bridge discovery and reads. Harness launch is stubbed; other native import targets and a real harness resume were not exercised.</p><p><a href="output/sheep-source-results.jsonl">Go test events</a> · <a href="output/sheep-review.json">Bundle and test metadata</a></p>` : '';
 const generated = `
       <p class="run-meta">${escapeHtml(timestamp)} UTC · ${passed} passed · ${failed} failed</p>
       <table class="route-table">
         <thead><tr><th scope="col">Check</th><th scope="col">Input</th><th scope="col">Result</th><th scope="col">Status</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <details><summary>Runner output</summary><pre>${escapeHtml(output.trim() || `No test output. ${total} tests.`)}</pre></details>`;
+      <details><summary>Runner output</summary><pre>${escapeHtml(output.trim() || `No test output. ${total} tests.`)}</pre></details>${sheepEvidence}`;
 
 const reportPath = path.join(appRoot, '..', 'tests.html');
 const report = readFileSync(reportPath, 'utf8');

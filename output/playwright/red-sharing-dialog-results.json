@@ -1,0 +1,292 @@
+{
+  "config": {
+    "configFile": "/Users/alejandrocamus/Documents/dev/surprised-face/app/playwright.config.ts",
+    "rootDir": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 15000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../output/playwright/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": {
+      "command": "SURPRISED_FACE_UI_TEST=1 npx quasar dev -p 9017 -H 127.0.0.1",
+      "url": "http://127.0.0.1:9017",
+      "reuseExistingServer": false,
+      "timeout": 60000
+    }
+  },
+  "suites": [
+    {
+      "title": "chat.spec.ts",
+      "file": "chat.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "invite and join dialogs use consistent type and padding in mint-charcoal",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 575,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:192:25",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 25,
+                      "line": 192
+                    },
+                    "snippet": "  190 |       if (action === 'Join a chat') await page.screenshot({ path: `../output/playwright/join-modal-${theme}.png` });\n  191 |       const type = await heading.evaluate(element => ({ size: parseFloat(getComputedStyle(element).fontSize), weight: Number(getComputedStyle(element).fontWeight) }));\n> 192 |       expect(type.size).toBeLessThanOrEqual(20);\n      |                         ^\n  193 |       expect(type.weight).toBeLessThanOrEqual(500);\n  194 |       const dialog = page.getByRole('dialog');\n  195 |       await expect(dialog).toBeVisible();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 25,
+                        "line": 192
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m\n\n  190 |       if (action === 'Join a chat') await page.screenshot({ path: `../output/playwright/join-modal-${theme}.png` });\n  191 |       const type = await heading.evaluate(element => ({ size: parseFloat(getComputedStyle(element).fontSize), weight: Number(getComputedStyle(element).fontWeight) }));\n> 192 |       expect(type.size).toBeLessThanOrEqual(20);\n      |                         ^\n  193 |       expect(type.weight).toBeLessThanOrEqual(500);\n  194 |       const dialog = page.getByRole('dialog');\n  195 |       await expect(dialog).toBeVisible();\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:192:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T15:37:22.420Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-invite-and-join-dialo-58782-nd-padding-in-mint-charcoal/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-invite-and-join-dialo-58782-nd-padding-in-mint-charcoal/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 25,
+                    "line": 192
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-2d40515fc9d8d30aa2ca",
+          "file": "chat.spec.ts",
+          "line": 180,
+          "column": 3
+        },
+        {
+          "title": "invite and join dialogs use consistent type and padding in cobalt-red",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 606,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:192:25",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 25,
+                      "line": 192
+                    },
+                    "snippet": "  190 |       if (action === 'Join a chat') await page.screenshot({ path: `../output/playwright/join-modal-${theme}.png` });\n  191 |       const type = await heading.evaluate(element => ({ size: parseFloat(getComputedStyle(element).fontSize), weight: Number(getComputedStyle(element).fontWeight) }));\n> 192 |       expect(type.size).toBeLessThanOrEqual(20);\n      |                         ^\n  193 |       expect(type.weight).toBeLessThanOrEqual(500);\n  194 |       const dialog = page.getByRole('dialog');\n  195 |       await expect(dialog).toBeVisible();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 25,
+                        "line": 192
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m\n\n  190 |       if (action === 'Join a chat') await page.screenshot({ path: `../output/playwright/join-modal-${theme}.png` });\n  191 |       const type = await heading.evaluate(element => ({ size: parseFloat(getComputedStyle(element).fontSize), weight: Number(getComputedStyle(element).fontWeight) }));\n> 192 |       expect(type.size).toBeLessThanOrEqual(20);\n      |                         ^\n  193 |       expect(type.weight).toBeLessThanOrEqual(500);\n  194 |       const dialog = page.getByRole('dialog');\n  195 |       await expect(dialog).toBeVisible();\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:192:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T15:37:24.092Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-invite-and-join-dialo-83491-e-and-padding-in-cobalt-red/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-invite-and-join-dialo-83491-e-and-padding-in-cobalt-red/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 25,
+                    "line": 192
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-95a569cf9be95c09a149",
+          "file": "chat.spec.ts",
+          "line": 180,
+          "column": 3
+        },
+        {
+          "title": "invite and join dialogs use consistent type and padding in classic",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 574,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:192:25",
+                    "location": {
+                      "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                      "column": 25,
+                      "line": 192
+                    },
+                    "snippet": "  190 |       if (action === 'Join a chat') await page.screenshot({ path: `../output/playwright/join-modal-${theme}.png` });\n  191 |       const type = await heading.evaluate(element => ({ size: parseFloat(getComputedStyle(element).fontSize), weight: Number(getComputedStyle(element).fontWeight) }));\n> 192 |       expect(type.size).toBeLessThanOrEqual(20);\n      |                         ^\n  193 |       expect(type.weight).toBeLessThanOrEqual(500);\n  194 |       const dialog = page.getByRole('dialog');\n  195 |       await expect(dialog).toBeVisible();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                        "column": 25,
+                        "line": 192
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m20\u001b[39m\nReceived:    \u001b[31m60\u001b[39m\n\n  190 |       if (action === 'Join a chat') await page.screenshot({ path: `../output/playwright/join-modal-${theme}.png` });\n  191 |       const type = await heading.evaluate(element => ({ size: parseFloat(getComputedStyle(element).fontSize), weight: Number(getComputedStyle(element).fontWeight) }));\n> 192 |       expect(type.size).toBeLessThanOrEqual(20);\n      |                         ^\n  193 |       expect(type.weight).toBeLessThanOrEqual(500);\n  194 |       const dialog = page.getByRole('dialog');\n  195 |       await expect(dialog).toBeVisible();\n    at /Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts:192:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-05T15:37:25.710Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-invite-and-join-dialo-cce71-type-and-padding-in-classic/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/alejandrocamus/Documents/dev/surprised-face/output/playwright/test-results/chat-invite-and-join-dialo-cce71-type-and-padding-in-classic/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/alejandrocamus/Documents/dev/surprised-face/app/tests/ui/chat.spec.ts",
+                    "column": 25,
+                    "line": 192
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6dac514d5d837ca37b9e-3b7262710986d2fa5869",
+          "file": "chat.spec.ts",
+          "line": 180,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-05T15:37:21.118Z",
+    "duration": 5741.438999999999,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

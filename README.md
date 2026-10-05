@@ -144,16 +144,17 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 - In chat, humans use blue tags and agents use red tags, with stable participant shades. Mint `#5EB783` and Charcoal `#302D2E` color the alternate app surfaces.
 - The left list shows recent projects with their local chats nested inside, plus shared chats. The right list shows members and agents of the selected chat. Settings opens in the main area and can be closed with the same sidebar button or Back to chat.
 - Selecting a project opens a ready composer with project and Codex/Hermes selectors. A plus icon appears when hovering or focusing a project. The first message creates a native chat in that folder, and the chat remains in the local catalog after restart.
-- The invite icon copies a code and shows a short confirmation. It shares that conversation's readable history into a chat with its own membership; later messages continue through the existing native session. Injected harness setup instructions and raw records stay internal.
+- The chat header has labeled Invite friend and Join a chat buttons with distinct icons. Invite friend copies a code and shows a larger confirmation below the header, explaining how to send it to a friend. It shares that conversation's readable history into a chat with its own membership; later messages continue through the existing native session. Injected harness setup instructions and raw records stay internal.
 - Names and roles stay visible; color is an additional cue.
 - [Design rules](design-system/index.html) show both themes and participant tags.
 
 ## Sheep
 
-- [Sheep](https://github.com/arjuna-dev/declawtter), formerly Declaw, provides cross-harness discovery and switching.
+- [Sheep](https://github.com/arjuna-dev/sheep), formerly Declaw, provides cross-harness discovery and switching.
 - :o starts the bundled executable with `sheep bridge --stdio` as a background JSON process. It is a CLI command, but the interactive Sheep terminal UI is not embedded in :o.
 - The bridge lists projects and chats, loads a portable transcript, and reads selected native records in pages. The native source remains read-only.
-- Sheep's compact transcript and existing checkout flow stay intact. The richer reader can also support Sheep inspection and export features.
+- Sheep commit `6e44c568f0c04071859c5357b0565c83ddf4ed25` adds native transcript import through `sheep checkout chat <harness:id> change-harness <target>`. It creates a separate target chat and preserves the source. Implemented targets are Codex, Claude, Pi, Hermes, and OpenCode; Antigravity returns an unsupported error. These converters carry readable text, not complete tool, media, or reasoning state.
+- The bundled helper already contains that clean revision, confirmed through Go build metadata. The app's JSON bridge exposes discovery and reading, but no import operation; the chat UI has no cross-harness export action yet. A future UI action should call a structured import operation and resume the returned target session through the app's adapter, rather than launching Sheep's interactive checkout.
 - Rich reads cost I/O and parsing when a session is opened. Ordinary lists do not request the rich records. The current reader path has not been benchmarked, and some page reads may rescan earlier source data.
 - The current app bundle is built for macOS arm64 from the local Sheep checkout. A pinned Sheep revision and binaries for other supported systems are still needed.
 - See [reader implementation and integration details](Research/mvp-base-and-harness-integration.md#where-sheep-fits).
@@ -166,6 +167,8 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 ## Run the app
 
 - `cd app && npm install && npm run dev:electron` builds the local reader from the adjacent Sheep checkout and opens the desktop app. The packaged macOS app includes that reader; app users do not install it separately.
+- Appearance, your display name, and the agent-mentions preference save automatically. Codex account status loads when Settings opens; Check status reports its result, and Sign in and Sign out are separate actions.
+- Development and installed apps use the same surprised-face profile and credential identity. For isolated testing, set `SURPRISED_FACE_DEV_DATA` to a separate folder and optionally `SURPRISED_FACE_ROOM_SERVICE_URL` to a local Worker. Generic Electron settings are not used.
 - `cd app && npm test` updates [Tests](tests.html) from the test run. `npm run build:electron` makes the macOS app bundle and DMG in `app/dist/electron/Packaged/`.
 - `cd app && npm run test:ui` runs the actual Vue interface with synthetic Electron IPC, harness, and chat-service fixtures and updates [Tests](tests.html) with results and screenshots. Install its test browser with `npx playwright install chromium`; `SURPRISED_FACE_TEST_BROWSER=chrome npm run test:ui` can use an installed Chrome instead.
 - The pilot Worker is deployed with chat-scoped invites. New people create an account in the app without setting up Cloudflare. Open the updated desktop build for the new flow. Operators deploying a separate Worker can use [Cloudflare room service setup](app/cloudflare/README.md).
