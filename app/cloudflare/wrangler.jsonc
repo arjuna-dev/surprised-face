@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "surprised-face-rooms",
+  "account_id": "4743fdc233efe7ba1b09e8be18032435",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-04",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "DIRECTORY", "class_name": "WorkspaceDirectory" },
+      { "name": "ROOMS", "class_name": "ChatRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["WorkspaceDirectory", "ChatRoom"] }
+  ],
+  "vars": {
+    "APP_ORIGIN": "*"
+  }
+}

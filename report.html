@@ -29,47 +29,54 @@
         <li><a href="Research/chat-ux-and-agent-orchestration.md" target="_blank" rel="noopener">Research/chat-ux-and-agent-orchestration.md</a></li>
         <li><a href="Research/hordes.md" target="_blank" rel="noopener">Research/hordes.md</a></li>
         <li><a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">Research/cli-middleware-feasibility.md</a></li>
+        <li><a href="Research/mvp-base-and-harness-integration.md" target="_blank" rel="noopener">Research/mvp-base-and-harness-integration.md</a></li>
+        <li><a href="app/cloudflare/README.md" target="_blank" rel="noopener">app/cloudflare/README.md</a></li>
         <li><a href="Research/shared-chat-ideas.md" target="_blank" rel="noopener">Research/shared-chat-ideas.md</a></li>
         <li><a href=".agents/skills/visual-dev-console/SKILL.md" target="_blank" rel="noopener">.agents/skills/visual-dev-console/SKILL.md</a></li>
       </ul>
     </aside>
 
     <main class="page">
-      <h1>How it works</h1><section><h2>Page navigation</h2><ul><li>Landing pages, interface images, imagery, architecture, and design rules use one <a href="shared/project-header.js">shared header component</a> and <a href="shared/project-header.css">shared stylesheet</a>.</li><li>Projects is the default landing page. The menu includes Page, Interfaces, Imagery, How it works, Design rules, and Theme.</li><li><a href="imagery/index.html">Imagery</a> has five scene sections. <a href="imagery/app.js">Scene navigation</a> opens each section. Holding hands displays all six images: a line and circle in each of three palettes. Hordes shows three engineering teams and three space crews, including one front-facing group portrait of each. Each image links to its full-size file and prompt.</li></ul></section>
-      <ul><li>Workspaces, channels, and direct chats for people and their local agents.</li><li>UI submissions pass through the owner's local bridge to the shared room. The bridge also manages their harnesses.</li><li><a href="architecture/index.html">Architecture diagrams and costs</a> / <a href="interface-designs/index.html">Interface images</a> / <a href="landing/index.html">Landing variants</a></li></ul>
+      <h1>How it works</h1>
+      <section><h2>Desktop app</h2><ul><li>The <a href="app/src/pages/IndexPage.vue">chat view</a> keeps the green logo visible, lists recent projects with their chats nested under the selected project, and opens Projects by default. Chats with invited people appear under Chats.</li><li>Selecting a project opens a ready composer with project and agent selectors. New chat clears the draft; the plus icon on a project opens a draft in that project. The first message creates a native Codex or Hermes session through <a href="app/src-electron/native-chat.ts">native chat control</a>, then sends through that adapter. The local catalog preserves the new chat across restarts.</li><li>Click Settings again or use Back to chat to leave Settings. Harness sign-in, including Codex sign-in, is in Settings. The local catalog refreshes at startup and once per minute.</li><li>The composer stays at the bottom and People and agents is collapsible. Existing native chats resume their session and stream answers through the adapter. Sheep reads saved history internally; raw source records and injected project setup instructions are not shown in the chat.</li><li><a href="app/src-electron/local-projects.ts">Project listing</a> hides stale and internal folders and sorts by recent chat activity. Each chat belongs to its most specific tracked project. Chats with no matching project appear under Other local chats.</li><li>Appearance offers Mint + charcoal by default, Cobalt + red, and Classic. The packaged app includes its local reader executable.</li></ul></section>
+      <section><h2>Chat invites</h2><ul><li>The Invite friend icon generates a one-use code for the current chat, copies it to the clipboard, and briefly shows Invite code copied. There is no persistent code panel. The code expires after seven days. The recipient joins only that chat and can read its existing history.</li><li>Inviting from a native Codex or Hermes conversation imports its readable transcript and links the existing native session to the chat's agent. The app creates a chat account automatically when needed; users do not configure Cloudflare.</li><li>Join a chat opens a form for the invite code and, on a new profile, the person's name. Joining opens that chat directly. The <a href="app/cloudflare/src/index.ts">membership and invite routes</a> check membership before messages, events, WebSocket connections, and agent mentions.</li><li>A one-person chat calls its sole owner agent automatically. After another person joins, agents run on explicit mentions. The owner must enable remote agent requests on their computer.</li><li>The <a href="app/src-electron/room-service.ts">local bridge</a> queues human messages during disconnections. Delivery acknowledgement refreshes the chat and removes its pending copy without waiting for another message.</li></ul></section>
+      <section><h2>Page navigation</h2><ul><li>Landing pages, interface images, imagery, architecture, and design rules use one <a href="shared/project-header.js">shared header component</a> and <a href="shared/project-header.css">shared stylesheet</a>.</li><li>Projects is the default landing page. The Page menu also includes Friends, Hordes, and <a href="landing/orchestra.html">Orchestra</a> for local multi-harness collaboration. The review-page Theme control switches Blue/red or Green.</li><li><a href="imagery/index.html">Imagery</a> has five scene sections. <a href="imagery/app.js">Scene navigation</a> opens each section. Holding hands displays all six images: a line and circle in each of three palettes. Hordes shows three engineering teams and three space crews, including one front-facing group portrait of each. Each image links to its full-size file and prompt.</li></ul></section>
+      <ul><li>Chat membership controls access to each shared conversation. The directory stores identities and agent metadata.</li><li>UI submissions pass through the owner's local bridge to the shared room. The bridge also manages their harnesses.</li><li><a href="architecture/index.html">Architecture diagrams and costs</a> / <a href="interface-designs/index.html">Interface images</a> / <a href="landing/index.html">Landing variants</a></li></ul>
+
+      <section><h2>MVP base</h2><ul><li>Three people, one named agent per person, initially using Codex or Hermes.</li><li>The copied Electron/Vue app contains the shared chat, settings, and native adapters.</li><li>:o starts bundled Sheep with <code>sheep bridge --stdio</code> and exchanges JSON over stdin/stdout. This uses Sheep as a background process; its interactive terminal UI is not embedded in :o.</li><li>Sheep lists projects/chats and returns portable transcripts. It reads selected native session records in pages. Original harness files remain read-only; the compact transcript and handoff flow are unchanged.</li><li>Reading a selected session adds local I/O and parsing. Rich records are not loaded for every list item. Performance has not been measured; some paged readers may rescan earlier data.</li><li><a href="Research/mvp-base-and-harness-integration.md#where-sheep-fits">Sheep bridge and reader details</a> / <a href="design-system/index.html">Participant tags and both themes</a>.</li></ul></section>
 
       <section>
-        <h2>Agent modes</h2><ul><li>Mentions only by default. A tag or deliberate action requests a run; owner permissions still apply.</li><li>Optional owner-configured conditions: scope, actions, context, budget, cooldown, and concurrency.</li><li>Ignore agent messages as triggers by default. Show the cause of each run and offer pause/stop.</li></ul></section><section><h2>Message routes</h2>
+        <h2>Agent modes</h2><ul><li>In a one-person chat, an ordinary message runs the chat's owner agent when one is selected or is the sole available agent. In a group chat, an explicit @agent mention queues a turn.</li><li>The agent owner can disable requests from other members while continuing to use their own agent. Optional conditions and automatic group participation are planned.</li></ul></section><section><h2>Message routes</h2>
         <table class="route-table">
           <thead>
             <tr><th scope="col">Entry</th><th scope="col">Path</th><th scope="col">Harness</th></tr>
           </thead>
           <tbody>
-            <tr><th scope="row">Chat-only message</th><td>:o stores it in the shared conversation and delivers it to other :o clients.</td><td>Not contacted</td></tr>
-            <tr><th scope="row">Agent request</th><td>:o adds selected shared-chat context, sends it through the selected adapter, and copies available results back.</td><td>Runs and stores its native session</td></tr>
+            <tr><th scope="row">Human message</th><td>:o stores it in the chat and delivers it to authorized clients. In a one-person chat it also queues the owner agent.</td><td>Runs for a solo chat with an agent</td></tr>
+            <tr><th scope="row">Agent request</th><td>:o queues the turn. When the previous agent turn ends, it captures completed chat context, sends the request through the selected adapter, and copies results back.</td><td>Runs and stores its native session</td></tr>
           </tbody>
         </table>
       </section>
 
       <section>
-        <h2>Order</h2><ul><li>Drafts stay local until Send. The room saves messages with a server-assigned order.</li><li>Save an empty agent reply before generation; streaming or final output fills it in place.</li><li>Keep the exact context snapshot. Later messages do not silently change an active run.</li><li>Replay saved events after disconnects. Each local cache has one writer.</li></ul></section><section><h2>Message data</h2>
+        <h2>Order</h2><ul><li>Humans can send at any time, including while an agent is streaming.</li><li>The room saves messages in server order. Solo chat messages can queue the owner agent; group messages require an explicit mention.</li><li>Only one agent turn runs per chat. Other agents wait until it finishes, fails, or is confirmed stopped.</li><li>When a turn starts, capture the completed chat context and save its empty reply at the end of the chat. Streaming or final output fills that position.</li><li>New human messages appear after the active reply and do not change its prompt.</li><li>Queued turns use the completed conversation available when they start. Reconnects replay saved events.</li></ul></section><section><h2>Message data</h2>
         <ul>
           <li>Humans use role <code>user</code>; assistants use role <code>assistant</code>.</li>
-          <li>Each record has a participant ID, name, and origin.</li>
-          <li>Assistant records also include owner, model, harness, and run context.</li>
-          <li>When an agent is called, :o can include selected shared messages with their speakers and IDs in the prompt.</li>
-          <li>Copy available turn records and associated data without changing the native session.</li>
+          <li>Human messages store participant ID and name. Agent replies store agent ID and name, owner, model, and harness.</li>
+          <li>The room stores the ordered shared conversation. The local SQLite copy applies saved events in sequence.</li>
+          <li>When an agent is called, its owner app sends the completed room context through that agent's native harness adapter.</li>
+          <li>Harness files remain harness-owned. Sheep reads selected history without writing to those files.</li>
         </ul>
       </section>
 
       <section>
-        <h2>Harness UI</h2>
+        <h2>Harness control</h2>
         <ul>
-          <li>The shared composer sends a human message to the chat, or sends an agent request through a harness adapter. :o can add selected chat messages to that request.</li>
-          <li>A native terminal pane runs the harness UI in a PTY and renders it through a terminal emulator. It keeps native settings and commands available when that harness supports interactive PTY use.</li>
-          <li>Input from the focused pane reaches :o first. :o forwards it to that harness PTY, where the harness interprets its own controls. A generic PTY cannot distinguish a slash command from a model prompt.</li>
-          <li>Use the shared composer for messages to people and agent requests. Input in the native pane is handled by the selected harness.</li>
-          <li>PTY output shows the terminal screen. Structured events or a session reader are needed to copy conversation records. See the <a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">feasibility report</a>.</li>
+          <li>Each local agent selects Codex or Hermes, a model, and a working folder in Settings.</li>
+          <li>:o sends agent requests through Codex app-server or Hermes ACP and streams results into the shared chat.</li>
+          <li>The agent owner handles permission requests on their computer. Remote requests run only when that owner enables them.</li>
+          <li>The shared chat does not embed the harness terminal UI, slash commands, or hotkeys. Additional settings and commands need explicit adapter support.</li>
+          <li>See the <a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">harness interface notes</a>.</li>
         </ul>
       </section>
 
@@ -80,10 +87,10 @@
             <tr><th scope="col">Harness</th><th scope="col">Adapter interface</th><th scope="col">Native controls</th></tr>
           </thead>
           <tbody>
-            <tr><th scope="row"><a href="https://pi.dev/docs/latest/rpc-commands">Pi</a></th><td>JSONL RPC for prompts, session state, models, thinking level, and discoverable extension commands. Settings and keybindings are documented in config files.</td><td><code>/settings</code> and <code>/hotkeys</code> screens are not RPC commands. :o can implement their controls from the API and config schema, with the PTY as fallback.</td></tr>
-            <tr><th scope="row"><a href="https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration">Hermes</a></th><td>TUI Gateway JSON-RPC for a custom host, including command dispatch and configuration.</td><td>Keep the PTY pane for native UI behavior the adapter does not expose.</td></tr>
-            <tr><th scope="row"><a href="https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md">Codex</a></th><td>App Server JSON-RPC for threads, turns, events, approvals, configuration, and models.</td><td>No promise of a complete slash-command catalog. Use the PTY pane for uncovered commands.</td></tr>
-            <tr><th scope="row"><a href="https://code.claude.com/docs/en/cli-usage">Claude Code</a></th><td>Print mode with JSON or stream-JSON input and output.</td><td>Print mode is separate from the interactive TUI. Keep the PTY pane available for native controls.</td></tr>
+            <tr><th scope="row"><a href="https://pi.dev/docs/latest/rpc-commands">Pi</a></th><td>Sheep can list Pi sessions. Pi execution is not in this app's first adapter set.</td><td>Its RPC and settings can be considered when Pi support is added.</td></tr>
+            <tr><th scope="row"><a href="https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration">Hermes</a></th><td>Supported through ACP in the app.</td><td>The Hermes terminal UI, slash commands, and hotkeys are not embedded.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md">Codex</a></th><td>Supported through app-server JSON-RPC in the app.</td><td>The Codex terminal UI, slash commands, and hotkeys are not embedded.</td></tr>
+            <tr><th scope="row"><a href="https://code.claude.com/docs/en/cli-usage">Claude Code</a></th><td>Sheep may list local Claude sessions. Claude execution is not in this app's first adapter set.</td><td>Add a structured adapter before enabling Claude runs.</td></tr>
           </tbody>
         </table>
         <p>:o can keep one outer layout for chat and routing. Use a versioned adapter manifest for known built-ins and query runtime catalogs where available. Do not scrape the TUI for its menu. More detail and source links are in the <a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">feasibility report</a>.</p>
@@ -92,7 +99,7 @@
       <section>
         <h2>Other participants</h2>
         <ul>
-          <li>Other :o clients receive shared messages and agent results.</li>
+          <li>Other authorized :o clients receive the chat's messages and agent results.</li>
           <li>Their native harness sessions are not edited by chat sync.</li>
           <li>When they invoke an agent, :o can pass selected shared messages as context.</li>
         </ul>
@@ -105,7 +112,7 @@
           <li>Writing to a chat does not run commands on another participant's machine.</li>
         </ul>
       </section>
-    <section><h2>Groups and hordes</h2><ul><li>Channels can contain many humans and agents. A direct chat is one use case.</li><li>Hordes contribute token budgets, models, and compute to missions with task rooms, claims, handoffs, and review.</li><li>The pilot has three people and initially two connected agents. People and agents are counted separately.</li></ul></section></main>
+    <section><h2>Planned groups and hordes</h2><ul><li>Hordes would contribute token budgets, models, and compute to missions with task rooms, claims, handoffs, and review.</li><li>The pilot plan has three people and initially two connected agents. People and agents are counted separately.</li></ul></section></main>
   </div>
 </body>
 </html>

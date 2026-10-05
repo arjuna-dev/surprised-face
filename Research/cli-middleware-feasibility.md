@@ -7,7 +7,7 @@ Research checked 2026-09-29. The harness set is Pi, Hermes, Codex, and Claude Co
 - Workspaces, channels, and direct chats can contain many humans and agents.
 - Each person's :o UI connects through their local bridge to a shared room. The same bridge manages their local harness adapters.
 - Cloud room events determine chat order; bridge caches have one writer and exported JSON is rebuilt from events.
-- Default agent mode is mentions only. Owner-configured conditions are optional and budgeted.
+- MVP agent turns require `@agent_name`. Humans can send at any time; agent turns queue and run one at a time per chat, across all harnesses. Owner-configured conditions are a later, budgeted option.
 - Attach repository links and direct owners to collaborator invitations. Media results use private upload/download endpoints, not terminal bytes or chat deltas.
 
 ## Input and routing
@@ -15,7 +15,7 @@ Research checked 2026-09-29. The harness set is Pi, Hermes, Codex, and Claude Co
 The user starts `:o`. The `:o` app receives each submission and chooses its destination.
 
 1. A message for people goes to shared chat. No harness runs.
-2. An agent request goes to the selected harness adapter. `:o` can add selected shared-chat messages as context to that actual request.
+2. An agent mention queues a turn. After the previous turn ends, `:o` captures completed shared-chat context, reserves the reply position, and submits through the selected harness adapter. The running prompt remains fixed while humans continue sending.
 3. The harness records its own request and response in its native session. `:o` copies available events and results to shared chat with participant, model, harness, and source metadata.
 
 The shared chat and harness prompt are separate surfaces. A human-only message does not become a fake harness turn. It can be included with its speaker name and ID when someone calls an agent.

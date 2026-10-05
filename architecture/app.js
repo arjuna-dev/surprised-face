@@ -1,13 +1,13 @@
 'use strict';
 const diagramSources = {
-  "stack": "flowchart TB\n  subgraph A[\"Participant A's machine\"]\n    UA[\":o UI\"] <--> BA[\"Local bridge A\"]\n    BA <--> HA[\"Owned harnesses\"]\n  end\n  subgraph B[\"Participant B's machine\"]\n    UB[\":o UI\"] <--> BB[\"Local bridge B\"]\n    BB <--> HB[\"Owned harnesses\"]\n  end\n  BA <-->|WSS| G[\"Worker: login and room routing\"]\n  BB <-->|WSS| G\n  More[\"More participant bridges\"] <--> G\n  G <--> R[\"Room per channel or direct chat\"]\n  R <--> E[(\"SQLite events and messages\")]\n  G <--> D[(\"D1 workspace directory\")]\n  G <--> F[(\"R2 artifacts\")]\n",
+  "stack": "flowchart TB\n  subgraph A[\"Participant A's machine\"]\n    UA[\":o UI\"] <--> BA[\"Local bridge A\"]\n    BA <--> HA[\"Owned harnesses\"]\n  end\n  subgraph B[\"Participant B's machine\"]\n    UB[\":o UI\"] <--> BB[\"Local bridge B\"]\n    BB <--> HB[\"Owned harnesses\"]\n  end\n  BA <-->|WSS| G[\"Deployed Worker: auth and routing\"]\n  BB <-->|WSS| G\n  More[\"More participant bridges\"] <--> G\n  G <--> D[\"Workspace directory Durable Object\"]\n  G <--> R[\"Chat room Durable Object\"]\n  R <--> E[(\"SQLite events, messages, and turns\")]\n",
   "messages": "flowchart LR\n  A[\"Alex's UI\"] <--> BA[\"Bridge A\"]\n  BA <--> R[\"One shared room: saved order\"]\n  R <--> BB[\"Bridge B\"]\n  BB <--> B[\"Jo's UI\"]\n  HA[\"the Alex harness\"] <--> BA\n  BB <--> HB[\"Jo's harness\"]\n",
-  "participation": "flowchart LR\n  M[\"Human sends message\"] --> R[\"Save in shared room\"]\n  R --> C{\"Agent tagged, or enabled condition met?\"}\n  C -->|no| Q[\"No harness run\"]\n  C -->|yes| P[\"Check owner permission and budget\"]\n  P --> B[\"Owner's bridge: run selected harness\"]\n  B --> O[\"Reply or artifact in chat\"]\n",
+  "participation": "flowchart LR\n  M[\"Human sends message\"] --> R[\"Save in shared room\"]\n  R --> C{\"Agent tagged, or enabled condition met?\"}\n  C -->|no| Q[\"No harness run\"]\n  C -->|yes| P[\"Check owner permission and budget\"]\n  P --> QTurn[\"Queue agent turn in room\"]\n  QTurn --> Start[\"After previous turn ends: capture context and reserve reply\"]\n  Start --> B[\"Owner's bridge: run selected harness\"]\n  B --> O[\"Reply or artifact in chat\"]\n",
   "projects": "flowchart LR\n  C[\"Project channel\"] --> G[\"GitHub repository and collaborator invites\"]\n  C --> R[\"Tagged agent request\"]\n  R --> B[\"Owner's bridge and tools\"]\n  B --> F[\"Music, GIF, code, or other output\"]\n  F --> S[(\"Private artifact storage\")]\n  S --> C\n  F -->|branch and PR| G\n",
   "hordes": "flowchart TB\n  W[\"Workspace: people, projects, agents\"] --> C[\"Channels and direct chats\"]\n  W --> M[\"Community mission\"]\n  M --> T[\"Task claims, budgets, and dependencies\"]\n  T --> A[\"Task room A and contributor bridges\"]\n  T --> B[\"Task room B and contributor bridges\"]\n  A --> V[\"Review artifacts and evidence\"]\n  B --> V\n  V --> S[\"Accepted findings in mission summary\"]\n",
   "backends": "flowchart LR\n  C[\"Same versioned chat protocol\"] --> A[\"Cloudflare room object\"]\n  C --> B[\"Node room service\"]\n  C --> S[\"Supabase transaction and Realtime\"]\n  A --> A1[(\"SQLite events\")]\n  B --> B1[(\"Postgres events and outbox\")]\n  S --> S1[(\"Postgres events and outbox\")]\n  A1 --> V[\"Ordered history and reconnect replay\"]\n  B1 --> V\n  S1 --> V\n",
   "appa": "flowchart LR\n  Chat[\"Shared context and provenance\"] --> H[\"Local harness\"]\n  H --> Hook[\"Blocking tool hook\"]\n  Hook --> P[\"OpenAPPA: policy decision\"]\n  P -->|allow| T[\"Tool on owner's machine\"]\n  P -->|deny or remedy| H\n  T -->|labeled result| Hook\n",
-  "mvp": "flowchart LR\n  A[\"3 people in 1 workspace\"] --> B[\"Project channel and direct chats\"]\n  B --> C[\"3 local bridges\"]\n  C --> D[\"2 connected agents on 2 harnesses\"]\n  D --> E[\"Shared outputs, replay, notifications\"]\n"
+  "mvp": "flowchart TB\n  A[\"3 people and 3 owned agents\"] --> B[\"heyDataAgent-based Electron chat\"]\n  B --> C[\"Local coordinator and SQLite\"]\n  C --> D[\"Codex app-server or Hermes ACP\"]\n  C --> S[\"Bundled Sheep: inventory and rich history\"]\n  C <-->|WSS| E[\"Shared room: order, agent queue, replay\"]\n"
 };
 
 let activeSection = 'stack';
@@ -16,17 +16,21 @@ let diagramQueue = Promise.resolve();
 let costChart;
 let supabaseChart;
 const sections = new Set(['stack','participation','messages','projects','hordes','backends','costs','openappa','mvp']);
-const mq = window.matchMedia('(prefers-color-scheme: dark)');
-function isDark(){const mode=document.documentElement.dataset.theme||'system';return mode==='dark'||(mode==='system'&&mq.matches);}
+function paletteInks(){return document.documentElement.dataset.theme==='green'?['#5EB783','#302D2E']:['#2148B8','#C83232'];}
+function reportColors(){
+  const style=getComputedStyle(document.documentElement);
+  const read=name=>style.getPropertyValue(name).trim();
+  return {paper:read('--bg'),text:read('--text'),muted:read('--muted'),line:read('--line'),faint:read('--faint'),accent:read('--link')};
+}
 function diagramTheme(){
-  const dark=isDark();
+  const colors=reportColors();
   return {startOnLoad:false,securityLevel:'strict',theme:'base',fontFamily:'Arial, Helvetica, sans-serif',
-    themeVariables:{fontSize:'13px',primaryColor:dark?'#1d2530':'#FAFAF7',primaryTextColor:dark?'#e1e6ed':'#293345',
-      primaryBorderColor:dark?'#afc0ed':'#2148B8',lineColor:dark?'#8598b5':'#657086',secondaryColor:dark?'#242e3b':'#f0f1ed',
-      tertiaryColor:dark?'#151a21':'#FAFAF7',clusterBkg:dark?'#151a21':'#FAFAF7',clusterBorder:dark?'#354050':'#dce0e5',
-      actorBkg:dark?'#1d2530':'#FAFAF7',actorBorder:dark?'#afc0ed':'#2148B8',actorTextColor:dark?'#e1e6ed':'#293345',
-      signalColor:dark?'#afc0ed':'#2148B8',signalTextColor:dark?'#e1e6ed':'#293345',labelBoxBkgColor:dark?'#151a21':'#FAFAF7',
-      edgeLabelBackground:dark?'#151a21':'#FAFAF7'},flowchart:{curve:'linear',nodeSpacing:24,rankSpacing:34},sequence:{useMaxWidth:true,actorMargin:30,diagramMarginX:8}};
+    themeVariables:{fontSize:'13px',primaryColor:colors.paper,primaryTextColor:colors.text,
+      primaryBorderColor:colors.accent,lineColor:colors.muted,secondaryColor:colors.faint,
+      tertiaryColor:colors.paper,clusterBkg:colors.paper,clusterBorder:colors.line,
+      actorBkg:colors.paper,actorBorder:colors.accent,actorTextColor:colors.text,
+      signalColor:colors.accent,signalTextColor:colors.text,labelBoxBkgColor:colors.paper,
+      edgeLabelBackground:colors.paper},flowchart:{curve:'linear',nodeSpacing:24,rankSpacing:34},sequence:{useMaxWidth:true,actorMargin:30,diagramMarginX:8}};
 }
 function renderActiveDiagram(){
   const container=document.querySelector('#'+activeSection+' [data-diagram]');
@@ -58,20 +62,19 @@ function showSection(){
 function refreshVisuals(){renderActiveDiagram();if(activeSection==='costs'){updateCosts();updateSupabase();}}
 window.addEventListener('hashchange',showSection);
 window.addEventListener('sf-theme-change',refreshVisuals);
-mq.addEventListener('change',refreshVisuals);
 
 // A fixed illustration, deliberately independent of any real room or harness.
 const simEvents=[
-  {type:'create',id:41,sender:'Alex',body:'@alex-agent can we try a smaller game map?',note:'Alex tags an owned agent. The room saves the request as #41 and both views receive it.'},
-  {type:'create',id:42,sender:'Alex agent / Pi',body:'Waiting for local runner',agent:true,context:'41',state:'queued',note:'The room saves empty reply #42 and freezes context containing message #41 before starting the Alex harness.'},
-  {type:'update',id:42,body:'A compact map would let us...',state:'streaming',note:'The first output batch fills #42. It keeps its original position.'},
-  {type:'create',id:43,sender:'Jo',body:'@jo-agent help me plan the terrain.',note:'Jo sends #43 while the Alex agent is working. It appears after the empty reply #42.'},
-  {type:'create',id:44,sender:'Jo agent / Codex',body:'Waiting for local runner',agent:true,context:'41, 43',state:'queued',note:"Jo's agent gets empty reply #44. Its frozen context includes #41 and #43; the incomplete #42 is excluded."},
-  {type:'update',id:42,body:'Try a 32 x 32 map. It leaves enough room to test the movement system.',state:'complete',note:'The Alex agent finishes #42. Completion does not move it after newer messages.'},
-  {type:'update',id:44,body:'I can draft the terrain layout...',state:'streaming',note:"Jo's agent streams into #44 using its earlier snapshot. The completed #42 has not silently entered its prompt."},
-  {type:'create',id:45,sender:'Alex',body:'Keep a clear path through the center.',note:'Alex message #45 is accepted during the second run. It can be included in the next request.'},
-  {type:'update',id:44,body:'I can draft three terrain layouts for a 32 x 32 map.',state:'complete',note:"The second run finishes in #44. Both views retain order 41, 42, 43, 44, 45."},
-  {type:'duplicate',id:45,note:'A retry of Alex previous send returns the original #45 acknowledgment. No new event or message is created.'}
+  {type:'create',id:41,sender:'Alex',body:'@alex-agent can we try a smaller game map?',note:'Alex tags an owned agent. The room saves request #41. No other agent turn is active.'},
+  {type:'create',id:42,sender:'Alex agent / Pi',body:'Starting...',agent:true,state:'starting',note:"The room starts Alex's approved turn: capture the completed chat context and reserve reply #42."},
+  {type:'update',id:42,body:'A compact map would let us...',state:'streaming',note:'The first output batch fills #42. Humans remain free to send.'},
+  {type:'create',id:43,sender:'Jo',body:'@jo-agent help me plan the terrain.',note:"Jo sends #43 while Alex's agent streams. Jo's agent turn queues without starting or reserving a reply."},
+  {type:'create',id:44,sender:'Alex',body:'Keep a clear path through the center.',note:'Alex sends #44 while the first agent is still streaming. It does not interrupt the agent or request another turn.'},
+  {type:'update',id:42,body:'Try a 32 x 32 map. It leaves enough room to test the movement system.',state:'complete',note:"Alex's agent finishes #42. The room can now start the next approved agent turn."},
+  {type:'create',id:45,sender:'Jo agent / Codex',body:'Starting...',agent:true,state:'starting',note:"Jo's turn starts with the completed conversation through #44, including Alex's full response. Only now does the room reserve reply #45."},
+  {type:'update',id:45,body:'For the 32 x 32 map, I can draft...',state:'streaming',note:"Jo's agent streams into #45. No other agent turn runs in this chat."},
+  {type:'update',id:45,body:'I can draft three terrain layouts for a 32 x 32 map, each with a clear path through the center.',state:'complete',note:"Jo's agent finishes. Both views retain message order 41, 42, 43, 44, 45."},
+  {type:'duplicate',id:44,note:"A retry of Alex's previous send returns the original #44 acknowledgment. No duplicate message is created."}
 ];
 let simIndex=0;
 function renderSimulation(){
@@ -87,15 +90,16 @@ function renderSimulation(){
     for(const message of messages){
       const row=document.createElement('li');if(message.agent)row.classList.add('agent');
       const sender=document.createElement('div');sender.className='sender';
-      const name=document.createElement('span');name.textContent=message.sender;
+      const name=document.createElement('span');name.textContent=message.sender;name.className='participant-tag';
+      name.dataset.role=message.agent?'agent':'human';name.dataset.tone=message.sender.startsWith('Jo')?'2':'1';
       const position=document.createElement('span');position.textContent='#'+message.id;sender.append(name,position);
       const body=document.createElement('p');body.className='body';body.textContent=message.body;row.append(sender,body);
-      if(message.agent){const metadata=document.createElement('div');metadata.className='run';metadata.textContent=message.state+' / context: '+message.context;row.append(metadata);}
+      if(message.agent){const metadata=document.createElement('div');metadata.className='run';metadata.textContent=message.state;row.append(metadata);}
       view.append(row);
     }
   }
   document.getElementById('sim-count').textContent=simIndex+' / '+simEvents.length+' steps | '+committed+' committed events';
-  document.getElementById('sim-description').textContent=simIndex?simEvents[simIndex-1].note:'Start with one sent message. Use Next event to see how concurrent replies keep their positions.';
+  document.getElementById('sim-description').textContent=simIndex?simEvents[simIndex-1].note:'Use Next event to see humans send during streaming while agent turns wait their turn.';
   document.getElementById('sim-next').disabled=simIndex===simEvents.length;
 }
 document.getElementById('sim-next').addEventListener('click',()=>{if(simIndex<simEvents.length)simIndex++;renderSimulation();});
@@ -124,14 +128,14 @@ function updateCosts(){
   document.getElementById('cf-data-cost').textContent=money(dataCost);
   document.getElementById('cf-total').textContent=money(sleeping+dataCost);
   document.getElementById('cost-detail').textContent='Modeled duration: '+Math.round(activeSeconds*.128).toLocaleString()+' GB-s with hibernation; '+Math.round(residentSeconds*.128).toLocaleString()+' GB-s if resident. Request overage: '+money(requestCost)+'.';
-  const dark=isDark(),color=dark?'#a0aab9':'#657086',line=dark?'#354050':'#dce0e5';
+  const colors=reportColors(),color=colors.muted,line=colors.line;
   const canvas=document.getElementById('cost-chart');
   canvas.setAttribute('aria-label','Monthly compute subtotal: '+money(sleeping)+' with hibernation; '+money(resident)+' for always resident rooms.');
   if(!window.Chart)return;
   if(!costChart){
-    costChart=new Chart(canvas,{type:'bar',data:{labels:['Hibernatable','Always resident'],datasets:[{label:'Monthly compute subtotal, USD',data:[sleeping,resident],backgroundColor:['#2148B8','#C83232'],maxBarThickness:55,borderRadius:0}]},
+    costChart=new Chart(canvas,{type:'bar',data:{labels:['Hibernatable','Always resident'],datasets:[{label:'Monthly compute subtotal, USD',data:[sleeping,resident],backgroundColor:paletteInks(),maxBarThickness:55,borderRadius:0}]},
       options:{responsive:true,maintainAspectRatio:false,animation:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>money(ctx.raw)}}},scales:{x:{beginAtZero:true,ticks:{color,callback:value=>'$'+value},grid:{color:line},border:{display:false}},y:{ticks:{color},grid:{display:false},border:{display:false}}}}});
-  }else{costChart.data.datasets[0].data=[sleeping,resident];costChart.options.scales.x.ticks.color=color;costChart.options.scales.y.ticks.color=color;costChart.options.scales.x.grid.color=line;costChart.resize();costChart.update('none');}
+  }else{costChart.data.datasets[0].data=[sleeping,resident];costChart.data.datasets[0].backgroundColor=paletteInks();costChart.options.scales.x.ticks.color=color;costChart.options.scales.y.ticks.color=color;costChart.options.scales.x.grid.color=line;costChart.resize();costChart.update('none');}
 }
 for(const id of ['rooms','hours','events','handler','connections','cf-rows','cf-storage'])document.getElementById(id).addEventListener('input',updateCosts);
 
@@ -144,9 +148,9 @@ function updateSupabase(){
   const counts=[2,10,100], values=counts.map(subtotal), canvas=document.getElementById('sb-chart');
   canvas.setAttribute('aria-label','Supabase base plus message overage for '+broadcasts.toLocaleString()+' broadcasts: '+counts.map((n,i)=>n+' receivers: $'+values[i].toFixed(2)).join('; '));
   if(!window.Chart)return;
-  const color=isDark()?'#a0aab9':'#657086',line=isDark()?'#354050':'#dce0e5';
-  if(!supabaseChart){supabaseChart=new Chart(canvas,{type:'bar',data:{labels:counts.map(n=>n+' receivers'),datasets:[{data:values,backgroundColor:'#2148B8',maxBarThickness:40}]},options:{responsive:true,maintainAspectRatio:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{color,callback:value=>'$'+value},grid:{color:line}},y:{ticks:{color},grid:{display:false}}}}});}
-  else{supabaseChart.data.datasets[0].data=values;supabaseChart.options.scales.x.ticks.color=color;supabaseChart.options.scales.y.ticks.color=color;supabaseChart.options.scales.x.grid.color=line;supabaseChart.resize();supabaseChart.update('none');}
+  const colors=reportColors(),color=colors.muted,line=colors.line;
+  if(!supabaseChart){supabaseChart=new Chart(canvas,{type:'bar',data:{labels:counts.map(n=>n+' receivers'),datasets:[{data:values,backgroundColor:paletteInks()[0],maxBarThickness:40}]},options:{responsive:true,maintainAspectRatio:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{color,callback:value=>'$'+value},grid:{color:line}},y:{ticks:{color},grid:{display:false}}}}});}
+  else{supabaseChart.data.datasets[0].data=values;supabaseChart.data.datasets[0].backgroundColor=paletteInks()[0];supabaseChart.options.scales.x.ticks.color=color;supabaseChart.options.scales.y.ticks.color=color;supabaseChart.options.scales.x.grid.color=line;supabaseChart.resize();supabaseChart.update('none');}
 }
 for(const id of ['sb-broadcasts','sb-receivers'])document.getElementById(id).addEventListener('input',updateSupabase);
 showSection();

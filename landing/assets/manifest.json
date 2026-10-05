@@ -108,6 +108,74 @@
       },
       "type": "HTML sans headline, raster artwork without display text",
       "focal_event": "many marks approaching an unfinished structure"
+    },
+    {
+      "key": "orchestra",
+      "title": "Orchestra mode",
+      "file": "orchestra.png",
+      "source": "/Users/alejandrocamus/.codex/generated_images/01a0e22e-b100-7f02-9437-82e612235f70/exec-8b7965bf-81a5-44dc-9a32-4f88aa2dfb16.png",
+      "prompt": "prompts/orchestra.txt",
+      "substrate": "#FAFAF7",
+      "inks": [
+        "#2148B8",
+        "#C83232"
+      ],
+      "mode": "controlled two-ink",
+      "representation": "faithful reproduction",
+      "layout": "editorial cover",
+      "process": "medium halftone with restrained dry-edge breakup",
+      "status": "generated concept",
+      "content": "One blue human conductor coordinating five red robot musicians.",
+      "width": 1448,
+      "height": 1086,
+      "ratio": "4:3",
+      "plate_roles": {
+        "dominant": "Cobalt human conductor, podium, and stage",
+        "accent": "Signal Red robots and instruments"
+      },
+      "type": "none; no text inside raster artwork",
+      "exact_text": null,
+      "focal_event": "oversized conductor gesture toward the robot ensemble",
+      "sha256": "66712e7e0d623e008aea6f0bf6ccdb16130da43dc4bf415a57f968c16611bf41",
+      "recipe": {
+        "subject": "one person conducting five robot musicians",
+        "intent": "personal statement",
+        "exact_text": null,
+        "text_language": "none",
+        "representation": "faithful reproduction",
+        "ratio": "4:3",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          "#2148B8",
+          "#C83232"
+        ],
+        "plate_roles": [
+          "human conductor and stage",
+          "robot musicians and instruments"
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "tension_balanced",
+        "focal_event": "abnormal scale relationship: conductor and smaller robot ensemble",
+        "release_zone": "open upper-right paper",
+        "unresolved_edge": "lower conductor crop",
+        "image_treatment": "medium mechanical halftone",
+        "type_hierarchy": "none; explicitly text-free",
+        "disruption": "oversized foreground conductor with bottom crop",
+        "imperfection_seed": "8d0ef4c983c546ee",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Human/agent brand roles override the default palette; large conductor gives Cobalt dominance.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      }
     }
   ]
 }

@@ -2,45 +2,56 @@
 
 - Project name: **surprised-face**.
 - Logo and planned CLI command: **`:o`**.
-- Workspaces, channels, and direct chats for people and their local agents.
+- Chats for people and their local agents, with invites scoped to one chat.
 - Each person keeps their harness, models, tools, credentials, and spending limits.
-- Group collaboration is the core model. A chat between friends is one use case.
+- Use cases include projects, friends, community hordes, and Orchestra mode for one person coordinating several local harnesses.
 
 ## Pages
 
 | Page | Contents |
 | --- | --- |
-| [Landing pages](landing/index.html) | Projects by default, Friends, and community Hordes. Use the same header dropdown on every review page. |
+| [Landing pages](landing/index.html) | Projects by default, Friends, community Hordes, and [Orchestra mode](landing/orchestra.html). Use the same header dropdown on every review page. |
 | [Interface images](interface-designs/index.html) | Three two-ink design concepts with left and right drawers and a central chat/composer. Fictional content, not a working app. |
 | [Imagery](imagery/index.html) | People, retro robots, lemonade, stars, dancing groups, and engineering / space hordes. |
 | [Design rules](design-system/index.html) | Name, colors, type, spacing, and readable controls. |
 | [Architecture](architecture/index.html) | Vue stack, local bridges, message order, agent modes, projects/media, hordes, backends, cost calculators, OpenAPPA, and group pilot. |
+| [MVP integration](Research/mvp-base-and-harness-integration.md) | heyDataAgent reuse, Sheep discovery, Codex/Hermes pilot, data ownership, and implementation steps. |
 | [How it works](report.html) | Concise routing and harness interface reference. |
-| [Tests](tests.html) | Actual execution evidence when application tests exist. |
+| [Tests](tests.html) | Inputs and results from `npm test` in `app/`. |
 | [MD](md.html) | Repository Markdown files. |
 
-Open the static pages directly in a browser. The message simulation, cost models, and architecture describe a proposal. No backend is connected.
+Open the design pages directly in a browser. `app/` contains the Electron app and Cloudflare Worker source. The shared room Worker is deployed at [surprised-face-rooms.camus-00.workers.dev](https://surprised-face-rooms.camus-00.workers.dev); its health endpoint responds. Cloudflare lists the account on Workers Free with no payment method on file. The pilot workspace is initialized and its owner app is connected.
+
+The deployed Worker gives each chat its own invite codes and membership. The current macOS arm64 app package is at `app/dist/electron/Packaged/surprised-face-0.1.0-mac-arm64.dmg`; open this build to use the updated chat flow.
 
 ## Structure
 
 | Entity | Purpose |
 | --- | --- |
-| Workspace | People, project references, channels, agent directory, and shared permissions. |
-| Channel | Project or topic conversation with its own membership and agent settings. |
-| Direct chat | Smaller conversation between two or more people, optionally with agents. |
+| Identity directory | Member identities, room membership, and agent directory. It does not grant access to every chat. |
+| Chat | One conversation with its own members and invite codes. |
 | Agent participant | Named assistant with an owner, harness connection, model, and native session. |
 | Horde | Coordinated agent runs backed by contributors' token budgets, models, and compute. |
 | Mission | Shared goal, bounded tasks, contribution offers, artifacts, and acceptance criteria. |
 
-## Proposed stack
+## Orchestra mode
 
-| Part | Choice | Reason |
+- One person coordinates multiple local agents through different harnesses in :o.
+- Mention agents to assign implementation, review, research, or other operations.
+- Agents take turns within a chat. Separate task chats can run in parallel; serialize access to a shared native session.
+- Use separate branches/worktrees when agents change code concurrently.
+- Local collaboration does not require another human or a shared cloud room. The intended local coordinator uses the bridge and SQLite to keep task queues, chat order, and results on the device.
+- Use Sheep's harness discovery, project/chat list, and native-session reader behind the app's local JSON bridge.
+
+## MVP stack
+
+| Part | Current choice | Role |
 | --- | --- | --- |
-| App UI | Vue 3 + TypeScript + Vite | Fits the chat, drawers, streaming replies, and media. No requirement favors React over Vue. |
-| Managed backend | Cloudflare Workers + SQLite Durable Objects | One coordinator per channel/direct chat, ordered writes and WebSockets. |
-| Directory / artifacts | D1 / private R2 | Workspace metadata and media files. |
-| Local bridge | TypeScript process + SQLite cache | Routes UI submissions, manages local harnesses, queues sends, applies server events. |
-| Alternative | Node + Postgres on a small server | Portable stack with server operations under our control. |
+| App UI | Electron + Vue 3 + TypeScript + Quasar/Vite | heyDataAgent-based chat shell with Codex and Hermes adapters. |
+| Room service | [Cloudflare Worker](https://surprised-face-rooms.camus-00.workers.dev) + SQLite Durable Objects | Deployed auth and room service; each chat owns ordered events, messages, WebSocket delivery, and its agent queue. |
+| Chat directory | SQLite Durable Object | Stores identities, per-chat invites, agents, and chat membership. |
+| Local bridge | Electron main process + SQLite cache + bundled Sheep helper | Runs local harnesses, queues writes, applies room events, and reads selected native history. |
+| Later storage | D1 and private R2 | Consider for larger directory workloads and shared files; not used by this pilot deployment. |
 
 - Supabase is another option, but Broadcast fan-out and high-frequency streaming can increase message charges. The architecture page models this separately from compute, storage, and other costs.
 - Hosting prices and estimates are linked to vendor sources in the architecture page. They are not measured all-in bills.
@@ -61,36 +72,38 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 
 | Input | Route |
 | --- | --- |
-| Human message | UI -> local bridge -> shared room -> other bridges and UIs. No model run. |
-| Tagged agent request | Room checks permission and saves request/context/reply position -> owner's bridge -> selected harness. |
+| Human message | UI -> local bridge -> shared room -> other authorized bridges and UIs. In a one-person chat, the selected owner agent can answer automatically. |
+| Tagged agent request | Room checks permission and queues the turn. When the chat is free, save context and reply position -> owner's bridge -> selected harness. |
 | Agent output | Owner's bridge -> shared room -> all authorized subscribers. Text fills the existing reply; files become attachments. |
-| Native harness controls | Focused terminal pane -> :o bridge -> child PTY. The harness interprets its own settings, commands, and hotkeys. |
+| Agent request | :o local adapter -> Codex app-server or Hermes ACP. The harness terminal UI, slash commands, and hotkeys are not embedded in this app. |
 
 ## Agent participation
 
 | Mode | Behavior |
 | --- | --- |
-| Mentions only, default | Acts when a person tags it or deliberately submits an agent action. Another owner's agent still requires permission. |
+| One-person chat | The owner's sole or selected agent answers an ordinary message immediately. |
+| Group chat | An agent acts when a person mentions its ID. The owner must enable remote agent requests for requests from others. |
 | Configured conditions, optional | Owner enables rules for particular channels, events, schedules, or meaningful contributions. Limits apply to context, actions, tokens, time, concurrency, and cooldowns. |
 
 - Conditions ignore agent messages by default. Deduplicate triggering events and bound causal chains to prevent loops.
 - Model-based detection spends tokens too. Make its scope and budget explicit.
-- Show why a run started, whose tokens it uses, its context, and pause/stop controls.
-- Agents return work or an answer. Ordinary human chat does not require agent commentary.
+- Show the agent and owner, whose tokens it uses, and stop controls. Context bookkeeping stays internal; reading the chat must not require inspecting it.
+- Agents return work or an answer. Ordinary messages run the owner agent in a one-person chat; group messages need `@agent_name`. Configured conditions are a later option.
 
 ## Message order and native records
 
 1. A human draft stays local until Send.
 2. The room checks membership, deduplicates the command, and saves it with a server-assigned sequence.
-3. Before generation, it saves an empty agent reply and exact shared context snapshot. Every UI shows that reply at the same position.
-4. The approved owner's bridge starts the run. New messages can arrive without changing the running prompt.
-5. Streaming batches fill the reply in place. If streaming is unavailable, final output fills the same reply after completion.
-6. Reconnecting clients replay saved events. A local cache has one writer; transcript JSON is an export, not a shared file everyone edits.
+3. Humans can send at any time. A solo chat may queue its owner agent automatically; group chats require a mention. Queued turns do not reserve a reply position yet.
+4. Only one agent turn runs per chat. After the previous turn ends and permissions are checked, the room atomically claims the next eligible turn, freezes the completed conversation context, and saves an empty reply at the end of the chat.
+5. The approved owner's bridge starts that turn. Human messages continue arriving after its reply position without changing its prompt or interrupting it.
+6. Streaming batches fill the reply in place. If streaming is unavailable, final output fills the same reply after completion. The next agent waits for the turn to finish, fail, or be confirmed stopped; a pause or temporary disconnect does not free the slot.
+7. Reconnecting clients replay saved events. A local cache has one writer; transcript JSON is an export, not a shared file everyone edits.
 
 - Shared records use `user` for humans and `assistant` for agents. Participant IDs, names, owner, harness, model, source IDs, and run context identify the speaker and origin.
 - Native harness sessions remain harness-owned. Submit real requests through adapters; copy available events/results or approved history imports into :o. Do not inject metadata into native files.
 - Record native session/turn frontiers and the actual submitted prompt as well as shared context. Private harness history can also affect output.
-- Different native sessions can run concurrently. Queue runs on the same session; use separate branches/worktrees for concurrent repository work.
+- Serialize agent turns within each chat, across all harnesses and native sessions. Separate chats/task rooms can run concurrently; also queue access to a native session shared by multiple rooms. Use branches/worktrees for concurrent repository work.
 
 ## Repositories and media
 
@@ -118,18 +131,43 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 ## Group pilot
 
 - Three humans: you and your two collaborators.
-- One workspace, a private project channel, and direct chats.
-- Three local bridges; initially two connected agents using two working adapters on separate machines. Agent count is separate from human count.
-- Human sends, mentions, owner approvals, concurrent replies, stop, reconnect, unread notifications, and one shared media output.
+- Separate chats with independent membership, including private project and friend conversations.
+- Three desktops/local bridges, one named agent per person. Start with two adapter types: Codex app-server and Hermes ACP. Each person chooses their own harness/model.
+- Human sends during streaming, mentions, owner approvals, queued agent turns, stop, reconnect, unread notifications, and one shared media output.
 - Reviewed import of existing harness history, preserving source provenance.
-- Pi, Hermes, Codex, and Claude Code remain in scope. Start with two stable adapters rather than requiring all four before trying collaboration.
+- Pi, OpenCode, Claude, and Copilot adapters follow the pilot. Inventory may display a harness's chats before its runnable adapter exists. See [MVP integration and next steps](Research/mvp-base-and-harness-integration.md).
 - Massive missions, configured observer modes, and broader packaging follow once the pilot is useful.
+
+## MVP interface
+
+- Desktop appearance choices: Cobalt + red, Mint + charcoal, and Classic. Classic keeps the previous app colors.
+- In chat, humans use blue tags and agents use red tags, with stable participant shades. Mint `#5EB783` and Charcoal `#302D2E` color the alternate app surfaces.
+- The left list shows recent projects with their local chats nested inside, plus shared chats. The right list shows members and agents of the selected chat. Settings opens in the main area and can be closed with the same sidebar button or Back to chat.
+- Selecting a project opens a ready composer with project and Codex/Hermes selectors. A plus icon appears when hovering or focusing a project. The first message creates a native chat in that folder, and the chat remains in the local catalog after restart.
+- The invite icon copies a code and shows a short confirmation. It shares that conversation's readable history into a chat with its own membership; later messages continue through the existing native session. Injected harness setup instructions and raw records stay internal.
+- Names and roles stay visible; color is an additional cue.
+- [Design rules](design-system/index.html) show both themes and participant tags.
 
 ## Sheep
 
-[Sheep](https://github.com/arjuna-dev/declawtter), formerly Declaw, is being developed for visibility into harnesses and switching between them in an app or CLI. Reuse its stable interfaces when ready. No Sheep code has been integrated here.
+- [Sheep](https://github.com/arjuna-dev/declawtter), formerly Declaw, provides cross-harness discovery and switching.
+- :o starts the bundled executable with `sheep bridge --stdio` as a background JSON process. It is a CLI command, but the interactive Sheep terminal UI is not embedded in :o.
+- The bridge lists projects and chats, loads a portable transcript, and reads selected native records in pages. The native source remains read-only.
+- Sheep's compact transcript and existing checkout flow stay intact. The richer reader can also support Sheep inspection and export features.
+- Rich reads cost I/O and parsing when a session is opened. Ordinary lists do not request the rich records. The current reader path has not been benchmarked, and some page reads may rescan earlier source data.
+- The current app bundle is built for macOS arm64 from the local Sheep checkout. A pinned Sheep revision and binaries for other supported systems are still needed.
+- See [reader implementation and integration details](Research/mvp-base-and-harness-integration.md#where-sheep-fits).
 
 - Structured interfaces handle prompts, events, approvals, models, and settings where supported.
 - Adapter manifests describe version-specific capabilities; runtime APIs provide catalogs where available.
-- A PTY terminal pane preserves uncovered native controls. Terminal pixels are not a complete transcript or universal command API.
+- Codex app-server and Hermes ACP handle the first adapter set. The shared UI currently exposes agent name, harness, model, and working folder; other native settings and commands need adapter support.
 - See [middleware feasibility](Research/cli-middleware-feasibility.md) and [chat UX research](Research/chat-ux-and-agent-orchestration.md).
+
+## Run the app
+
+- `cd app && npm install && npm run dev:electron` builds the local reader from the adjacent Sheep checkout and opens the desktop app. The packaged macOS app includes that reader; app users do not install it separately.
+- `cd app && npm test` updates [Tests](tests.html) from the test run. `npm run build:electron` makes the macOS app bundle and DMG in `app/dist/electron/Packaged/`.
+- `cd app && npm run test:ui` runs the actual Vue interface with synthetic Electron IPC, harness, and chat-service fixtures and updates [Tests](tests.html) with results and screenshots. Install its test browser with `npx playwright install chromium`; `SURPRISED_FACE_TEST_BROWSER=chrome npm run test:ui` can use an installed Chrome instead.
+- The pilot Worker is deployed with chat-scoped invites. New people create an account in the app without setting up Cloudflare. Open the updated desktop build for the new flow. Operators deploying a separate Worker can use [Cloudflare room service setup](app/cloudflare/README.md).
+- `npm test` runs the local consistency checks and writes their results to [tests.html](tests.html).
+- See [Cloudflare room service setup](app/cloudflare/README.md) for Worker secrets and deployment.

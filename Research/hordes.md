@@ -41,7 +41,7 @@ Research checked 2026-09-28.
 - Large missions use bounded task rooms, an atomic claim/lease per work item, contributor budgets, and explicit result acceptance.
 - Task attempts carry fencing epochs; expired workers cannot publish as the current owner. Paid work is not rerun automatically.
 - Contributors keep their own bridge, harnesses, API keys/local models, and spending controls.
-- Separate native sessions can run in parallel. Use branches/worktrees for repository work and immutable versions for artifacts.
+- Separate task rooms can run agents in parallel. Within one chat, humans can always send but agent turns run one at a time; queued turns start with completed chat context. Also serialize access to any native session shared across rooms. Use branches/worktrees for repository work and immutable versions for artifacts.
 - A mission summary receives selected findings. Do not fan every agent's token stream out to every contributor.
 - Preserve music, GIFs, patches, analyses, and verification evidence as attributed artifacts.
 - Review submissions independently. More agents or messages do not prove a claim.

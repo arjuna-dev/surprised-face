@@ -1,0 +1,56 @@
+{
+  "name": "surprised-face",
+  "version": "0.1.0",
+  "description": "Shared chats with local AI agents and harnesses.",
+  "productName": "surprised-face",
+  "desktopName": "surprised-face",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build:sheep": "bash scripts/build-sheep.sh",
+    "predev:electron": "npm run build:sheep",
+    "prebuild:electron": "npm run build:sheep",
+    "lint": "eslint -c ./eslint.config.js \"./src*/**/*.{ts,js,cjs,mjs,vue}\"",
+    "format": "prettier --write \"**/*.{js,ts,vue,css,scss,html,md,json}\" --ignore-path .gitignore",
+    "test": "node scripts/test-report.mjs",
+    "test:ui": "node scripts/ui-test-report.mjs",
+    "dev": "quasar dev",
+    "dev:electron": "quasar dev -m electron",
+    "build": "quasar build",
+    "build:electron": "quasar build -m electron",
+    "postinstall": "quasar prepare"
+  },
+  "dependencies": {
+    "lucide-vue-next": "^1.0.0",
+    "quasar": "^2.16.0",
+    "vue": "^3.5.22",
+    "vue-router": "^5.0.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.58.2",
+    "@quasar/app-vite": "^2.5.1",
+    "@types/node": "^24.0.0",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "autoprefixer": "^10.4.27",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
+    "shadcn-vue": "^2.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite-plugin-checker": "^0.12.0",
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.6"
+  },
+  "engines": {
+    "node": "^24.0.0",
+    "npm": ">= 10.0.0",
+    "yarn": ">= 1.21.1",
+    "pnpm": ">= 10.0.0"
+  }
+}

@@ -23,7 +23,10 @@
 
 ## Agent behavior
 
-- Default: agents act only on a tag or deliberate invocation.
+- MVP: humans request agent turns with `@agent_name`. Ordinary human messages do not trigger a reply.
+- Humans can always send, including during streaming. Only one agent turn runs per chat; other mentioned agents queue.
+- A queued turn gets its reply position and completed chat context when it starts, after the previous turn finishes, fails, or is confirmed stopped. Sending a human message does not interrupt the active agent.
+- Use ordinary chat input. Context bookkeeping stays internal; no special Reply action or context inspection is required.
 - Optional: owner-configured conditions, including meaningful contributions, scoped to channels/actions with budgets and cooldowns.
 - Agent-authored messages do not trigger further agents by default. Deduplicate events and limit causal chains.
 - An agent can also watch for a configured condition and act, but this should be opt-in and narrow.
@@ -36,7 +39,7 @@
 - The person starts `:o` as the CLI front door instead of launching a harness directly.
 - Every message and key event enters `:o` first. `:o` decides whether submitted text stays in shared human chat or is sent to an agent through a selected harness.
 - A human-only message is stored and delivered by `:o`; it does not go to the harness or spend model tokens.
-- When an agent is called or an opt-in trigger fires, `:o` sends the request with selected shared-chat messages the harness has not seen. The harness records that combined request as its native user turn.
+- An agent mention queues a turn. When it reaches the front of the chat queue and the previous turn has ended, `:o` sends the request with completed shared-chat context the harness has not seen. The harness records that combined request as its native user turn. Future opt-in triggers use the same queue.
 - The harness's native session remains owned by that harness, while `:o` shares copied run data and results with source participant and message IDs.
 - Use a PTY to receive the native harness TUI. To show it alongside shared chat, render it through a terminal emulator and compose it with the `:o` interface. The local `:o` process launches the CLI; a browser page cannot start it by itself. Do not edit terminal control bytes as plain text.
 - All user input goes through the `:o` app. Its shared composer routes messages to people or sends an agent request through an adapter. When the native terminal pane is focused, `:o` may forward that pane's terminal input to the selected harness PTY, where the harness interprets its own settings and commands. A generic PTY cannot tell whether submitted text is a slash command or a model prompt, so use the shared composer whenever recipient choice matters.
@@ -64,7 +67,6 @@
 ## Open questions
 
 - What would make the shared conversation useful if participants already have private agent chats and GitHub?
-- Can one person add a message to the shared human conversation without starting a harness turn?
 - Should a summoned agent use the summoning person's tokens, an explicitly funded mission budget, or a contributor's own local model?
 - Does an agent result need to be copied into a local harness session, or is a shared artifact enough?
 - When should a scheduled message appear in the shared chat, and who approved its schedule?

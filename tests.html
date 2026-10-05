@@ -29,6 +29,8 @@
         <li><a href="Research/chat-ux-and-agent-orchestration.md" target="_blank" rel="noopener">Research/chat-ux-and-agent-orchestration.md</a></li>
         <li><a href="Research/hordes.md" target="_blank" rel="noopener">Research/hordes.md</a></li>
         <li><a href="Research/cli-middleware-feasibility.md" target="_blank" rel="noopener">Research/cli-middleware-feasibility.md</a></li>
+        <li><a href="Research/mvp-base-and-harness-integration.md" target="_blank" rel="noopener">Research/mvp-base-and-harness-integration.md</a></li>
+        <li><a href="app/cloudflare/README.md" target="_blank" rel="noopener">app/cloudflare/README.md</a></li>
         <li><a href="Research/shared-chat-ideas.md" target="_blank" rel="noopener">Research/shared-chat-ideas.md</a></li>
         <li><a href=".agents/skills/visual-dev-console/SKILL.md" target="_blank" rel="noopener">.agents/skills/visual-dev-console/SKILL.md</a></li>
       </ul>
@@ -36,6 +38,305 @@
 
     <main class="page">
       <h1>Tests</h1>
+      <!-- TEST_REPORT_START -->
+      <p class="run-meta">2026-10-05T12:13:53.693Z UTC · 22 passed · 0 failed</p>
+      <table class="route-table">
+        <thead><tr><th scope="col">Check</th><th scope="col">Input</th><th scope="col">Result</th><th scope="col">Status</th></tr></thead>
+        <tbody><tr><th scope="row">Human message identity</th><td>event 1: member-1, Maya, &quot;Hello&quot;</td><td>SQLite keeps the participant ID and name. Replaying the event adds no duplicate.</td><td>Pass</td></tr>
+<tr><th scope="row">Room event order</th><td>WebSocket event 2 arrives before event 1.</td><td>Local events apply in sequence 1, 2; the cursor ends at 2.</td><td>Pass</td></tr>
+<tr><th scope="row">Queued sends</th><td>Two pending messages; two flush requests start together.</td><td>The mocked API receives each message once, in saved order, with one active send. An acknowledgement notification refreshes the UI after the pending copies are removed.</td><td>Pass</td></tr>
+<tr><th scope="row">Room service default</th><td>A new settings file has no saved room service URL.</td><td>Disconnected installs use the managed hosted URL; an explicit local development override can use a local Worker.</td><td>Pass</td></tr>
+<tr><th scope="row">Appearance choices</th><td>Saved theme is light, green, dark, cobalt-red, or an unknown value.</td><td>Saved Light opens Classic; Green and Dark open Mint + charcoal; new installs use Mint + charcoal.</td><td>Pass</td></tr>
+<tr><th scope="row">Development helper</th><td>Quasar app path is app/.quasar/dev-electron; bundled helper is app/resources/bin/sheep.</td><td>The app resolves the helper in the project resources directory.</td><td>Pass</td></tr>
+<tr><th scope="row">Packaged helper</th><td>A packaged app with its own resources directory.</td><td>The app resolves resources/bin/sheep inside the package.</td><td>Pass</td></tr>
+<tr><th scope="row">Catalog filters</th><td>Three local chats with different project paths, harnesses, agents, and titles.</td><td>Combined filters return only the matching chat; an unknown agent returns none.</td><td>Pass</td></tr>
+<tr><th scope="row">Missing chat path</th><td>One local chat has no path; the user selects /work/game.</td><td>The pathless chat is skipped and the matching chat is shown without a render error.</td><td>Pass</td></tr>
+<tr><th scope="row">Stale project</th><td>A pinned discovered project points to a deleted 0900 folder; others are internal, one-off, or ignored.</td><td>They are absent from the project list; real folders and manually tracked offline projects remain.</td><td>Pass</td></tr>
+<tr><th scope="row">Recent projects</th><td>Alpha has a newer chat than Beta, while Gamma has an older chat.</td><td>Project order is Alpha, Beta, Gamma by activity time.</td><td>Pass</td></tr>
+<tr><th scope="row">Nested project chats</th><td>A chat in /work/game, with both /work and /work/game tracked as projects.</td><td>The child project owns the activity; the parent is sorted by its own activity.</td><td>Pass</td></tr>
+<tr><th scope="row">Chat placement</th><td>Chats under a project, a nested project, and an unrelated folder.</td><td>Each chat appears only under its most specific tracked project.</td><td>Pass</td></tr>
+<tr><th scope="row">Readable chat</th><td>User and assistant turns mixed with system and tool records.</td><td>The chat shows only user and assistant turns; raw records stay internal.</td><td>Pass</td></tr>
+<tr><th scope="row">New Codex chat</th><td>Create a Codex chat in /work/game with chosen-model, then send Hello.</td><td>The selected folder and model reach thread/start. The first message uses the new session without reopening it.</td><td>Pass</td></tr>
+<tr><th scope="row">New Hermes chat</th><td>Create with an empty folder, then /work/game and hermes-model.</td><td>The empty folder is rejected. The selected folder and model reach session/new.</td><td>Pass</td></tr>
+<tr><th scope="row">New chat persistence</th><td>Save a new native chat, close SQLite, and reopen it.</td><td>The chat title, native ID, harness, and project folder survive restart.</td><td>Pass</td></tr>
+<tr><th scope="row">Native setup context</th><td>Native user records contain an AGENTS.md setup envelope, environment context, and an ordinary question about AGENTS.md.</td><td>Only the actual question and assistant reply appear. The same visible history is used for a chat invite.</td><td>Pass</td></tr>
+<tr><th scope="row">Codex local chat</th><td>Send to thread-1 twice after opening an existing Codex conversation.</td><td>The adapter resumes once and emits reply text and completion for both turns.</td><td>Pass</td></tr>
+<tr><th scope="row">Hermes local chat</th><td>Send to session-1 through Hermes ACP.</td><td>The adapter emits started, reply text, and completed in that order.</td><td>Pass</td></tr>
+<tr><th scope="row">Imported chat copy</th><td>Imported assistant message with an original timestamp and agent owner.</td><td>The local copy retains its agent attribution, original time, and native room link.</td><td>Pass</td></tr>
+<tr><th scope="row">Window navigation</th><td>Hash route, local file, and external web URL navigation attempts.</td><td>Only the loaded app document and its hash routes are allowed.</td><td>Pass</td></tr></tbody>
+      </table>
+      <details><summary>Runner output</summary><pre>TAP version 13
+# Subtest: local chat search combines project, harness, agent, and text filters
+ok 1 - local chat search combines project, harness, agent, and text filters
+  ---
+  duration_ms: 0.62025
+  type: &#39;test&#39;
+  ...
+# Subtest: project filtering tolerates local chats without a working folder
+ok 2 - project filtering tolerates local chats without a working folder
+  ---
+  duration_ms: 0.078917
+  type: &#39;test&#39;
+  ...
+# Subtest: project list skips stale and internal discovered folders
+ok 3 - project list skips stale and internal discovered folders
+  ---
+  duration_ms: 3.460292
+  type: &#39;test&#39;
+  ...
+# Subtest: projects sort by the latest chat activity rather than alphabetically
+ok 4 - projects sort by the latest chat activity rather than alphabetically
+  ---
+  duration_ms: 0.249667
+  type: &#39;test&#39;
+  ...
+# Subtest: a nested project owns its chats and activity instead of its parent
+ok 5 - a nested project owns its chats and activity instead of its parent
+  ---
+  duration_ms: 0.085708
+  type: &#39;test&#39;
+  ...
+# Subtest: new app chats remain in the local catalog after restarting
+ok 6 - new app chats remain in the local catalog after restarting
+  ---
+  duration_ms: 13.192334
+  type: &#39;test&#39;
+  ...
+# Subtest: stores the human participant name with the committed message
+ok 7 - stores the human participant name with the committed message
+  ---
+  duration_ms: 4.194
+  type: &#39;test&#39;
+  ...
+# Subtest: imported agent history keeps its author and original time in the local copy
+ok 8 - imported agent history keeps its author and original time in the local copy
+  ---
+  duration_ms: 4.337416
+  type: &#39;test&#39;
+  ...
+# Subtest: a new project chat creates a native session and sends its first message without resuming it
+ok 9 - a new project chat creates a native session and sends its first message without resuming it
+  ---
+  duration_ms: 0.911709
+  type: &#39;test&#39;
+  ...
+# Subtest: a new Hermes project chat keeps the selected folder and rejects a missing project
+ok 10 - a new Hermes project chat keeps the selected folder and rejects a missing project
+  ---
+  duration_ms: 0.977958
+  type: &#39;test&#39;
+  ...
+# Subtest: an opened Codex chat resumes its native session and streams a reply
+ok 11 - an opened Codex chat resumes its native session and streams a reply
+  ---
+  duration_ms: 0.2505
+  type: &#39;test&#39;
+  ...
+# Subtest: a Hermes local chat streams its own reply and releases the session
+ok 12 - a Hermes local chat streams its own reply and releases the session
+  ---
+  duration_ms: 0.168959
+  type: &#39;test&#39;
+  ...
+# Subtest: reopening a new Codex chat hides injected project instructions while keeping the actual conversation
+ok 13 - reopening a new Codex chat hides injected project instructions while keeping the actual conversation
+  ---
+  duration_ms: 0.607333
+  type: &#39;test&#39;
+  ...
+# Subtest: a chat transcript shows conversation turns while leaving harness records out of the chat
+ok 14 - a chat transcript shows conversation turns while leaving harness records out of the chat
+  ---
+  duration_ms: 0.092375
+  type: &#39;test&#39;
+  ...
+# Subtest: desktop navigation stays on the app document or its hash routes
+ok 15 - desktop navigation stays on the app document or its hash routes
+  ---
+  duration_ms: 0.629375
+  type: &#39;test&#39;
+  ...
+# Subtest: a chat belongs to the deepest matching project
+ok 16 - a chat belongs to the deepest matching project
+  ---
+  duration_ms: 0.374291
+  type: &#39;test&#39;
+  ...
+# Subtest: applies out-of-order room events only after the missing sequence arrives
+ok 17 - applies out-of-order room events only after the missing sequence arrives
+  ---
+  duration_ms: 2.468417
+  type: &#39;test&#39;
+  ...
+# Subtest: flushes pending sends once and in the outbox order
+ok 18 - flushes pending sends once and in the outbox order
+  ---
+  duration_ms: 12.240542
+  type: &#39;test&#39;
+  ...
+# Subtest: new installs use the deployed room service URL
+ok 19 - new installs use the deployed room service URL
+  ---
+  duration_ms: 0.397708
+  type: &#39;test&#39;
+  ...
+# Subtest: appearance offers two reference themes and keeps the previous layout as Classic
+ok 20 - appearance offers two reference themes and keeps the previous layout as Classic
+  ---
+  duration_ms: 0.339833
+  type: &#39;test&#39;
+  ...
+# Subtest: development finds the bundled helper beside the project, not inside Quasar output
+ok 21 - development finds the bundled helper beside the project, not inside Quasar output
+  ---
+  duration_ms: 2.693666
+  type: &#39;test&#39;
+  ...
+# Subtest: packaged builds use their bundled resources directory
+ok 22 - packaged builds use their bundled resources directory
+  ---
+  duration_ms: 0.082542
+  type: &#39;test&#39;
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 98.295959</pre></details><!-- TEST_REPORT_END -->
+<!-- UI_TEST_REPORT_START --><h2>Chat interface</h2><p class="run-meta">2026-10-05T12:12:34.560Z · npm run test:ui · 10 passed · 0 failed</p>
+<p>The actual Vue interface runs in Chromium with mocked Electron IPC. Project names, messages, agent replies, and invite codes are synthetic. window.prompt throws as it does in Electron. Assertions cover the rendered controls and API calls; hardware clipboard and live model calls are checked separately.</p>
+<table class="route-table"><thead><tr><th scope="col">Workflow</th><th scope="col">Result</th></tr></thead><tbody><tr><th scope="row">an empty chat view has no phantom invite and selecting a project enables its composer</th><td>Pass</td></tr>
+<tr><th scope="row">project plus and composer selectors create a Hermes chat and send its first message</th><td>Pass</td></tr>
+<tr><th scope="row">New chat survives Electron prompt restrictions and a failed first send keeps the draft for retry</th><td>Pass</td></tr>
+<tr><th scope="row">the local chat invite icon copies a real code with a short confirmation</th><td>Pass</td></tr>
+<tr><th scope="row">an existing chat uses the same invite icon and joining uses a working form</th><td>Pass</td></tr>
+<tr><th scope="row">changing the composer project keeps the draft and New chat resets it</th><td>Pass</td></tr>
+<tr><th scope="row">a delivered chat message clears its sending copy without waiting for another message</th><td>Pass</td></tr>
+<tr><th scope="row">an invite emptyInvite shows an error instead of a false copy confirmation</th><td>Pass</td></tr>
+<tr><th scope="row">an invite failCopy shows an error instead of a false copy confirmation</th><td>Pass</td></tr>
+<tr><th scope="row">composer and project controls fit a smaller desktop window</th><td>Pass</td></tr></tbody></table>
+<details><summary>Before the fixes</summary><p>The first UI run reproduced the phantom empty invite field and the New chat recovery screen from Electron's unsupported prompt. Five of six checks failed; the viewport-only check passed. Native session creation and catalog persistence also failed before implementation.</p><a href="output/playwright/red-results.json">Original UI results</a><figure><img src="output/playwright/red-empty-invite.png" alt="Empty invite panel before the fix" style="width:100%;height:auto"></figure><figure><img src="output/playwright/red-new-chat.png" alt="New chat crash before the fix" style="width:100%;height:auto"></figure></details>
+<figure><img src="output/playwright/project-composer.png" alt="Project selected, composer ready" style="width:100%;height:auto"><figcaption>Project selected, composer ready. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/new-chat-reply.png" alt="New Hermes chat with fixture reply" style="width:100%;height:auto"><figcaption>New Hermes chat with fixture reply. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/invite-copied.png" alt="Invite icon and copy confirmation" style="width:100%;height:auto"><figcaption>Invite icon and copy confirmation. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure>
+<figure><img src="output/playwright/small-project-composer.png" alt="Composer at 1000 x 680" style="width:100%;height:auto"><figcaption>Composer at 1000 x 680. Real Vue view with synthetic project, harness, and chat-service fixtures.</figcaption></figure><details><summary>Current structured results</summary><a href="output/playwright/results.json">Playwright results</a></details><!-- UI_TEST_REPORT_END -->
+      <h2>Desktop chat view</h2>
+      <ul>
+        <li>2026-10-05: checked the Electron development preview with two isolated app profiles on one computer, the real local catalog, and a throwaway local Worker.</li>
+        <li>Selected surprised-face, opened a new draft with the project plus button, and sent &quot;Reply with exactly: chat-ready. Do not use tools or change files.&quot; The app created a native Codex session and displayed its live answer, &quot;chat-ready&quot;. Reopening the new sidebar chat loaded the saved exchange without injected project setup instructions.</li>
+        <li>The green logo, composer, and collapsible People and agents panel were visible. Raw harness records and per-chat sign-in controls were absent. Settings contained harness sign-in; clicking Settings again or Back to chat closed it.</li>
+        <li>Clicked the Invite friend icon. The app created the chat account, imported the two visible messages, copied the invite code, and briefly showed &quot;Invite code copied&quot;. Pasting the system clipboard into the Join a chat form confirmed that a nonempty code had actually been copied. Codes are omitted from this report.</li>
+        <li>Sent &quot;Reply with exactly: invite-chat-ready. Do not use tools or change files.&quot; from that chat. Its linked native Codex session answered &quot;invite-chat-ready&quot;.</li>
+        <li>A fresh guest profile joined with the code and the name Friend check. It saw the four existing messages and both people in the participant panel, then sent &quot;Hello from the friend check&quot; successfully. This was a second identity on the same computer, not a second physical desktop.</li>
+        <li>The guest send exposed a duplicate pending copy after acknowledgement. After the fix, sent &quot;Delivery acknowledgement check&quot; and observed one delivered message with no pending copy. Hiding and reopening People and agents also worked.</li>
+        <li>Live model calls exercised Codex. Hermes creation and sending were checked with mocked adapter and rendered UI fixtures in the automated runs above.</li>
+      </ul>
+      <details><summary>Delivery acknowledgement regression</summary><p>The rendered UI check failed before the fix because the delivered text appeared twice. The passing check now asserts one committed row and no pending sending row without another incoming event.</p><a href="output/playwright/red-acknowledgement-results.json">Failing structured result</a><figure><img src="output/playwright/red-acknowledgement.png" alt="Duplicate pending copy before the acknowledgement fix" style="width:100%;height:auto"></figure></details>
+      <h2>Room service</h2>
+      <!-- WORKER_TEST_REPORT_START -->
+      <p class="run-meta">2026-10-05T10:27:54.693Z UTC · Local Wrangler Worker</p>
+      <table class="route-table"><thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Status</th></tr></thead><tbody><tr><th scope="row">Session identity</th><td>Owner and invited members authenticate with their participant IDs.</td><td>Pass</td></tr>
+<tr><th scope="row">App account creation</th><td>A new person can register without a Cloudflare key and cannot read existing chats.</td><td>Pass</td></tr>
+<tr><th scope="row">Chat invite access</th><td>Codes admit people to one chat; new chats stay private until invited.</td><td>Pass</td></tr>
+<tr><th scope="row">Solo and group agent routing</th><td>Solo chats call their owner agent automatically; group chats require a mention.</td><td>Pass</td></tr>
+<tr><th scope="row">Existing chat history</th><td>An imported Codex conversation is visible to invitees and retries do not duplicate messages.</td><td>Pass</td></tr>
+<tr><th scope="row">Agent routing</th><td>An @agent message creates a turn the configured owner can claim.</td><td>Pass</td></tr>
+<tr><th scope="row">Stream ordering</th><td>A second agent waits, then receives the completed reply and intervening human messages.</td><td>Pass</td></tr>
+<tr><th scope="row">Live updates</th><td>WebSocket clients receive new messages with participant names.</td><td>Pass</td></tr>
+<tr><th scope="row">Event order</th><td>The room returns 18 contiguous events with participant names.</td><td>Pass</td></tr>
+<tr><th scope="row">Idempotent send</th><td>Retrying the same client ID returns the original message sequence.</td><td>Pass</td></tr></tbody></table>
+      <details><summary>Worker output</summary><pre>⛅️ wrangler 4.147.0
+────────────────────
+Your Worker has access to the following bindings:
+Binding                                      Resource                  Mode
+env.DIRECTORY (WorkspaceDirectory)           Durable Object            local
+env.ROOMS (ChatRoom)                         Durable Object            local
+env.APP_ORIGIN (&quot;*&quot;)                         Environment Variable      local
+env.SESSION_SECRET (&quot;(hidden)&quot;)              Environment Variable      local
+env.ADMIN_SECRET (&quot;(hidden)&quot;)                Environment Variable      local
+
+⎔ Starting local server...
+Wrangler detected this dev session is running in an AI agent.
+The Local Explorer API is available at http://127.0.0.1:62919/cdn-cgi/local/explorer/api
+Useful routes:
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api/local/workers - local Workers and bindings
+  POST http://127.0.0.1:62919/cdn-cgi/local/explorer/api/local/scheduled?worker=&lt;name&gt; - invoke a Worker&#39;s scheduled handler; cron is required (see the OpenAPI schema for the full request)
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api/storage/kv/namespaces - KV namespaces
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api/d1/database - D1 databases
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api/r2/buckets - R2 buckets
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api/workers/durable_objects/namespaces - Durable Object namespaces
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api/workflows - Workflows
+  POST http://127.0.0.1:62919/cdn-cgi/local/explorer/api/local/observability/query - run a read-only SQL query (SELECT/WITH only) over captured request traces and console logs. Tables: spans, logs (read attributes via json(attributes)). Example:
+    curl -X POST http://127.0.0.1:62919/cdn-cgi/local/explorer/api/local/observability/query -H &#39;Content-Type: application/json&#39; -d &#39;{&quot;sql&quot;:&quot;SELECT service, name, outcome, duration_ms FROM spans WHERE parent_id IS NULL LIMIT 20&quot;}&#39;
+  POST http://127.0.0.1:62919/cdn-cgi/local/explorer/api/local/observability/clear - clear all captured traces and logs
+If the routes above don&#39;t cover what you need, fetch the full OpenAPI schema (large - use only as a last resort):
+  GET http://127.0.0.1:62919/cdn-cgi/local/explorer/api - OpenAPI schema
+[wrangler:info] Ready on http://127.0.0.1:62919
+[wrangler:info] GET /health 200 OK (3ms)
+[wrangler:info] GET /health 200 OK (1ms)
+[wrangler:info] POST /v1/admin/bootstrap 200 OK (4ms)
+[wrangler:info] POST /v1/register 200 OK (2ms)
+[wrangler:info] GET /v1/rooms 200 OK (2ms)
+[wrangler:info] GET /v1/me 200 OK (1ms)
+[wrangler:info] GET /v1/rooms 200 OK (2ms)
+[wrangler:info] POST /v1/agents 200 OK (5ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/messages 200 OK (4ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/claim 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/086ab9a2-cfa1-464a-9f85-8466329eb4e3/finish 200 OK (3ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/invites 200 OK (2ms)
+[wrangler:info] POST /v1/join 200 OK (3ms)
+[wrangler:info] POST /v1/join 200 OK (2ms)
+[wrangler:info] POST /v1/join 403 Forbidden (1ms)
+[wrangler:info] GET /v1/rooms 200 OK (2ms)
+[wrangler:info] GET /v1/members 200 OK (2ms)
+[wrangler:info] GET /v1/agents 200 OK (1ms)
+[wrangler:info] GET /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/events 200 OK (3ms)
+[wrangler:info] POST /v1/rooms 201 Created (1ms)
+[wrangler:info] GET /v1/rooms 200 OK (1ms)
+[wrangler:info] GET /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/events 403 Forbidden (1ms)
+[wrangler:info] GET /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/members 403 Forbidden (1ms)
+[wrangler:info] POST /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/import 200 OK (4ms)
+[wrangler:info] POST /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/import 200 OK (3ms)
+[wrangler:info] POST /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/invites 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/join 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/import 403 Forbidden (2ms)
+[wrangler:info] GET /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/events 200 OK (2ms)
+[wrangler:info] GET /v1/rooms 200 OK (1ms)
+[wrangler:info] GET /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/members 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/messages 200 OK (1ms)
+[wrangler:info] GET /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/connect 101 Switching Protocols (2ms)
+[wrangler:info] POST /v1/agents 200 OK (4ms)
+[wrangler:info] POST /v1/agents 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/9d3962f4-fff4-4ec7-9e0d-4aeb86330d2f/messages 403 Forbidden (2ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/messages 200 OK (3ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/claim 200 OK (1ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/claim 200 OK (3ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/messages 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/claim 409 Conflict (1ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/162f9f24-013b-4187-af6f-1a794800d886/chunk 200 OK (3ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/162f9f24-013b-4187-af6f-1a794800d886/finish 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/turns/claim 200 OK (2ms)
+[wrangler:info] POST /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/messages 200 OK (2ms)
+[wrangler:info] GET /v1/rooms/3f402ccf-c8ab-4d21-ad4e-4974c8e5c259/events 200 OK (1ms)</pre></details>
+      <!-- WORKER_TEST_REPORT_END -->
+      <h2>Deployed service</h2>
+      <p class="run-meta">2026-10-05 10:31 UTC · deployed Worker 1034ead4-e72a-414b-9d1d-e027a9ea555c</p>
+      <table class="route-table"><thead><tr><th scope="col">Request</th><th scope="col">Response</th><th scope="col">Status</th></tr></thead><tbody><tr><th scope="row"><code>GET https://surprised-face-rooms.camus-00.workers.dev/health</code></th><td><code>{"ok":true,"service":"surprised-face-rooms"}</code></td><td>Pass</td></tr><tr><th scope="row"><code>POST /v1/register</code> with an empty body</th><td><code>400</code> with a required-name error, confirming the public registration route is deployed.</td><td>Pass</td></tr></tbody></table>
+      <p class="note">Cloudflare shows Workers Free active and no payment method on file.</p>
+      <h2>App run</h2>
+      <p class="run-meta">2026-10-04 · packaged macOS arm64 app</p>
+      <table class="route-table"><thead><tr><th scope="col">Action</th><th scope="col">Observed result</th><th scope="col">Status</th></tr></thead><tbody>
+        <tr><th scope="row">Owner sign-in</th><td>The app opened the bootstrapped workspace using its locally encrypted session and displayed the shared <code>general</code> chat.</td><td>Pass</td></tr>
+        <tr><th scope="row">Sheep refresh</th><td>The packaged Sheep bridge completed a project and conversation refresh from the local harness sources.</td><td>Pass</td></tr>
+        <tr><th scope="row">Codex account</th><td>The Codex app-server account check returned a signed-in account. No model turn was started.</td><td>Pass</td></tr>
+        <tr><th scope="row">Local agent profile</th><td><code>alejandro-agent</code> is registered for this project. Remote agent execution remains off.</td><td>Pass</td></tr>
+        <tr><th scope="row">Collaborator access</th><td>A chat-specific invite code was generated and copied in an isolated desktop run. A three-device conversation has not been run.</td><td>Partial</td></tr>
+      </tbody></table>
+      <p class="note">The one-time bootstrap secret was removed locally and from the Worker after setup. The app package is unsigned and currently built for macOS arm64.</p>
     </main>
   </div>
 </body>

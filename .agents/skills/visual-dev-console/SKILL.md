@@ -21,7 +21,7 @@ Do not add Overview, Plan, or standalone Evidence pages unless the user asks for
 
 Keep the Tests page empty apart from the page title, page navigation, and Markdown drawer until real test evidence exists. Do not fill it with a placeholder message, status card, sample result, or invented data. When a test run exists, add its actual inputs, expected and observed outputs, command, and result.
 
-For this project, `:o` supports workspaces, channels, and direct chats with many humans and agents. It owns all user input and is the shared-chat entry point across harnesses. Each participant's UI connects through their owned local bridge to a shared room; that bridge also manages local harnesses. Do not describe user input as going directly to a harness. `:o` routes human messages to shared chat without starting a harness run. Agents use mentions only by default. Owners may enable scoped conditions or meaningful-contribution detection with permissions, context limits, budgets, cooldowns, concurrency limits, and loop prevention. When an agent is explicitly called or an opt-in trigger fires, `:o` builds a prompt from the request and selected shared messages the harness has not seen, then sends it through the chosen adapter. The harness keeps its native session, and `:o` copies selected results and run metadata into shared chat. Keep source participant IDs on included context. Do not edit harness session files directly.
+For this project, `:o` has private local chats and shared chats with explicit membership. Invites grant access to one chat, never to every chat or project. It owns all user input and is the shared-chat entry point across harnesses. Each participant's UI connects through their owned local bridge to a shared room; that bridge also manages local harnesses. Do not describe user input as going directly to a harness. In a one-person chat, an ordinary message can run the owner's agent immediately. After another person joins, agents use mentions. Owners may enable scoped conditions or meaningful-contribution detection with permissions, context limits, budgets, cooldowns, concurrency limits, and loop prevention. Agent requests enter the room turn queue. When a turn starts, `:o` builds a prompt from the request and completed shared messages the harness has not seen, then sends it through the chosen adapter. Future opt-in triggers must use the same queue. The harness keeps its native session, and `:o` copies selected results and run metadata into shared chat. Keep source participant IDs on included context. Do not edit harness session files directly.
 
 A PTY carries the native TUI's output. To show it beside shared chat, render the PTY stream through a terminal emulator and compose that surface with `:o`'s UI. A local `:o` process must launch and manage a local CLI; a browser page cannot launch a process on its own.
 
@@ -31,11 +31,14 @@ Prefer structured harness interfaces for prompt submission, session events, appr
 
 ## Project architecture references
 
-- Shared rooms save message order and an empty agent reply before generation. Streaming fills the saved reply in place; context is frozen and reconnects replay saved events.
+- Approved chat rule: humans can always send. A one-person chat can call the owner's agent automatically. A group chat requires `@agent_name` to queue a turn. Only one agent turn runs per chat, across all harnesses.
+- When the previous turn finishes, fails, or is confirmed stopped, atomically claim the next eligible queued turn, freeze completed conversation context, and reserve its reply at the end of the chat. Do not reserve a queued reply or freeze its context when the mention arrives. Streaming fills the active reply in place; new human messages do not change its prompt. A pause or temporary disconnect does not free the active slot.
+- Keep context bookkeeping internal. Do not require explicit Reply selection or context inspection to read the chat. Separate chats/task rooms can run concurrently; shared native sessions still need serialization. Reconnects replay saved events.
 - Repositories remain canonical project hosts. Encourage code collaboration with repository links and a host invitation action; keep grants explicit.
 - Music, GIFs, and other outputs are attributed, versioned artifacts with authorized previews/downloads and optional repository links.
 - Hordes coordinate contributed model tokens and compute using task rooms, bounded claims, budgets, handoffs, and validation.
 - The pilot has three humans; agent count is separate. Two-person diagrams are examples, not a product limit.
+- Recommended pilot base: reuse heyDataAgent's Electron/Vue shell and Codex/Hermes clients after removing its domain features. Improve Sheep to preserve available native records alongside compact transcripts and expose a versioned JSON mode. :o bundles and launches the compiled Sheep helper through stdin/stdout without displaying its interactive TUI. Keep summaries lightweight and rich reads on demand. Discovery support does not imply a runnable adapter exists. See `Research/mvp-base-and-harness-integration.md`.
 - Generated interface images are fictional design concepts, never evidence of a working harness or backend.
 
 ## Writing and layout
@@ -46,7 +49,7 @@ Prefer structured harness interfaces for prompt submission, session events, appr
 - Prefer a narrow reading column, simple navigation, plain lists or tables, and thin separators. Use cards only when they clarify a real grouping. Avoid decorative hero areas and oversized dashboards.
 - Keep the Markdown drawer compact, left aligned, and present on every page, including an otherwise empty Tests page. On narrow screens it can move above the page content.
 - Explain a workflow in the order it happens. Keep architecture diagrams small and use them only when they make a real data flow easier to understand.
-- Support light and dark color schemes. Follow the system preference by default. Dark backgrounds should use a very dark hue, such as blue-gray `#151a21`, and must not be pure black. Keep text and borders readable in both schemes. Add a manual theme control only when requested.
+- Public review pages and the planned app use Blue/red and Green themes through the shared header's manual control. Green replaces dark mode: Mint Green `#5EB783` and Charcoal `#302D2E` on Neutral White `#FAFAF7`. Blue/red uses Cobalt `#2148B8` for humans and Signal Red `#C83232` for agents. Assign stable participant shades, show names/roles, and keep body text neutral. Reuse `shared/project-header.css`; do not recolor raster illustrations. The separate development console may retain its existing light/dark styles.
 - Keep pages usable on narrow screens and with keyboard navigation. Respect reduced-motion settings.
 
 If behavior is not implemented yet, describe it as intended behavior in a plain sentence. Do not imply that a proposed flow has been observed in a real run. Avoid badges or banners to communicate this distinction.
@@ -91,7 +94,7 @@ Before finishing a feature change, confirm that:
 
 - The relevant behavior has a failing red test and a passing green test, or the reason for not using that cycle is stated.
 - The project's test command creates or updates `tests.html` from real run data.
-- The pages use the three-page navigation, a complete Markdown drawer, and minimal light and dark styles described above.
+- The pages use the three-page navigation, a complete Markdown drawer, and the minimal styles and applicable theme rules described above.
 - `report.html` describes the current code accurately and does not present assumptions as observed behavior.
 - UI workflows show real screenshots when available. Text workflows show readable inputs and outputs.
 - Source links match the implementation, and secrets or personal data are not exposed.

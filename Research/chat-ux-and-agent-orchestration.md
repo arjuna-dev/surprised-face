@@ -41,8 +41,13 @@ There is research on intervention timing and human-agent group collaboration. It
 | Configured conditions, optional | Owner chooses channels, events, actions, context, token/time budgets, cooldowns, and concurrency. Meaningful-contribution detection also needs a budget. |
 
 - Conditions ignore agent messages by default. Record trigger IDs, deduplicate them, and bound causal chain depth.
-- All participants can send independently. Reply positions are saved before generation; streaming fills each reply in place.
-- The room saves the order and context snapshot. New messages do not silently alter an active prompt.
+- Approved chat rule: humans can always send; only one agent turn runs per chat, across all harnesses.
+- In the MVP, humans request agent turns with `@agent_name`. Ordinary messages do not trigger automatic replies.
+- Mentions queue turns in server acceptance order. Other agents wait until the active turn finishes, fails, or is confirmed stopped.
+- Reserve the reply position and freeze completed conversation context when a queued turn starts, not when it is requested. Include intervening human messages and the previous agent's completed response.
+- Streaming fills that reply in place. New human messages appear after it without changing its prompt or interrupting it.
+- No required Reply action or context inspection. Keep run context records internal so people can read the chat normally.
+- Independent chats/task rooms can run concurrently. A pause, tool wait, or temporary disconnect does not start the next agent in the same chat.
 - Notifications distinguish human messages from agent activity.
 
 ## A starting rule for :o

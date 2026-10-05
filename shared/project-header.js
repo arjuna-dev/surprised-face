@@ -4,11 +4,12 @@
   const root = new URL('../', document.currentScript.src);
   const themeKey = 'sf-theme';
   const pageKey = 'sf-landing-page';
-  const modes = ['system', 'light', 'dark'];
+  const modes = ['light', 'green'];
   const pages = [
     { path: 'landing/index.html', label: 'Projects' },
     { path: 'landing/friends.html', label: 'Friends' },
-    { path: 'landing/hordes.html', label: 'Hordes' }
+    { path: 'landing/hordes.html', label: 'Hordes' },
+    { path: 'landing/orchestra.html', label: 'Orchestra' }
   ];
   const links = [
     { path: 'interface-designs/index.html', label: 'Interfaces' },
@@ -23,7 +24,7 @@
   const savePreference = (key, value) => {
     try { localStorage.setItem(key, value); } catch { /* Preferences are optional. */ }
   };
-  const validTheme = value => modes.includes(value) ? value : 'system';
+  const validTheme = value => (value === 'green' || value === 'dark') ? 'green' : 'light';
   document.documentElement.dataset.theme = validTheme(readPreference(themeKey));
 
   function mount() {
@@ -60,8 +61,9 @@
     const control = header.querySelector('#theme');
     function labelTheme() {
       const theme = document.documentElement.dataset.theme;
-      control.textContent = 'Theme: ' + theme;
-      control.setAttribute('aria-label', 'Color theme ' + theme + '. Click to change.');
+      const name = theme === 'green' ? 'Green' : 'Blue / red';
+      control.textContent = 'Theme: ' + name;
+      control.setAttribute('aria-label', 'Color theme ' + name + '. Click to change.');
     }
     function applyTheme(theme) {
       document.documentElement.dataset.theme = validTheme(theme);

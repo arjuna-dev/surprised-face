@@ -9,3 +9,4 @@ html[data-theme=dark]{--screen:#151a21;--ink:#afc0ed;--line:#354050}html[data-th
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 
 .project-poster .art{width:82%;right:-4%;bottom:-120px}.project-poster .caption{max-width:210px}@media(max-width:760px){.project-poster .art{width:115%;right:-20%;bottom:85px}}
+.orchestra-poster{min-height:0}.orchestra-poster .headline{position:absolute;left:62%;top:0;width:38%;padding:6% 6% 0 0}.orchestra-poster h1{font-size:clamp(30px,4.8vw,69px)}.orchestra-art{display:block;width:100%;height:auto;mix-blend-mode:multiply}@media(max-width:760px){.orchestra-poster .headline{position:static;width:auto;padding:32px 6% 0}.orchestra-poster .eyebrow{font-size:10px;margin-bottom:12px}}
