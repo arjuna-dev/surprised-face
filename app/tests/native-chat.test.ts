@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { test } from 'node:test';
+import { CodexDesktopUnavailable } from '../src-electron/codex-desktop-link';
 import { NativeChatService } from '../src-electron/native-chat';
 
 test('a new project chat creates a native session and sends its first message without resuming it', async () => {
@@ -61,6 +62,40 @@ test('an opened Codex chat resumes its native session and streams a reply', asyn
   assert.equal(resumed.length, 1);
   assert.ok(events.some((event) => (event as { type?: string; text?: string }).type === 'delta' && (event as { text?: string }).text === 'Hello'));
   assert.equal(events.filter((event) => (event as { type?: string }).type === 'completed').length, 2);
+});
+
+test('an open Codex desktop chat receives the app message without starting a second app-server turn', async () => {
+  const started: unknown[] = [];
+  const codex = Object.assign(new EventEmitter(), {
+    startThread: async () => ({}),
+    resumeThread: async () => { throw new Error('resume should not run'); },
+    startTurn: async (input: unknown) => { started.push(input); return {}; },
+  });
+  const hermes = Object.assign(new EventEmitter(), { newSession: async () => ({ sessionId: '' }), loadSession: async () => ({}), prompt: async () => ({}) });
+  const delivered: unknown[] = [];
+  const desktop = { startTurn: async (input: unknown) => { delivered.push(input); } };
+  const service = new NativeChatService(codex, hermes, desktop);
+  await service.send({ harness: 'codex', sessionId: 'thread-1', cwd: '/work/game', text: 'Hello from the app' });
+  assert.deepEqual(delivered, [{ threadId: 'thread-1', text: 'Hello from the app', cwd: '/work/game' }]);
+  assert.deepEqual(started, []);
+});
+
+test('a Codex chat uses the local adapter when the desktop thread has no owner', async () => {
+  const resumed: unknown[] = [];
+  const started: unknown[] = [];
+  const codex = Object.assign(new EventEmitter(), { startThread: async () => ({}) }) as EventEmitter & { resumeThread: (input: unknown) => Promise<unknown>; startTurn: () => Promise<unknown> };
+  codex.resumeThread = async (input) => { resumed.push(input); return {}; };
+  codex.startTurn = async () => {
+    started.push('turn');
+    queueMicrotask(() => codex.emit('event', { method: 'turn/completed', params: { threadId: 'thread-1' } }));
+    return {};
+  };
+  const hermes = Object.assign(new EventEmitter(), { newSession: async () => ({ sessionId: '' }), loadSession: async () => ({}), prompt: async () => ({}) });
+  const desktop = { startTurn: async () => { throw new CodexDesktopUnavailable(); } };
+  const service = new NativeChatService(codex, hermes, desktop);
+  await service.send({ harness: 'codex', sessionId: 'thread-1', cwd: '/work/game', text: 'Hi' });
+  assert.deepEqual(resumed, [{ threadId: 'thread-1', cwd: '/work/game' }]);
+  assert.deepEqual(started, ['turn']);
 });
 
 test('a Hermes local chat streams its own reply and releases the session', async () => {

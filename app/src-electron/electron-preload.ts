@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('surprisedFace', {
   sheepReadNative: (input: unknown) => ipcRenderer.invoke('sheep:read-native', input),
   sheepNativeRecords: (input: unknown) => ipcRenderer.invoke('sheep:native-records', input),
   nativeSend: (input: unknown) => ipcRenderer.invoke('native:send', input),
+  nativeFollow: (input: unknown) => ipcRenderer.invoke('native:follow', input),
   nativeCreate: (input: unknown) => ipcRenderer.invoke('native:create', input),
   nativeLink: (input: unknown) => ipcRenderer.invoke('native:link', input),
   nativeShare: (input: unknown) => ipcRenderer.invoke('native:share', input),

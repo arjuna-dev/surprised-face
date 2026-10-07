@@ -19,7 +19,7 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
     const on = (name: string) => (handler: (value: unknown) => void) => { (events[name] ||= []).push(handler); return () => {}; };
     // Match Electron's unsupported window.prompt rather than accepting browser dialogs.
     window.prompt = () => { throw new Error('prompt() is and will not be supported.'); };
-    Object.assign(window, { uiFixture: state, emitCodex: (value: unknown) => { for (const handler of events.codexEvent || []) handler(value); }, surprisedFace: {
+    Object.assign(window, { uiFixture: state, emitCodex: (value: unknown) => { for (const handler of events.codexEvent || []) handler(value); }, emitNative: (value: unknown) => { for (const handler of events.native || []) handler(value); }, surprisedFace: {
       settings: async () => structuredClone(state.settings),
       updateSettings: async (input: Record<string, unknown>) => {
         call('updateSettings', input);
@@ -40,7 +40,11 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
       hermesStatus: async () => ({ installed: true, version: 'Fixture Hermes' }),
       rooms: async () => structuredClone(state.rooms),
       sheepRefresh: async () => ({ projects: [{ name: 'Design', path: '/work/design' }, { name: 'Garden', path: '/work/garden' }], conversations: state.conversations }),
-      sheepRead: async () => ({ messages: [{ role: 'user', content: 'A sample conversation' }, { role: 'assistant', content: 'Sample reply' }] }),
+      sheepRead: async () => ({ messages: [
+        { role: 'user', content: '<external_codex_apps_open_page>{"page_id":null}</external_codex_apps_open_page>' },
+        { role: 'user', content: 'A sample conversation' },
+        { role: 'assistant', content: 'Sample reply' },
+      ] }),
       roomMessages: async () => state.sharedMessages, pendingMessages: async () => state.pendingOutbox, openRoom: async () => state.sharedMessages,
       sendMessage: async (input: { roomId: string; text: string }) => {
         const createdAt = new Date().toISOString();
@@ -62,6 +66,7 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
         state.conversations.push(chat);
         return chat;
       },
+      nativeFollow: async (input: unknown) => { call('nativeFollow', input); },
       nativeSend: async (input: { harness: string; sessionId: string; text: string }) => {
         call('nativeSend', input);
         for (const handler of events.native || []) {
@@ -139,6 +144,28 @@ test('New chat survives Electron prompt restrictions and a failed first send kee
   await expect(page.getByText('Something went wrong in this view.', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.getByText('Hello from your agent', { exact: true })).toBeVisible();
+});
+
+test('an open Codex chat follows later desktop messages and hides harness page context', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: 'Design', exact: true }).click();
+  await page.getByRole('button', { name: 'C Local design' }).click();
+  await expect(page.getByText('A sample conversation', { exact: true })).toBeVisible();
+  await expect(page.getByText('Sample reply', { exact: true })).toBeVisible();
+  await expect(page.getByText(/external_codex_apps_open_page/)).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any).uiFixture.calls.some((call: { method: string; input?: { sessionId?: string } }) => call.method === 'nativeFollow' && call.input?.sessionId === 'local-1'))).toBe(true);
+  await page.evaluate(() => (window as any).emitNative({
+    harness: 'codex', sessionId: 'local-1', type: 'transcript',
+    messages: [
+      { role: 'user', content: 'A sample conversation' },
+      { role: 'assistant', content: 'Sample reply' },
+      { role: 'user', content: 'Hello from Codex desktop' },
+      { role: 'assistant', content: 'Hello from the desktop reply' },
+    ],
+  }));
+  await expect(page.getByText('Hello from Codex desktop', { exact: true })).toBeVisible();
+  await expect(page.getByText('Hello from the desktop reply', { exact: true })).toBeVisible();
+  await expect(page.getByText(/external_codex_apps_open_page/)).toHaveCount(0);
 });
 
 test('inviting from a local chat shows its code in a modal and copies only on request', async ({ page }) => {

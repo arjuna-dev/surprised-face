@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -456,16 +456,17 @@ export function normalizeReasoningEffort(value: unknown): CodexReasoningEffort |
 function resolveCodexExecutable(): string | null {
   const explicitPath = process.env.CODEX_APP_BIN || process.env.CODEX_BIN || '';
 
-  if (isExecutableFile(explicitPath)) {
+  if (isLaunchableCodex(explicitPath)) {
     return explicitPath;
   }
 
   const pathMatch = findOnPath('codex');
-  if (pathMatch) {
+  if (pathMatch && isLaunchableCodex(pathMatch)) {
     return pathMatch;
   }
 
   const candidates = [
+    '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
     path.join(os.homedir(), '.volta/bin/codex'),
     '/opt/homebrew/bin/codex',
     '/usr/local/bin/codex',
@@ -473,7 +474,28 @@ function resolveCodexExecutable(): string | null {
     ...nvmCodexCandidates(),
   ];
 
-  return candidates.find(isExecutableFile) ?? null;
+  return candidates.find(isLaunchableCodex) ?? null;
+}
+
+function isLaunchableCodex(filePath: string): boolean {
+  return isExecutableFile(filePath) && !codexVendorBinaryMissing(filePath);
+}
+
+function codexVendorBinaryMissing(filePath: string): boolean {
+  let text = '';
+  try {
+    text = readFileSync(filePath, 'utf8');
+  } catch {
+    return false;
+  }
+  if (!text.includes('vendorRoot')) return false;
+  const triple = process.platform === 'darwin'
+    ? (process.arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin')
+    : process.platform === 'linux'
+      ? (process.arch === 'arm64' ? 'aarch64-unknown-linux-musl' : 'x86_64-unknown-linux-musl')
+      : (process.arch === 'arm64' ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-msvc');
+  const binaryName = process.platform === 'win32' ? 'codex.exe' : 'codex';
+  return !existsSync(path.join(path.dirname(filePath), '..', 'vendor', triple, 'codex', binaryName));
 }
 
 function findOnPath(command: string): string | null {
