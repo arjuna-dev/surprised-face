@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const panels = ['people','lemonade','stars','groups','hordes'];
+  const panels = ['people','lemonade','stars','groups','hordes','observability','string-cup'];
   function showPanel() {
     const requested = location.hash.slice(1);
     const active = panels.includes(requested) ? requested : 'people';

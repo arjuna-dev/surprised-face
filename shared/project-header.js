@@ -9,7 +9,8 @@
     { path: 'landing/index.html', label: 'Projects' },
     { path: 'landing/friends.html', label: 'Friends' },
     { path: 'landing/hordes.html', label: 'Hordes' },
-    { path: 'landing/orchestra.html', label: 'Orchestra' }
+    { path: 'landing/orchestra.html', label: 'Orchestra' },
+    { path: 'landing/observability.html', label: 'Observability' }
   ];
   const links = [
     { path: 'interface-designs/index.html', label: 'Interfaces' },
@@ -36,8 +37,8 @@
         <span class="project-face">:o</span><span>surprised-face</span>
       </a>
       <nav class="project-menu" aria-label="Project">
-        <label class="project-page-label">Page
-          <select id="landing-variant" aria-label="Landing page">
+        <label class="project-page-label">Pages
+          <select id="landing-variant" aria-label="Pages">
             ${pages.map(page => `<option value="${url(page.path)}">${page.label}</option>`).join('')}
           </select>
         </label>

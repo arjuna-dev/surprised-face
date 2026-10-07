@@ -1,0 +1,7 @@
+Make a targeted edit to the supplied 4:3 editorial illustration. Preserve the clean Neutral White paper #FAFAF7, the original framing and composition, and the visible medium halftone. Use exactly two inks: Cobalt #2148B8 for the man and his marks, Signal Red #C83232 for the humanoid robot and its marks. Add no text.
+
+Keep the same amused blue man, red robot, paper slips, work table, pose, expressions, and scene. Change only the man's eyewear. Make it read as peculiar 1960s machine eyeglasses, not binoculars or goggles. Use two small, eye-sized lenses close to his eyes in a thin cobalt wire frame. Make them asymmetric: one small round lens and one slightly narrower oval lens tilted by a few degrees. Add one tiny hinge gear and one small knurled adjustment wheel at the temple, connected with delicate frame details. Keep both eyes and most of his face visible. The lenses should occupy only the area immediately around each eye.
+
+Avoid thick rings, bulky cups, projecting tubes, external barrels, face-sized optics, large flip-up covers, and oversized headgear. Preserve the original character identities and the red robot arranging paper slips. No new props, symbols, diagrams, writing, logos, UI, borders, or extra gestures.
+
+Keep the hand-printed 1960s editorial character, restrained paper highlights, crisp plate separation, and existing quiet upper-left paper. Use only the two named inks and paper white. Avoid black, gray, extra hues, gradients, photorealism, 3D, glossy depth, and distressed aging.

@@ -10,3 +10,13 @@ html[data-theme=dark]{--screen:#151a21;--ink:#afc0ed;--line:#354050}html[data-th
 
 .project-poster .art{width:82%;right:-4%;bottom:-120px}.project-poster .caption{max-width:210px}@media(max-width:760px){.project-poster .art{width:115%;right:-20%;bottom:85px}}
 .orchestra-poster{min-height:0}.orchestra-poster .headline{position:absolute;left:62%;top:0;width:38%;padding:6% 6% 0 0}.orchestra-poster h1{font-size:clamp(30px,4.8vw,69px)}.orchestra-art{display:block;width:100%;height:auto;mix-blend-mode:multiply}@media(max-width:760px){.orchestra-poster .headline{position:static;width:auto;padding:32px 6% 0}.orchestra-poster .eyebrow{font-size:10px;margin-bottom:12px}}
+
+.observability-poster .observability-art{position:absolute;width:min(1000px,78%);height:auto;right:-5%;bottom:-23%;z-index:-1;mix-blend-mode:multiply}
+.observability-poster .headline{position:relative;width:min(560px,48%);padding:63px 0 0 6%;z-index:1}
+.observability-poster h1{font-size:clamp(42px,5.6vw,78px);max-width:560px}
+.observability-poster .caption{max-width:300px}
+.observability-question{max-width:1440px;margin:auto;padding:34px 6% 56px;border-top:1px solid var(--line)}
+.observability-question .eyebrow{color:var(--red);margin-bottom:14px}
+.observability-question h2{max-width:850px;font-size:clamp(27px,4vw,48px);line-height:1.12;margin:0 0 14px}
+.observability-question>p:last-child{max-width:620px;font-size:15px;line-height:1.6;margin:0;opacity:.88}
+@media(max-width:760px){.observability-poster{display:flex;min-height:0;flex-direction:column}.observability-poster .headline{width:100%;padding:48px 6% 0}.observability-poster h1{font-size:clamp(40px,8vw,60px)}.observability-poster .observability-art{position:relative;width:126%;right:auto;bottom:auto;margin:18px 0 0 -16%;z-index:0}.observability-poster .caption{position:relative;left:auto;bottom:auto;max-width:245px;margin:18px 6% 28px;z-index:1}.observability-poster .edition{display:none}.observability-question{padding-top:28px;padding-bottom:38px}.observability-question h2{font-size:29px}}

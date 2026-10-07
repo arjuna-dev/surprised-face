@@ -9,3 +9,7 @@ Apply red/green TDD to behavior changes and keep the project-local `report.html`
 ## Imagery
 
 - Omit text inside illustrations unless explicitly requested. Override the mono-color skill's default captions for this project.
+
+## Product ideas
+
+- Keep the active backlog in [FEATURE_WISHLIST.md](FEATURE_WISHLIST.md). Revisit it for Prime Agent and Cursor CLI harnesses, starter skills such as [autoresearch](https://github.com/karpathy/autoresearch), Friends, Hordes, Collaborate, and Observability modes, and direct skill actions for creating and sharing emojis, GIFs, and web UI elements.

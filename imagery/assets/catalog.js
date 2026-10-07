@@ -20,7 +20,7 @@ window.imageryCatalog = [
   {
     "key": "radio-lemonade",
     "title": "Radio and lemonade",
-    "file": "assets/radio-lemonade.png?v=f9ba014959fc",
+    "file": "assets/radio-lemonade.png?v=06b83f37812f",
     "prompt": "assets/prompts/radio-lemonade.txt",
     "alt": "A red 1960s radio with arms and legs serving lemonade to a reclining blue human.",
     "width": 1086,

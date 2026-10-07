@@ -1,6 +1,6 @@
 {
   "collection": "surprised-face imagery",
-  "generator": "image_gen",
+  "generator": "mixed",
   "skill": "mono-color",
   "recipes_are_prompt_intent": true,
   "images": [
@@ -178,8 +178,8 @@
       "file": "assets/radio-lemonade.png",
       "prompt": "assets/prompts/radio-lemonade.txt",
       "alt": "A red 1960s radio with arms and legs serving lemonade to a reclining blue human.",
-      "source": "exec-25b03570-4613-4850-9286-3b6de265aa26.png",
-      "parent": null,
+      "source": "Retro Radio Robot Refreshment.png",
+      "parent": "exec-25b03570-4613-4850-9286-3b6de265aa26.png",
       "recipe": {
         "subject": "Radio and lemonade",
         "intent": "playful editorial illustration",
@@ -225,29 +225,12 @@
       },
       "width": 1086,
       "height": 1448,
-      "sha256": "f9ba014959fcc53c3555539a805b324bc0bd5452690d43134417d7d7cc4078a7",
+      "sha256": "06b83f37812f8d7148b152198ef1ddf3f7deb957f2ef6ee3402b4aa2169ee8b5",
       "embedded_caption": null,
       "post_processing": {
-        "method": "Local ink masking and sampled paper replacement with feathered edges",
+        "method": "User-provided fixed image copied without modification",
         "uses_generation": false,
-        "original_git_revision": "cc273ea",
-        "original_sha256": "983dbb71777ab7b8f4a7e23b9b314de0f092ae8e8cd4c782f968ee43222afd50",
-        "caption_regions": [
-          [
-            530,
-            1180,
-            545,
-            250
-          ]
-        ],
-        "paper_sample": [
-          20,
-          20,
-          430,
-          240
-        ],
-        "feather_pixels": 16,
-        "changed_pixels": 119089
+        "source_filename": "Retro Radio Robot Refreshment.png"
       }
     },
     {
@@ -1137,6 +1120,294 @@
       "width": 1672,
       "height": 941,
       "sha256": "97ba0187c83b4a1e757944988e73500fc155ca8ec6829cebd37ddfa1256836c7"
+    },
+    {
+      "key": "cup-and-string",
+      "title": "Cup and string",
+      "category": "people",
+      "file": "assets/cup-and-string.png",
+      "prompt": "assets/prompts/cup-and-string.txt",
+      "alt": "Two blue children talk through paper cups and a string in separate sunlit rooms; one red robot works at a computer and another keeps a child company.",
+      "source": "kids-call.png",
+      "parent": "exec-17576480-a0d1-4b35-8863-897c37563e69.png",
+      "recipe": {
+        "subject": "Two children talking by cup and string in separate rooms with two robots",
+        "intent": "playful editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 15,
+        "visual_tension": "balanced",
+        "focal_event": "A taut cup-and-string line joins two children across distinct daytime room settings",
+        "release_zone": "continuous low-detail wall and floor across a modest central gap",
+        "unresolved_edge": "none",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "taut blue string crossing the modest central gap",
+        "imperfection_seed": "04de215052d909dc",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Cobalt identifies both children; Signal Red identifies both robots.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "embedded_caption": null,
+      "width": 2730,
+      "height": 1536,
+      "sha256": "30f57642c2a5e460ff476fd2c9ea314a810ae81354714d248aefdffac2c43f26"
+    },
+    {
+      "key": "observability",
+      "title": "Observability",
+      "category": "people",
+      "file": "../../landing/assets/observability.png",
+      "prompt": "../../landing/assets/prompts/observability.txt",
+      "alt": "A blue man wearing asymmetric 1960s machine spectacles reviews paper records with a red humanoid robot.",
+      "source": "observabillity-image.png",
+      "parent": "exec-10052cd2-2cc8-4bb2-ac9d-c2870603af0d.png",
+      "recipe": {
+        "subject": "Human with compact asymmetric machine eyeglasses reviewing project records alongside a robot",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "4:3",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "composition_editorial_cover",
+        "empty_paper": 35,
+        "visual_tension": "balanced",
+        "focal_event": "Compact asymmetric machine eyeglasses inspect a shared project record",
+        "release_zone": "quiet upper-left neutral paper",
+        "unresolved_edge": "lower and right image crop",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "disruption": "asymmetric round and oval eyepieces with a tiny temple gear",
+        "imperfection_seed": "0119f77bcd6738d8",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Cobalt identifies the person and record marks; Signal Red identifies the robot.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic."
+      },
+      "embedded_caption": null,
+      "width": 1448,
+      "height": 1086,
+      "sha256": "926ec0965010ee8ebae457d099ff84c00f4676b59350fa89fd8e7871a0119d95"
+    },
+    {
+      "key": "horde-charging-chatgpt",
+      "title": "Charging horde / ChatGPT",
+      "category": "hordes",
+      "file": "assets/horde-charging-chatgpt.png",
+      "prompt": "assets/prompts/horde-charging-chatgpt.txt",
+      "alt": "A blue-and-red sci-fi horde advances on varied one-off vehicles, with walkers, flying bikes and boards, and a single mechanical elephant and camel.",
+      "provider": "ChatGPT image generation",
+      "source": "exec-e5059340-e1e3-4f7d-a724-4aa9b0ae327e.png",
+      "parent": "exec-1727a36b-8b53-4d07-a9dd-117e5578f129.png",
+      "recipe": {
+        "subject": "A diverse horde of human and humanoid robot riders and walkers on unique science-fiction vehicles",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "distant_panorama",
+        "empty_paper": 10,
+        "visual_tension": "collective_motion",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "imperfection_seed": "0860d4ace11f45b9",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Cobalt identifies humans and their vehicles; Signal Red identifies humanoid robots and their vehicles.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic.",
+        "release_zone": "Open high-sky band with a futuristic skyline and a few flying vehicles",
+        "unresolved_edge": "The crowd and vehicles extend beyond the left and right edges",
+        "disruption": "Walking figures and one-off machine silhouettes break the repeated vehicle rhythm",
+        "focal_event": "A mixed human and robot horde advances through a retro-futurist city on individually designed ground and flying machines"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "0860d4ace11f45b9498287ac61e9949139b4d168ac850c4a692350498f724c80"
+    },
+    {
+      "key": "horde-front-facing-chatgpt",
+      "title": "Front-facing horde / ChatGPT",
+      "category": "hordes",
+      "file": "assets/horde-front-facing-chatgpt.png",
+      "prompt": "assets/prompts/horde-front-facing-chatgpt.txt",
+      "alt": "A front-facing horde of cobalt-blue humans and signal-red humanoid robots advances through a sci-fi city among unique vehicles, walkers, a mechanical elephant and a mechanical camel.",
+      "provider": "ChatGPT image generation",
+      "source": "exec-f612d8a9-ebef-41c7-bc4e-2ac1805d89e8.png",
+      "parent": "exec-e5059340-e1e3-4f7d-a724-4aa9b0ae327e.png",
+      "recipe": {
+        "subject": "A front-facing horde of humans and humanoid robots walking and riding unique retro-futurist vehicles",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "front_facing_panorama",
+        "empty_paper": 10,
+        "visual_tension": "collective_motion",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "imperfection_seed": "e7daf71fee464d5a",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Cobalt identifies humans and their vehicles; Signal Red identifies humanoid robots and their vehicles.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic.",
+        "release_zone": "Sparse futuristic skyline above the front-facing crowd",
+        "unresolved_edge": "The crowd continues beyond the left and right edges",
+        "disruption": "Front-facing characters, walkers and a small set of one-off vehicles keep the horde varied",
+        "focal_event": "A diverse human and robot crowd advances toward the viewer on foot and aboard distinct machines"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "e7daf71fee464d5a865af89e038e087189968e7b3a9be58fe9d24007cc8158b9"
+    },
+    {
+      "key": "horde-front-facing-chatgpt-2",
+      "title": "Front-facing horde 2 / ChatGPT",
+      "category": "hordes",
+      "file": "assets/horde-front-facing-chatgpt-2.png",
+      "prompt": "assets/prompts/horde-front-facing-chatgpt-2.txt",
+      "alt": "Front-facing cobalt-blue people and signal-red robots fill a futuristic city street, walking and riding varied bikes, hovercraft, a tank, one mechanical elephant and one camel.",
+      "provider": "ChatGPT image generation",
+      "source": "exec-dbd1f95c-ce67-4dc5-b584-a025933e40b0.png",
+      "parent": null,
+      "recipe": {
+        "subject": "A front-facing horde of human and humanoid robot walkers and riders on varied science-fiction vehicles",
+        "intent": "editorial illustration",
+        "exact_text": null,
+        "text_language": null,
+        "representation": "faithful reproduction",
+        "ratio": "16:9",
+        "carrier": "none",
+        "substrate": {
+          "id": "substrate_neutral_white",
+          "hex": "#FAFAF7"
+        },
+        "mode": "complementary duotone",
+        "palette": "custom_cobalt_signal_red",
+        "inks": [
+          {
+            "role": "human",
+            "name": "Cobalt",
+            "hex": "#2148B8"
+          },
+          {
+            "role": "agent",
+            "name": "Signal Red",
+            "hex": "#C83232"
+          }
+        ],
+        "layout": "front_facing_panorama",
+        "empty_paper": 10,
+        "visual_tension": "collective_motion",
+        "image_treatment": "1960s illustrated two-plate print with medium halftone",
+        "type_hierarchy": null,
+        "imperfection_seed": "e6f95ce50dbd716d",
+        "imperfections": [
+          "imperfection_ink_density",
+          "imperfection_dry_edge"
+        ],
+        "plate_balance_reason": "Cobalt identifies human characters and their vehicles; Signal Red identifies humanoid robots and their vehicles.",
+        "seed_usage": "Stable recipe identifier; image generation is not deterministic.",
+        "release_zone": "Sparse retro-futurist skyline above the frontal crowd",
+        "unresolved_edge": "The crowd continues beyond the left and right edges",
+        "disruption": "Front-facing faces and a varied spread of one-off flying and ground vehicles",
+        "focal_event": "A mixed human and robot horde advances toward the viewer on foot and aboard unique machines"
+      },
+      "embedded_caption": null,
+      "width": 1672,
+      "height": 941,
+      "sha256": "e6f95ce50dbd716d0ac2e7fa71c85956f062e741ca35aa570edffafa015a5c6f"
     }
   ]
 }

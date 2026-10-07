@@ -23,6 +23,7 @@ figure img { display:block; width:100%; height:auto; background:var(--paper); }
 figcaption { display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:12px 0; font-size:13px; }
 figcaption a { font-size:11px; }
 .portrait { max-width:580px; }
+.landscape { max-width:1100px; }
 .group-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; }
 .group-palette h2 { margin:0 0 16px; font-size:12px; font-weight:400; color:var(--muted); }
 .group-palette figure + figure { margin-top:20px; }
