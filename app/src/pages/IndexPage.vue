@@ -1164,6 +1164,14 @@ function handleNativeChatEvent(value: unknown): void {
     const reply = nativeAddedMessages.value.at(-1);
     if (reply?.role === 'assistant') reply.content += string(event.text);
     void scrollNativeToBottom();
+  } else if (event?.type === 'transcript' && Array.isArray(event.messages)) {
+    nativeTranscript.value = { messages: event.messages };
+    const sent = nativeAddedMessages.value.find((item) => item.role === 'user')?.content.trim();
+    const rows = event.messages.filter((item): item is { role?: unknown; content?: unknown } => Boolean(item) && typeof item === 'object');
+    if (sent && rows.some((item) => item.role === 'user' && typeof item.content === 'string' && item.content.trim() === sent)) {
+      nativeAddedMessages.value = [];
+    }
+    void scrollNativeToBottom();
   } else if (event?.type === 'completed') nativeSending.value = false;
   else if (event?.type === 'failed') {
     nativeSending.value = false;
@@ -1207,6 +1215,7 @@ async function loadNativeTranscript(): Promise<void> {
       harness: selectedNative.value.harness,
       id: selectedNative.value.id,
     });
+    if (selectedNative.value.harness === 'codex') void api.nativeFollow({ sessionId: selectedNative.value.id });
   } catch (error) {
     nativeError.value = messageOf(error)
       .replace(/Sheep/g, 'Local catalog')

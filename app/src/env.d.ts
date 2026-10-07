@@ -61,6 +61,7 @@ interface SurprisedFaceApi {
   sheepReadNative(input: unknown): Promise<unknown>;
   sheepNativeRecords(input: { harness: string; id: string }): Promise<unknown[]>;
   nativeSend(input: { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; text: string }): Promise<void>;
+  nativeFollow(input: { sessionId: string }): Promise<void>;
   nativeCreate(input: { harness: 'codex' | 'hermes'; cwd: string; title: string }): Promise<{ id: string; harness: 'codex' | 'hermes'; path: string; title: string; updatedAt: string }>;
   nativeLink(input: { harness: string; sessionId: string }): Promise<{ roomId: string; agentId: string } | null>;
   nativeShare(input: { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; title: string; agentName?: string }): Promise<{ room: SharedRoom; invite?: { code: string; expiresAt: string } }>;

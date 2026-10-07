@@ -12,6 +12,8 @@ import {
 import { HermesAcpClient } from './hermes-acp';
 import { AgentRunner } from './agent-runner';
 import { NativeChatService } from './native-chat';
+import { CodexDesktopLink } from './codex-desktop-link';
+import { CodexSessionFollow, findCodexSessionFile } from './codex-session-follow';
 import { LocalStore } from './local-store';
 import { RoomService } from './room-service';
 import { SettingsStore, type LocalAgentSettings } from './settings-store';
@@ -33,6 +35,7 @@ let codex: CodexAppServer;
 let hermes: HermesAcpClient;
 let agentRunner: AgentRunner;
 let nativeChat: NativeChatService;
+const codexSessionFollows = new Map<string, CodexSessionFollow>();
 
 if (!ownsSingleInstanceLock) {
   app.quit();
@@ -57,7 +60,15 @@ if (!ownsSingleInstanceLock) {
         clientVersion: app.getVersion(),
       });
       agentRunner = new AgentRunner(roomService, localStore, settingsStore, codex, hermes);
-      nativeChat = new NativeChatService(codex, hermes);
+      nativeChat = new NativeChatService(codex, hermes, {
+        startTurn: (input) => {
+          const link = new CodexDesktopLink({
+            socketPath: process.env.CODEX_IPC_SOCKET || path.join(os.homedir(), '.codex', 'ipc', 'ipc.sock'),
+            sessionFile: findCodexSessionFile(input.threadId, path.join(os.homedir(), '.codex', 'sessions')),
+          });
+          return link.startTurn(input).finally(() => link.close());
+        },
+      });
 
       bindEvents();
       registerHandlers();
@@ -80,6 +91,8 @@ if (!ownsSingleInstanceLock) {
   app.on('before-quit', () => {
     roomService?.stop();
     sheepBridge?.stop();
+    for (const follow of codexSessionFollows.values()) follow.close();
+    codexSessionFollows.clear();
     codex?.stop();
     hermes?.stop();
     localStore?.close();
@@ -298,7 +311,12 @@ function registerHandlers(): void {
     const value = input as { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; text: string };
     const chat = localStore.catalog('app-conversation').find((item) => item.id === value.sessionId && item.harness === value.harness);
     if (chat) localStore.cache('app-conversation', value.sessionId, value.harness, { ...chat, updatedAt: new Date().toISOString() });
+    if (value.harness === 'codex') followCodexSession(value.sessionId);
     await nativeChat.send(value);
+  });
+  safeIpc('native:follow', (_event, input) => {
+    const value = input as { sessionId?: string };
+    if (value.sessionId) followCodexSession(value.sessionId);
   });
   safeIpc('native:link', (_event, input) => {
     const value = input as { harness: string; sessionId: string };
@@ -491,6 +509,18 @@ function safeIpc(
 function assertMainWindowSender(event: Electron.IpcMainInvokeEvent): void {
   if (!mainWindow || event.sender !== mainWindow.webContents)
     throw new Error('Request did not come from the active app window.');
+}
+
+function followCodexSession(sessionId: string): void {
+  if (!sessionId || nativeChat.owns('codex', sessionId) || codexSessionFollows.has(sessionId)) return;
+  const filePath = findCodexSessionFile(sessionId, path.join(os.homedir(), '.codex', 'sessions'));
+  if (!filePath) return;
+  const follow = new CodexSessionFollow(filePath);
+  codexSessionFollows.set(sessionId, follow);
+  follow.on('update', (view: { messages: unknown[] }) => {
+    sendToRenderer('native:chat-event', { harness: 'codex', sessionId, type: 'transcript', messages: view.messages });
+  });
+  follow.start();
 }
 
 function sendToRenderer(channel: string, value: unknown): void {

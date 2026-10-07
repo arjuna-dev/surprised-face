@@ -1,4 +1,9 @@
 import { EventEmitter } from 'node:events';
+import { CodexDesktopUnavailable } from './codex-desktop-link';
+
+type DesktopTurnBridge = {
+  startTurn(input: { threadId: string; text: string; cwd?: string }): Promise<unknown>;
+};
 
 type Harness = 'codex' | 'hermes';
 type NativeChatInput = { harness: Harness; sessionId: string; cwd: string; text: string };
@@ -23,8 +28,9 @@ type ActiveTurn = {
 export class NativeChatService extends EventEmitter {
   private readonly active = new Map<string, ActiveTurn>();
   private readonly resumed = new Set<string>();
+  private readonly owned = new Set<string>();
 
-  constructor(private readonly codex: CodexClient, private readonly hermes: HermesClient) {
+  constructor(private readonly codex: CodexClient, private readonly hermes: HermesClient, private readonly desktop: DesktopTurnBridge | null = null) {
     super();
     codex.on('event', (event: unknown) => this.onCodex(event));
     hermes.on('event', (event: unknown) => this.onHermes(event));
@@ -42,8 +48,14 @@ export class NativeChatService extends EventEmitter {
       : await this.hermes.newSession(input.model, input.cwd);
     const sessionId = input.harness === 'codex' ? string(object(object(result)?.thread)?.id) : string(object(result)?.sessionId);
     if (!sessionId) throw new Error('The agent did not create a chat. Try again.');
-    this.resumed.add(`${input.harness}:${sessionId}`);
+    const key = `${input.harness}:${sessionId}`;
+    this.resumed.add(key);
+    this.owned.add(key);
     return { harness: input.harness, sessionId, cwd: input.cwd };
+  }
+
+  owns(harness: Harness, sessionId: string): boolean {
+    return this.owned.has(`${harness}:${sessionId}`);
   }
 
   async send(input: NativeChatInput): Promise<void> {
@@ -51,11 +63,8 @@ export class NativeChatService extends EventEmitter {
     if (!sessionId || !cwd || !text.trim()) throw new Error('Choose a chat with a working folder and enter a message.');
     const key = `${harness}:${sessionId}`;
     if (this.active.has(key)) throw new Error('This chat is still answering.');
-    if (!this.resumed.has(key)) {
-      if (harness === 'codex') await this.codex.resumeThread({ threadId: sessionId, cwd });
-      else await this.hermes.loadSession(sessionId, cwd);
-      this.resumed.add(key);
-    }
+    const tryDesktop = harness === 'codex' && Boolean(this.desktop) && !this.owned.has(key);
+    if (!tryDesktop && !this.resumed.has(key)) await this.resume(harness, sessionId, cwd, key);
     let resolve!: () => void;
     let reject!: (error: Error) => void;
     const complete = new Promise<void>((done, fail) => { resolve = done; reject = fail; });
@@ -64,6 +73,16 @@ export class NativeChatService extends EventEmitter {
     this.active.set(key, { input, sawText: false, resolve, reject, timer });
     this.emit('event', { harness, sessionId, type: 'started' });
     try {
+      if (harness === 'codex' && this.desktop && !this.owned.has(key)) {
+        try {
+          await this.desktop.startTurn({ threadId: sessionId, text, cwd });
+          this.finish(key, 'completed');
+          return;
+        } catch (error) {
+          if (!isDesktopUnavailable(error)) throw error;
+        }
+      }
+      if (!this.resumed.has(key)) await this.resume(harness, sessionId, cwd, key);
       if (harness === 'codex') await this.codex.startTurn({ threadId: sessionId, text, cwd });
       else await this.hermes.prompt(sessionId, text);
       await complete;
@@ -71,6 +90,12 @@ export class NativeChatService extends EventEmitter {
       this.finish(key, 'failed', error instanceof Error ? error.message : String(error));
       throw error;
     }
+  }
+
+  private async resume(harness: Harness, sessionId: string, cwd: string, key: string): Promise<void> {
+    if (harness === 'codex') await this.codex.resumeThread({ threadId: sessionId, cwd });
+    else await this.hermes.loadSession(sessionId, cwd);
+    this.resumed.add(key);
   }
 
   private onCodex(value: unknown): void {
@@ -123,6 +148,10 @@ export class NativeChatService extends EventEmitter {
     if (type === 'failed') active.reject(new Error(message));
     else active.resolve();
   }
+}
+
+function isDesktopUnavailable(error: unknown): boolean {
+  return error instanceof CodexDesktopUnavailable || (error instanceof Error && error.name === 'CodexDesktopUnavailable');
 }
 
 function object(value: unknown): Record<string, unknown> | null {
