@@ -59,16 +59,17 @@ if (!ownsSingleInstanceLock) {
         workingDirectory: () => os.homedir(),
         clientVersion: app.getVersion(),
       });
-      agentRunner = new AgentRunner(roomService, localStore, settingsStore, codex, hermes);
-      nativeChat = new NativeChatService(codex, hermes, {
-        startTurn: (input) => {
+      const desktop = {
+        startTurn: (input: { threadId: string; text: string; cwd?: string }) => {
           const link = new CodexDesktopLink({
             socketPath: process.env.CODEX_IPC_SOCKET || path.join(os.homedir(), '.codex', 'ipc', 'ipc.sock'),
             sessionFile: findCodexSessionFile(input.threadId, path.join(os.homedir(), '.codex', 'sessions')),
           });
           return link.startTurn(input).finally(() => link.close());
         },
-      });
+      };
+      agentRunner = new AgentRunner(roomService, localStore, settingsStore, codex, hermes, desktop);
+      nativeChat = new NativeChatService(codex, hermes, desktop);
 
       bindEvents();
       registerHandlers();
@@ -103,7 +104,7 @@ function bindEvents(): void {
   roomService.on('event', (payload) => {
     sendToRenderer('room:event', payload);
     const event = asObject(asObject(payload)?.event);
-    if (event?.type === 'turn.queued' || event?.type === 'turn.finished') {
+    if (event?.type === 'turn.queued' || event?.type === 'turn.finished' || event?.type === 'turn.availability') {
       const roomId = stringValue(asObject(payload)?.roomId);
       if (roomId) setTimeout(() => void agentRunner.runPending(roomId), 0);
     }
@@ -130,7 +131,7 @@ function registerHandlers(): void {
   safeIpc('app:update-settings', async (_event, input) => {
     const previous = await settingsStore.get();
     const settings = await settingsStore.update(input as Parameters<SettingsStore['update']>[0]);
-    if (settings.connected && settings.allowRemoteAgentRequests && !previous.allowRemoteAgentRequests) {
+    if (settings.connected && settings.allowRemoteAgentRequests !== previous.allowRemoteAgentRequests) {
       void roomService.rooms()
         .then((rooms) => agentRunner.resumePending(rooms.map((room) => room.id)))
         .catch((error: unknown) => sendToRenderer('app:error', error instanceof Error ? error.message : String(error)));
@@ -216,56 +217,34 @@ function registerHandlers(): void {
     return result.canceled ? null : result.filePaths[0] || null;
   });
 
+  safeIpc('sheep:cached', () => {
+    const conversations = conversationCatalog(localStore.catalog('conversation'));
+    const projects = sortProjectsByRecent(projectsForUi(localStore.catalog('project')), conversations as { path?: string; updatedAt?: string }[]);
+    return { projects, conversations };
+  });
   safeIpc('sheep:health', () => sheepBridge.request('health'));
   safeIpc('sheep:projects', async () => {
-    const result = await sheepBridge.request<{ projects: Record<string, unknown>[] }>(
-      'projects.list',
-    );
+    const result = await sheepBridge.request<{ projects: Record<string, unknown>[] }>('projects.list');
     const projects = sortProjectsByRecent(projectsForUi(result.projects || []), []);
-    for (const project of projects)
-      localStore.cache(
-        'project',
-        stringField(project.name) || stringField(project.path),
-        '',
-        project,
-      );
+    localStore.replaceCatalog('project', projects);
     return { ...result, projects };
   });
   safeIpc('sheep:conversations', async () => {
-    const result = await sheepBridge.request<{ conversations: Record<string, unknown>[] }>(
-      'conversations.list',
-    );
-    result.conversations = conversationCatalog(result.conversations || []);
-    for (const conversation of result.conversations || [])
-      localStore.cache(
-        'conversation',
-        stringField(conversation.id),
-        stringField(conversation.harness),
-        conversation,
-      );
+    const result = await sheepBridge.request<{ conversations: Record<string, unknown>[]; sourceError?: string }>('conversations.list');
+    localStore.replaceCatalog('conversation', result.conversations || [], !result.sourceError);
+    result.conversations = conversationCatalog(result.sourceError ? localStore.catalog('conversation') : result.conversations || []);
     return result;
   });
   safeIpc('sheep:refresh', async () => {
     const result = await sheepBridge.request<{
       projects: Record<string, unknown>[];
       conversations: Record<string, unknown>[];
+      conversationSourceError?: string;
     }>('refresh');
-    result.conversations = conversationCatalog(result.conversations || []);
+    localStore.replaceCatalog('conversation', result.conversations || [], !result.conversationSourceError);
+    result.conversations = conversationCatalog(result.conversationSourceError ? localStore.catalog('conversation') : result.conversations || []);
     const projects = sortProjectsByRecent(projectsForUi(result.projects || []), (result.conversations || []) as { path?: string; updatedAt?: string }[]);
-    for (const project of projects)
-      localStore.cache(
-        'project',
-        stringField(project.name) || stringField(project.path),
-        '',
-        project,
-      );
-    for (const conversation of result.conversations || [])
-      localStore.cache(
-        'conversation',
-        stringField(conversation.id),
-        stringField(conversation.harness),
-        conversation,
-      );
+    localStore.replaceCatalog('project', projects);
     return { ...result, projects };
   });
   safeIpc('sheep:read', (_event, identity) =>

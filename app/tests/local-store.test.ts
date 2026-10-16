@@ -62,3 +62,37 @@ test('imported agent history keeps its author and original time in the local cop
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+test('catalog replacement removes deleted discovery entries and preserves owned chats and native records', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'surprised-face-catalog-'));
+  const file = path.join(directory, 'catalog.sqlite');
+  const store = new LocalStore(file);
+  try {
+    store.cache('app-conversation', 'owned', 'codex', { id: 'owned', harness: 'codex' });
+    store.cache('conversation', 'deleted', 'pi', { id: 'deleted', harness: 'pi' });
+    store.saveNativePage({ harness: 'pi', sessionId: 'deleted', format: 'jsonl', complete: true, records: [{ index: 0, raw: { tool: 'preserve' } }] });
+    const fresh = [{ id: 'fresh', harness: 'pi', title: 'Fresh title' }];
+    store.replaceCatalog('conversation', fresh);
+    assert.deepEqual(store.catalog('conversation'), fresh);
+    assert.equal(store.catalog('app-conversation')[0]?.id, 'owned');
+    assert.deepEqual(store.nativeRecords('pi', 'deleted'), [{ index: 0, kind: '', at: null, raw: { tool: 'preserve' } }]);
+    store.close();
+    const reopened = new LocalStore(file);
+    try { assert.deepEqual(reopened.catalog('conversation'), fresh); }
+    finally { reopened.close(); }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+
+test('partial discovery preserves cached harness entries until a complete refresh', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'surprised-face-partial-catalog-'));
+  const store = new LocalStore(path.join(directory, 'catalog.sqlite'));
+  try {
+    store.replaceCatalog('conversation', [{ id: 'claude-old', harness: 'claude' }]);
+    store.replaceCatalog('conversation', [{ id: 'codex-new', harness: 'codex' }], false);
+    assert.deepEqual(new Set(store.catalog('conversation').map((chat) => chat.id)), new Set(['claude-old', 'codex-new']));
+    store.replaceCatalog('conversation', []);
+    assert.deepEqual(store.catalog('conversation'), []);
+  } finally { store.close(); rmSync(directory, { recursive: true, force: true }); }
+});

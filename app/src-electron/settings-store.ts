@@ -1,6 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { safeStorage } from 'electron';
 import { DEFAULT_ROOM_SERVICE_URL, normalizeAppTheme, resolveRoomServiceUrl } from './settings-defaults';
 import type { AppTheme } from './settings-defaults';
 
@@ -39,7 +38,7 @@ const defaults: StoredSettings = {
 export class SettingsStore {
   private readonly filePath: string;
   private value: StoredSettings = { ...defaults };
-  private loaded = false;
+  private loading: Promise<void> | null = null;
 
   constructor(userDataPath: string) {
     this.filePath = path.join(userDataPath, 'settings.json');
@@ -54,6 +53,7 @@ export class SettingsStore {
     await this.load();
     const encrypted = this.value.encryptedAccessToken;
     if (!encrypted) return '';
+    const { safeStorage } = await import('electron');
     if (!safeStorage.isEncryptionAvailable())
       throw new Error('Secure credential storage is unavailable on this computer.');
     return safeStorage.decryptString(Buffer.from(encrypted, 'base64'));
@@ -87,6 +87,7 @@ export class SettingsStore {
     accessToken: string,
   ): Promise<PublicSettings> {
     await this.load();
+    const { safeStorage } = await import('electron');
     if (!safeStorage.isEncryptionAvailable())
       throw new Error('Secure credential storage is unavailable on this computer.');
     this.value.backendUrl = normalizeBackendUrl(backendUrl);
@@ -110,9 +111,12 @@ export class SettingsStore {
     return { ...value, connected: Boolean(encryptedAccessToken && value.member) };
   }
 
-  private async load(): Promise<void> {
-    if (this.loaded) return;
-    this.loaded = true;
+  private load(): Promise<void> {
+    this.loading ??= this.readSettings();
+    return this.loading;
+  }
+
+  private async readSettings(): Promise<void> {
     try {
       const saved = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<StoredSettings>;
       this.value = {

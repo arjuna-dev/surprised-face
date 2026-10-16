@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('surprisedFace', {
   saveAgent: (input: unknown) => ipcRenderer.invoke('app:save-agent', input),
   runPending: (roomId: string) => ipcRenderer.invoke('app:run-pending', roomId),
   chooseFolder: () => ipcRenderer.invoke('app:choose-folder'),
+  sheepCached: () => ipcRenderer.invoke('sheep:cached'),
   sheepHealth: () => ipcRenderer.invoke('sheep:health'),
   sheepProjects: () => ipcRenderer.invoke('sheep:projects'),
   sheepConversations: () => ipcRenderer.invoke('sheep:conversations'),

@@ -1,5 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, statSync } from 'node:fs';
+import { CodexDesktopUnavailable } from './codex-desktop-link';
+import type { NativeDisplayMessage } from '../src/lib/native-transcript';
 import type { CodexAppServer } from './codex-app-server';
 import type { HermesAcpClient, HermesEvent } from './hermes-acp';
 import type { LocalStore } from './local-store';
@@ -33,6 +35,7 @@ type StreamState = {
 
 export class AgentRunner extends EventEmitter {
   private readonly activeRooms = new Set<string>();
+  private readonly pendingWakeups = new Set<string>();
   private readonly codexRuns = new Map<string, StreamState>();
   private readonly hermesRuns = new Map<string, StreamState>();
   private readonly resumedCodexThreads = new Set<string>();
@@ -44,6 +47,7 @@ export class AgentRunner extends EventEmitter {
     private readonly settings: SettingsStore,
     private readonly codex: CodexAppServer,
     private readonly hermes: HermesAcpClient,
+    private readonly desktop: { startTurn(input: { threadId: string; text: string; cwd?: string }): Promise<NativeDisplayMessage[]> } | null = null,
   ) {
     super();
     this.codex.on('event', (event: unknown) => this.handleCodexEvent(event));
@@ -51,7 +55,11 @@ export class AgentRunner extends EventEmitter {
   }
 
   async runPending(roomId: string): Promise<void> {
-    if (!roomId || this.activeRooms.has(roomId)) return;
+    if (!roomId) return;
+    if (this.activeRooms.has(roomId)) {
+      this.pendingWakeups.add(roomId);
+      return;
+    }
     this.activeRooms.add(roomId);
     let ranTurn = false;
     try {
@@ -69,9 +77,12 @@ export class AgentRunner extends EventEmitter {
         this.emit('agent/error', { roomId, agentId: agent.id, message });
         try { await this.rooms.finishAgentTurn(roomId, turn.turnId, 'failed', message); } catch { /* connection retry or app shutdown */ }
       }
+    } catch (error) {
+      this.emit('agent/error', { roomId, message: errorMessage(error) });
     } finally {
       this.activeRooms.delete(roomId);
-      if (ranTurn) setTimeout(() => void this.runPending(roomId), 0);
+      const wakeAgain = this.pendingWakeups.delete(roomId);
+      if (ranTurn || wakeAgain) setTimeout(() => void this.runPending(roomId), 0);
     }
   }
 
@@ -104,6 +115,23 @@ export class AgentRunner extends EventEmitter {
     prompt: string,
     previous?: { native_session_id: string; context_through_seq: number },
   ): Promise<void> {
+    if (previous && this.desktop && !this.resumedCodexThreads.has(previous.native_session_id)) {
+      let replies: NativeDisplayMessage[] | undefined;
+      try {
+        replies = await this.desktop.startTurn({ threadId: previous.native_session_id, text: prompt, cwd: agent.workingDirectory });
+      } catch (error) {
+        // Only a confirmed unavailable desktop permits trying another writer.
+        if (!(error instanceof CodexDesktopUnavailable) && !(error instanceof Error && error.name === 'CodexDesktopUnavailable')) throw error;
+      }
+      if (replies) {
+        const state = this.createStream(roomId, turn.turnId, previous.native_session_id, agent.id);
+        for (const reply of replies) if (reply.role === 'assistant' && reply.content) this.addChunk(state, reply.content);
+        this.store.saveAgentSession({ roomId, agentId: agent.id, harness: agent.harness, sessionId: previous.native_session_id, cwd: agent.workingDirectory, model: agent.model, contextThroughSeq: turn.contextThroughSeq });
+        await this.finishStream(state, 'complete');
+        if (state.failure) throw new Error(state.failure);
+        return;
+      }
+    }
     let threadId = previous?.native_session_id || '';
     if (!threadId) {
       const started = asObject(await this.codex.startThread({ cwd: agent.workingDirectory, ...(agent.model ? { model: agent.model } : {}) }));

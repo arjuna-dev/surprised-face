@@ -19,6 +19,42 @@ for (const match of output.matchAll(/^(ok|not ok) \d+ - (.+)$/gm)) results.set(m
 
 const checks = [
   {
+    name: 'Shared native Codex session',
+    test: 'a shared Codex chat uses its desktop owner instead of acquiring a second writer',
+    input: 'A shared chat is linked to an existing desktop session; a mocked second writer rejects resume.',
+    result: 'The runner submits through the existing desktop owner and copies its assistant reply into the room.',
+  },
+  {
+    name: 'Startup settings synchronization',
+    test: 'concurrent startup settings reads wait for the saved connection and agents',
+    input: 'The bridge and renderer request settings together from one synthetic saved profile.',
+    result: 'Both await the same file read and receive the saved identity, connected state, and local agents.',
+  },
+  {
+    name: 'Agent queue wakeups',
+    test: 'queue wakeups received during a claim are retried after the claim completes',
+    input: 'A mocked claim is in flight when another queue availability event arrives.',
+    result: 'After the first empty claim finishes, the runner claims again instead of losing the wakeup.',
+  },
+  {
+    name: 'Agent claim recovery',
+    test: 'claim failures are reported and do not prevent a later queue retry',
+    input: 'A mocked claim fails with Connection lost, followed by a successful empty claim.',
+    result: 'The runner emits the error and releases the local room lock so the next retry can run.',
+  },
+  {
+    name: 'Catalog reconciliation',
+    test: 'catalog replacement removes deleted discovery entries and preserves owned chats and native records',
+    input: 'Replace a saved catalog, reopen SQLite, and inspect app-owned chats and paged native records.',
+    result: 'Deleted discovery rows disappear, new rows survive restart, and owned chats and native fields remain intact.',
+  },
+  {
+    name: 'Partial discovery',
+    test: 'partial discovery preserves cached harness entries until a complete refresh',
+    input: 'A partial catalog is followed by a successful empty snapshot.',
+    result: 'Partial results retain unavailable harness entries; a complete empty refresh removes the old discovery rows.',
+  },
+  {
     name: 'Bundled Sheep native import',
     test: 'bundled Sheep imports a synthetic Pi chat into a separate Codex session',
     input: 'Synthetic Pi user/assistant turns; disposable Codex destination; stubbed Codex CLI launch.',
@@ -231,14 +267,24 @@ const rows = checks.map((check) => {
 const timestamp = new Date().toISOString();
 const sheepReviewPath = path.join(appRoot, '../output/sheep-review.json');
 const sheepReview = existsSync(sheepReviewPath) ? JSON.parse(readFileSync(sheepReviewPath, 'utf8')) : null;
-const sheepEvidence = sheepReview ? `<h2>Sheep source and bundle</h2><p>${escapeHtml(sheepReview.sourceTestTime)} · <code>go test -json ./...</code> in the Sheep checkout · ${sheepReview.sourceTests.pass} passed · ${sheepReview.sourceTests.fail} failed · ${sheepReview.sourceTests.skip} skipped.</p><p>The existing ${escapeHtml(sheepReview.platform)} bundle reports revision <code>${escapeHtml(sheepReview.revision)}</code> and vcs.modified=${escapeHtml(sheepReview.modified)} in Go build metadata. It already contains the native import commit. This is an audit of committed behavior, not a new app export feature; no product behavior changed in this review. The bundled-helper regression above executes the converter with synthetic text and disposable target roots, then checks bridge discovery and reads. Harness launch is stubbed; other native import targets and a real harness resume were not exercised.</p><p><a href="output/sheep-source-results.jsonl">Go test events</a> · <a href="output/sheep-review.json">Bundle and test metadata</a></p>` : '';
+const sheepEvidence = sheepReview ? `<h2>Sheep source and bundle</h2><p>${escapeHtml(sheepReview.sourceTestTime)} · <code>go test -json ./...</code> in the Sheep checkout · ${sheepReview.sourceTests.pass} passed · ${sheepReview.sourceTests.fail} failed · ${sheepReview.sourceTests.skip} skipped.</p><p>The earlier ${escapeHtml(sheepReview.platform)} bundle audit reported revision <code>${escapeHtml(sheepReview.revision)}</code> and vcs.modified=${escapeHtml(sheepReview.modified)} in Go build metadata. It already contains the native import commit. This historical audit preceded the catalog startup changes shown above. The bundled-helper regression above executes the converter with synthetic text and disposable target roots, then checks bridge discovery and reads. Harness launch is stubbed; other native import targets and a real harness resume were not exercised.</p><p><a href="output/sheep-source-results.jsonl">Go test events</a> · <a href="output/sheep-review.json">Bundle and test metadata</a></p>` : '';
+const performancePath = path.join(appRoot, '../output/startup-performance.json');
+const performance = existsSync(performancePath) ? JSON.parse(readFileSync(performancePath, 'utf8')) : null;
+const sourceResultsPath = path.join(appRoot, '../output/sheep-startup-test-results.jsonl');
+const sourceEvents = existsSync(sourceResultsPath) ? readFileSync(sourceResultsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line)) : [];
+const sourcePass = sourceEvents.filter((event) => event.Action === 'pass' && event.Test).length;
+const sourceFail = sourceEvents.filter((event) => event.Action === 'fail' && event.Test).length;
+const startupEvidence = performance ? `<h2>Catalog startup</h2><p>The real local catalog contains ${performance.conversationCount} chats. The baseline helper took ${performance.baselineSeconds.toFixed(3)}s; the changed helper took ${performance.coldSeconds.toFixed(3)}s with an empty cache and ${performance.restartSeconds.toFixed(3)}s after restarting with a populated cache. This measures the helper catalog operation, not full Electron startup. Metadata equality: ${performance.identicalCatalogs ? 'all fields matched' : 'differences observed'}.</p><p>The full Sheep suite (go test -json ./...) reports ${sourcePass} passing tests and ${sourceFail} failures. Regression coverage includes unchanged-file reuse, changed/deleted/new sessions, renamed Codex titles, source preservation, native page continuation, unknown native fields, and damaged-cache fallback. The app checks exercise catalog reconciliation, partial discovery, native import, and preservation of native records. <a href="output/startup-performance.json">Timings and method</a> · <a href="output/sheep-startup-test-results.jsonl">Go test events</a> · <a href="output/typecheck-results.json">Production typecheck and existing test fixture issues</a></p>` : '';
+const livePath = path.join(appRoot, '../output/agent-mentions/live-check.json');
+const live = existsSync(livePath) ? JSON.parse(readFileSync(livePath, 'utf8')) : null;
+const mentionEvidence = live ? `<h2>Shared agent recovery</h2><p>${escapeHtml(live.checkedAt)}. Read-only verification of existing requests in the live chat: one assistant reply completed; the collaborator's older build reported an active writer conflict. The new shared desktop session regression above verifies the fix with a synthetic desktop owner. The collaborator must install the updated build before that path can be verified on their computer.</p><p><a href="output/agent-mentions/worker-red.html">Failing queue regression before the fix</a> · <a href="output/agent-mentions/live-check.json">Sanitized live observation</a></p>` : '';
 const generated = `
       <p class="run-meta">${escapeHtml(timestamp)} UTC · ${passed} passed · ${failed} failed</p>
       <table class="route-table">
         <thead><tr><th scope="col">Check</th><th scope="col">Input</th><th scope="col">Result</th><th scope="col">Status</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <details><summary>Runner output</summary><pre>${escapeHtml(output.trim() || `No test output. ${total} tests.`)}</pre></details>${sheepEvidence}`;
+      <details><summary>Runner output</summary><pre>${escapeHtml(output.trim() || `No test output. ${total} tests.`)}</pre></details>${startupEvidence}${sheepEvidence}${mentionEvidence}`;
 
 const reportPath = path.join(appRoot, '..', 'tests.html');
 const report = readFileSync(reportPath, 'utf8');

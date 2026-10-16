@@ -507,6 +507,15 @@ export class ChatRoom extends DurableObject<Env> {
 
   private claimTurn(actor: string, input: { agentIds?: string[]; allowRemote?: boolean }): Response {
     const sql = this.ctx.storage.sql;
+    // Keep declined cross-owner requests pending without blocking runnable turns.
+    // Only the authenticated owner can pause or restore their own requests.
+    const waitingState = input.allowRemote ? 'queued' : 'awaiting_permission';
+    const previousState = input.allowRemote ? 'awaiting_permission' : 'queued';
+    const changed = sql.exec<{ id: string }>(
+      'UPDATE turns SET state=?, updated_at=? WHERE owner_id=? AND requested_by<>? AND state=? RETURNING id',
+      waitingState, now(), actor, actor, previousState,
+    ).toArray();
+    if (changed.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: Boolean(input.allowRemote) });
     const active = sql.exec('SELECT id FROM turns WHERE state=\'active\' LIMIT 1').toArray()[0];
     if (active) return json({ turn: null, reason: 'another_agent_active' }, 409);
     const turn = sql.exec<{ id: string; request_message_id: string; agent_id: string; agent_name: string; harness: string; model: string; owner_id: string; requested_by: string }>(
@@ -514,10 +523,18 @@ export class ChatRoom extends DurableObject<Env> {
       actor, actor, input.allowRemote ? 1 : 0,
     ).toArray()[0];
     if (!turn) {
-      const blocked = sql.exec<{ owner_id: string }>("SELECT owner_id FROM turns WHERE state='queued' ORDER BY queue_seq LIMIT 1").toArray()[0];
+      const blocked = sql.exec<{ owner_id: string }>("SELECT owner_id FROM turns WHERE state='awaiting_permission' AND owner_id=? ORDER BY queue_seq LIMIT 1", actor).toArray()[0];
       return json({ turn: null, ...(blocked?.owner_id === actor ? { reason: 'remote_requests_disabled' } : {}) });
     }
-    if (turn.owner_id !== actor) return json({ turn: null, reason: 'earlier_turn_waiting_for_owner' });
+    if (turn.owner_id !== actor) {
+      // Installed desktops may have already consumed the original queue event.
+      // Wake that owner once per pending turn, including after a server upgrade.
+      const rechecked = sql.exec(
+        "SELECT event_seq FROM events WHERE type='turn.queued' AND json_extract(data,'$.turnId')=? AND json_extract(data,'$.recheck')=1 LIMIT 1", turn.id,
+      ).toArray()[0];
+      if (!rechecked) this.appendEvent('turn.queued', { turnId: turn.id, agentId: turn.agent_id, agentName: turn.agent_name, ownerId: turn.owner_id, requestedBy: turn.requested_by, requestMessageId: turn.request_message_id, recheck: true });
+      return json({ turn: null, reason: 'earlier_turn_waiting_for_owner' });
+    }
     if (turn.requested_by !== actor && !input.allowRemote) return json({ turn: null, reason: 'remote_requests_disabled' });
     if (!(input.agentIds || []).includes(turn.agent_id)) return json({ turn: null, reason: 'agent_not_configured_here' });
     const request = sql.exec<{ message_seq: number; text: string }>('SELECT message_seq, text FROM messages WHERE id=?', turn.request_message_id).toArray()[0];

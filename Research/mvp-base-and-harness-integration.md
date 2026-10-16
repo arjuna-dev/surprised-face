@@ -60,11 +60,13 @@ flowchart TB
 - Implemented operations: `health`, `projects.list`, `conversations.list`, `conversations.read`, `conversations.readNative`, and `refresh`.
 - `conversations.readNative` accepts a harness, session ID, cursor, and page limit. Sheep resolves the session from its latest inventory; the caller cannot pass an arbitrary source path.
 - Sheep is Go; :o is TypeScript. This integration uses a compiled executable, rather than a TypeScript source import. A future Go consumer could use public packages, but Sheep's current `internal/` packages cannot be imported by an unrelated project. See [Go internal-package rules](https://go.dev/doc/go1.4#internalpackages).
-- Sheep's bridge, native reader, and native import changes are committed as `6e44c568f0c04071859c5357b0565c83ddf4ed25`. The bundled helper's Go build metadata identifies that clean revision; :o's build script currently rebuilds from the local Sheep checkout. The checked-in app resource is specific to this macOS arm64 environment. Release packaging still needs a reproducible pinned Sheep revision and a matching binary for each supported OS/architecture. The pilot does not search for an arbitrary global Sheep installation.
+- Sheep's bridge, native reader, and native import changes are committed as `6e44c568f0c04071859c5357b0565c83ddf4ed25`. The helper build starts from that baseline revision and includes local Sheep changes; Go build metadata marks a modified working tree. :o's build script rebuilds from the adjacent local Sheep checkout. The checked-in app resource is specific to this macOS arm64 environment. Release packaging still needs a reproducible pinned Sheep revision and a matching binary for each supported OS/architecture. The pilot does not search for an arbitrary global Sheep installation.
 - Keep live prompt submission, approvals, streaming, and stopping in the Codex/Hermes clients already available in the desktop base.
 - Do not have Sheep and :o independently launch or control the same native session at once.
 - Settings choose executable/config roots, default harness/model, and each named agent's working directory. The choice of a default harness does not filter out other harnesses' chats.
 - A repository directory is not necessarily where the harness stores conversations. Discover each harness's data/config roots as well as each session's working directory.
+
+The app loads saved catalog metadata from its SQLite store before requesting fresh discovery. Sheep reuses metadata for unchanged Codex, Claude, Pi, and Hermes files, checks the Codex title index on each list, and deduplicates source roots and paths. Full transcript and native-record reads still read the harness source. [Catalog timing evidence](../output/startup-performance.json) compares all returned fields across 445 local chats.
 
 ### What Sheep currently provides
 

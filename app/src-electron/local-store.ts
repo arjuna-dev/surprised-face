@@ -134,6 +134,35 @@ export class LocalStore {
     ).run(kind, itemId, harness, JSON.stringify(data), new Date().toISOString());
   }
 
+  // Reconcile one discovery snapshot atomically. Native records and chats
+  // created by this app use separate tables/kinds and are never removed here.
+  replaceCatalog(kind: string, items: Record<string, unknown>[], removeMissing = true): void {
+    const existing = this.database.prepare('SELECT item_id,harness FROM catalog_items WHERE kind=?').all(kind) as { item_id: string; harness: string }[];
+    const upsert = this.database.prepare('INSERT INTO catalog_items (kind,item_id,harness,data,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(kind,item_id,harness) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE catalog_items.data<>excluded.data');
+    const remove = this.database.prepare('DELETE FROM catalog_items WHERE kind=? AND item_id=? AND harness=?');
+    const seen = new Set<string>();
+    const now = new Date().toISOString();
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      for (const item of items) {
+        const id = stringValue(kind === 'project' ? item.name || item.path : item.id) || '';
+        const harness = kind === 'project' ? '' : stringValue(item.harness) || '';
+        if (!id) continue;
+        seen.add(JSON.stringify([id, harness]));
+        upsert.run(kind, id, harness, JSON.stringify(item), now);
+      }
+      if (removeMissing) {
+        for (const item of existing) {
+          if (!seen.has(JSON.stringify([item.item_id, item.harness]))) remove.run(kind, item.item_id, item.harness);
+        }
+      }
+      this.database.exec('COMMIT');
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   catalog(kind: string): Record<string, unknown>[] {
     const rows = this.database.prepare('SELECT data FROM catalog_items WHERE kind=? ORDER BY updated_at DESC').all(kind) as { data: string }[];
     return rows.map((row) => JSON.parse(row.data) as Record<string, unknown>);

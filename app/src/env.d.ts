@@ -53,6 +53,7 @@ interface SurprisedFaceApi {
   saveAgent(input: unknown): Promise<SurprisedFaceSettings>;
   runPending(roomId: string): Promise<unknown>;
   chooseFolder(): Promise<string | null>;
+  sheepCached(): Promise<{ projects: Record<string, unknown>[]; conversations: Record<string, unknown>[] }>;
   sheepHealth(): Promise<unknown>;
   sheepProjects(): Promise<{ projects: Record<string, unknown>[] }>;
   sheepConversations(): Promise<{ conversations: Record<string, unknown>[]; sourceError?: string }>;

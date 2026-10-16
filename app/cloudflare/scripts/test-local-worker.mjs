@@ -138,6 +138,31 @@ try {
   assert.ok(nextTurn.body.turn.context.some((message) => message.text === 'Jo reply completed.'), 'next agent sees the completed prior reply');
   assert.ok(nextTurn.body.turn.context.some((message) => message.participantName === 'Lee'), 'next agent sees collaborator messages in chat order');
 
+  // Reproduce two owners declining cross-owner mentions, followed by an own-agent request.
+  const queueRoom = await api('/v1/rooms', { token: ownerToken, body: { name: 'Permission queue regression' } });
+  const queueId = queueRoom.body.id;
+  const queueInvite = await api(`/v1/rooms/${queueId}/invites`, { token: ownerToken, body: { count: 1 } });
+  await api('/v1/rooms/join', { token: jo.token, body: { code: queueInvite.body.invites[0].code } });
+  const remoteJo = await api(`/v1/rooms/${queueId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex hello', agentIds: ['jo-codex'] } });
+  await api(`/v1/rooms/${queueId}/messages`, { token: jo.token, body: { clientId: randomUUID(), text: '@maya-codex hello', agentIds: ['maya-codex'] } });
+  const ownRequest = await api(`/v1/rooms/${queueId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@maya-codex answer me', agentIds: ['maya-codex'] } });
+  for (let retry = 0; retry < 2; retry++) {
+    await api(`/v1/rooms/${queueId}/turns/claim`, { token: ownerToken, body: { agentIds: ['maya-codex'], allowRemote: false } });
+  }
+  const wakeEvents = (await api(`/v1/rooms/${queueId}/events?after=0`, { token: ownerToken })).body.events;
+  assert.equal(wakeEvents.filter(event => event.type === 'turn.queued' && event.recheck === true && event.turnId === remoteJo.body.turnIds[0]).length, 1, 'retrying a blocked claim wakes an older desktop once without an event loop');
+  await api(`/v1/rooms/${queueId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  const ownClaim = await api(`/v1/rooms/${queueId}/turns/claim`, { token: ownerToken, body: { agentIds: ['maya-codex'], allowRemote: false } });
+  assert.equal(ownClaim.body.turn?.turnId, ownRequest.body.turnIds[0], 'disabled cross-owner mentions must not deadlock later own-agent requests');
+  await api(`/v1/rooms/${queueId}/turns/${ownClaim.body.turn.turnId}/finish`, { token: ownerToken, body: { state: 'complete' } });
+  const resumedRemote = await api(`/v1/rooms/${queueId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: true } });
+  assert.equal(resumedRemote.body.turn?.turnId, remoteJo.body.turnIds[0], 'opting in restores the original pending mention');
+  const simultaneous = await api(`/v1/rooms/${queueId}/turns/claim`, { token: ownerToken, body: { agentIds: ['maya-codex'], allowRemote: true } });
+  assert.equal(simultaneous.status, 409, 'restoring mentions still permits only one active agent');
+  const permissionEvents = (await api(`/v1/rooms/${queueId}/events?after=0`, { token: ownerToken })).body.events;
+  assert.ok(permissionEvents.some(event => event.type === 'turn.availability'), 'permission changes wake connected owners to retry eligible turns');
+  assert.ok(permissionEvents.some(event => event.type === 'turn.queued' && event.recheck === true), 'already installed desktops are also woken through their existing queue event handler');
+
   const duplicate = await api(`/v1/rooms/${roomId}/messages`, {
     token: ownerToken, body: { clientId: firstClientId, text: '@Jo Codex check this', agentIds: ['jo-codex'] },
   });
@@ -156,6 +181,7 @@ try {
     ['Chat invite access', 'Codes admit people to one chat; new chats stay private until invited.', 'Pass'],
     ['Solo and group agent routing', 'Solo chats call their owner agent automatically; group chats require a mention.', 'Pass'],
     ['Existing chat history', 'An imported Codex conversation is visible to invitees and retries do not duplicate messages.', 'Pass'],
+    ['Permission queue regression', 'Disabled cross-owner requests do not block own-agent turns; opt-in restores pending mentions and preserves one active turn.', 'Pass'],
     ['Agent routing', 'An @agent message creates a turn the configured owner can claim.', 'Pass'],
     ['Stream ordering', 'A second agent waits, then receives the completed reply and intervening human messages.', 'Pass'],
     ['Live updates', 'WebSocket clients receive new messages with participant names.', 'Pass'],

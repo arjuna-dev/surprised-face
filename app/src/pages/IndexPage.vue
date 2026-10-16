@@ -308,12 +308,12 @@
                     ><span
                       ><strong>Run agent mentions on this computer</strong
                       ><small
-                        >Allows messages from this workspace to start your local harness.</small
+                        >Allows other people in your chats to start your local agents with a mention.</small
                       ></span
                     ><input v-model="allowAgentRuns" type="checkbox"
                   /></label>
                   <p class="section-help">
-                    When off, mentions remain queued until you turn this on.
+                    When off, mentions from other people wait for permission. You can still mention your own agents.
                   </p>
                 </section>
                 <section class="settings-section">
@@ -424,6 +424,11 @@
               <button class="outline-button chat-action" aria-label="Join a chat" @click="joinChat"><LogIn :size="17" />Join a chat</button>
             </div>
           </div>
+
+          <p v-if="selectedRoom && !settings.allowRemoteAgentRequests" class="native-status" role="status">
+            <span>Mentions from other people are paused on this computer.</span>
+            <button class="outline-button" @click="settingsOpen = true">Manage agent mentions</button>
+          </p>
 
           <div ref="messageViewport" class="message-viewport">
             <div v-if="!selectedRoom" class="empty-state">
@@ -965,6 +970,12 @@ onMounted(async () => {
     agentDrafts.value = settings.value.agents.length
       ? settings.value.agents.map((agent) => ({ ...agent }))
       : [blankAgent(settings.value.displayName)];
+    try {
+      const saved = await api.sheepCached();
+      if (saved.projects.length || saved.conversations.length) applyCatalog(saved);
+    } catch {
+      // A missing local cache is recoverable through live discovery.
+    }
     void refreshCatalog();
     catalogTimer = window.setInterval(() => {
       void refreshCatalog();
@@ -1032,19 +1043,23 @@ async function loadWorkspace(): Promise<void> {
   }
 }
 
+function applyCatalog(result: { projects: Record<string, unknown>[]; conversations: Record<string, unknown>[]; conversationSourceError?: string }): void {
+  projects.value = result.projects || [];
+  const activeProject = selectedProject.value;
+  if (activeProject && !projects.value.some((project) => projectKey(project) === projectKey(activeProject)))
+    selectedProject.value = null;
+  conversations.value = (result.conversations || []) as LocalConversation[];
+  if (result.conversationSourceError) catalogError.value = result.conversationSourceError;
+  catalogLoaded.value = true;
+}
+
 async function refreshCatalog(): Promise<void> {
   if (catalogLoading.value) return;
   catalogLoading.value = true;
   catalogError.value = '';
   try {
     const result = await api.sheepRefresh();
-    projects.value = result.projects || [];
-    const activeProject = selectedProject.value;
-    if (activeProject && !projects.value.some((project) => projectKey(project) === projectKey(activeProject)))
-      selectedProject.value = null;
-    conversations.value = (result.conversations || []) as LocalConversation[];
-    if (result.conversationSourceError) catalogError.value = result.conversationSourceError;
-    catalogLoaded.value = true;
+    applyCatalog(result);
   } catch (error) {
     catalogError.value = messageOf(error)
       .replace(/Sheep/g, 'Local catalog')

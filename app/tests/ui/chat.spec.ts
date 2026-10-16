@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-async function fixture(page: Page, options: { room?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean } = {}) {
+async function fixture(page: Page, options: { room?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean } = {}) {
   await page.addInitScript((options) => {
     const events: Record<string, ((value: unknown) => void)[]> = {};
     const state = {
@@ -39,7 +39,12 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
       onCodexEvent: on('codexEvent'),
       hermesStatus: async () => ({ installed: true, version: 'Fixture Hermes' }),
       rooms: async () => structuredClone(state.rooms),
-      sheepRefresh: async () => ({ projects: [{ name: 'Design', path: '/work/design' }, { name: 'Garden', path: '/work/garden' }], conversations: state.conversations }),
+      sheepCached: async () => ({ projects: [{ name: 'Design', path: '/work/design' }], conversations: options.slowCatalog || options.failCatalog ? [{ id: 'cached-1', harness: 'codex', title: 'Saved conversation', path: '/work/design' }] : [] }),
+      sheepRefresh: async () => {
+        if (options.slowCatalog) await new Promise(resolve => setTimeout(resolve, 5000));
+        if (options.failCatalog) throw new Error('Catalog refresh unavailable');
+        return { projects: [{ name: 'Design', path: '/work/design' }, { name: 'Garden', path: '/work/garden' }], conversations: state.conversations };
+      },
       sheepRead: async () => ({ messages: [
         { role: 'user', content: '<external_codex_apps_open_page>{"page_id":null}</external_codex_apps_open_page>' },
         { role: 'user', content: 'A sample conversation' },
@@ -454,4 +459,35 @@ test('Codex check failures show an error and leave Check status available', asyn
   await expect(page.getByText('Codex is unavailable.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Check status', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+});
+
+
+test('saved catalog appears while refresh is pending and is replaced by fresh discovery', async ({ page }) => {
+  await fixture(page, { slowCatalog: true });
+  await page.getByText('Design', { exact: true }).first().click();
+  await expect(page.getByText('Saved conversation', { exact: true })).toBeVisible();
+  await page.screenshot({ path: '../output/playwright/cached-catalog-startup.png' });
+  await expect(page.getByText('Local design', { exact: true })).toBeVisible({ timeout: 7000 });
+  await expect(page.getByText('Saved conversation', { exact: true })).toHaveCount(0);
+});
+
+test('saved catalog remains usable when discovery fails', async ({ page }) => {
+  await fixture(page, { failCatalog: true });
+  await page.getByText('Design', { exact: true }).first().click();
+  await expect(page.getByText('Saved conversation', { exact: true })).toBeVisible();
+  await expect(page.getByText('Catalog refresh unavailable', { exact: true })).toBeVisible();
+  await page.getByText('Saved conversation', { exact: true }).click();
+  await expect(page.getByText('Sample reply', { exact: true })).toBeVisible();
+});
+
+
+test('shared chat explains disabled remote mentions and opens the owner control', async ({ page }) => {
+  await fixture(page, { room: true });
+  await expect(page.getByText('Mentions from other people are paused on this computer.', { exact: true })).toBeVisible();
+  await page.screenshot({ path: '../output/playwright/agent-mentions-paused.png' });
+  await page.getByRole('button', { name: 'Manage agent mentions', exact: true }).click();
+  await page.getByRole('checkbox', { name: /Run agent mentions/ }).check();
+  await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.allowRemoteAgentRequests)).toBe(true);
+  await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
+  await expect(page.getByText('Mentions from other people are paused on this computer.', { exact: true })).toHaveCount(0);
 });
