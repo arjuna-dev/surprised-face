@@ -2,7 +2,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   CodexAppServer,
   resolveCodexExecutable,
@@ -20,11 +20,13 @@ import { RoomService } from './room-service';
 import { SettingsStore, type HarnessName } from './settings-store';
 import { harnessParticipants } from './harness-participants';
 import { HarnessContextMirror } from './harness-context-mirror';
+import { HarnessSessionSync } from './harness-session-sync';
 import { SheepBridge } from './sheep-bridge';
 import { isSafeAppNavigation } from './navigation-policy';
 import { projectsForUi, projectsFromConversations, sortProjectsByRecent } from './local-projects';
 import { displayTranscriptMessages } from '../src/lib/native-transcript';
 import { configureAppProfile } from './app-data-path';
+import { GOOGLE_OAUTH_CLIENT_ID } from './google-auth-config';
 
 const currentDir = fileURLToPath(new URL('.', import.meta.url));
 configureAppProfile(app, process.env.SURPRISED_FACE_DEV_DATA);
@@ -39,7 +41,9 @@ let hermes: HermesAcpClient;
 let agentRunner: AgentRunner;
 let nativeChat: NativeChatService;
 let harnessContextMirror: HarnessContextMirror;
+let harnessSessionSync: HarnessSessionSync;
 let availableHarnesses: HarnessName[] = [];
+let appSessionVerified = false;
 const codexSessionFollows = new Map<string, CodexSessionFollow>();
 
 if (!ownsSingleInstanceLock) {
@@ -65,6 +69,17 @@ if (!ownsSingleInstanceLock) {
         workingDirectory: () => os.homedir(),
         clientVersion: app.getVersion(),
       });
+      harnessSessionSync = new HarnessSessionSync(localStore, async (input) => {
+        if (input.harness === 'codex') {
+          const link = new CodexDesktopLink({
+            socketPath: process.env.CODEX_IPC_SOCKET || path.join(os.homedir(), '.codex', 'ipc', 'ipc.sock'),
+            sessionFile: findCodexSessionFile(input.sessionId, path.join(os.homedir(), '.codex', 'sessions')),
+          });
+          await link.appendPlainText({ threadId: input.sessionId, text: input.text, cwd: input.cwd }).finally(() => link.close());
+          return;
+        }
+        await hermes.appendPlainText(input.sessionId, input.text, input.cwd);
+      }, 300, (error) => sendToRenderer('app:error', errorMessage(error)));
       const desktop = {
         startTurn: (input: { threadId: string; text: string; cwd?: string; onDelta?: (text: string) => void }) => {
           const link = new CodexDesktopLink({
@@ -80,7 +95,6 @@ if (!ownsSingleInstanceLock) {
       bindEvents();
       registerHandlers();
       await createWindow();
-      void connectExistingRooms();
     })
     .catch((error: unknown) => {
       dialog.showErrorBox('surprised-face could not start', errorMessage(error));
@@ -114,6 +128,7 @@ function bindEvents(): void {
     if (roomId && ['message.created', 'message.delta', 'turn.started', 'turn.finished'].includes(stringValue(event?.type) || '')) {
       void harnessContextMirror.sync(roomId).catch((error: unknown) => sendToRenderer('app:error', errorMessage(error)));
     }
+    if (roomId && (event?.type === 'message.created' || event?.type === 'turn.finished')) harnessSessionSync.schedule(roomId);
     if (event?.type === 'turn.queued' || event?.type === 'turn.finished' || event?.type === 'turn.availability') {
       if (roomId) setTimeout(() => void agentRunner.runPending(roomId), 0);
     }
@@ -137,6 +152,22 @@ function bindEvents(): void {
 
 function registerHandlers(): void {
   safeIpc('app:settings', () => settingsStore.get());
+  safeIpc('app:session-check', async () => {
+    const result = await roomService.sessionCheck();
+    appSessionVerified = result.authenticated;
+    if (appSessionVerified) await connectExistingRooms();
+    else roomService.disconnect();
+    return result;
+  });
+  safeIpc('app:google-sign-in', async () => {
+    const member = await roomService.signInWithGoogle(
+      GOOGLE_OAUTH_CLIENT_ID,
+      (url) => shell.openExternal(url),
+    );
+    appSessionVerified = true;
+    await connectExistingRooms();
+    return member;
+  });
   safeIpc('app:available-harnesses', () => detectAvailableHarnesses());
   safeIpc('app:update-settings', async (_event, input) => {
     const previous = await settingsStore.get();
@@ -155,21 +186,9 @@ function registerHandlers(): void {
     await connectExistingRooms();
     return result;
   });
-  safeIpc('app:register', async (_event, name) => {
-    const member = await roomService.register(stringField(name) || os.userInfo().username);
-    await connectExistingRooms();
-    return member;
-  });
   safeIpc('app:copy-text', async (_event, value) => {
     await clipboard.writeText(String(value));
     return { ok: true };
-  });
-  safeIpc('app:join', async (_event, input) => {
-    const result = await roomService.join(
-      input as { backendUrl: string; code: string; name: string },
-    );
-    await connectExistingRooms();
-    return result;
   });
   safeIpc('app:join-room', async (_event, code) => {
     const result = await roomService.joinRoom(String(code));
@@ -177,8 +196,9 @@ function registerHandlers(): void {
     return result;
   });
   safeIpc('app:logout', async () => {
-    roomService.disconnect();
-    return settingsStore.clearConnection();
+    await roomService.logout();
+    appSessionVerified = false;
+    return settingsStore.get();
   });
   safeIpc('app:create-invites', async (_event, roomId) => roomService.createInvites(String(roomId), 1));
   safeIpc('app:hordes', (_event, input) => roomService.hordeRequest(input as Parameters<RoomService['hordeRequest']>[0]));
@@ -207,6 +227,11 @@ function registerHandlers(): void {
   });
   safeIpc('app:members', (_event, roomId) => roomService.members(String(roomId)));
   safeIpc('app:agents', (_event, roomId) => roomService.agents(String(roomId)));
+  safeIpc('app:decide-mention', async (_event, input) => {
+    const value = input as { roomId: string; turnId: string; decision: 'once' | 'always' | 'decline' };
+    await roomService.decideMention(String(value.roomId), String(value.turnId), value.decision);
+    return { ok: true };
+  });
   safeIpc('app:run-pending', async (_event, roomId) => {
     await agentRunner.runPending(String(roomId));
     return { ok: true };
@@ -278,13 +303,21 @@ function registerHandlers(): void {
 
   safeIpc('native:create', async (_event, input) => {
     const value = input as { harness: 'codex' | 'hermes'; cwd: string; title: string };
+    const requestId = randomUUID();
+    const usage = await roomService.reserveChatCreation(requestId);
     const settings = await settingsStore.get();
     const cwd = value.cwd || os.homedir();
     const agent = harnessParticipants(settings).find((item) => item.harness === value.harness);
-    const session = await nativeChat.create({ harness: value.harness, cwd, ...(agent?.model ? { model: agent.model } : {}) });
+    let session: Awaited<ReturnType<typeof nativeChat.create>>;
+    try {
+      session = await nativeChat.create({ harness: value.harness, cwd, ...(agent?.model ? { model: agent.model } : {}) });
+    } catch (error) {
+      await roomService.releaseChatCreation(requestId).catch(() => {});
+      throw error;
+    }
     const chat = { id: session.sessionId, harness: session.harness, path: session.cwd, title: value.title.trim().slice(0, 80) || 'New chat', updatedAt: new Date().toISOString() };
     localStore.cache('app-conversation', chat.id, chat.harness, chat);
-    return chat;
+    return { ...chat, remainingChatsToday: usage.remaining };
   });
   safeIpc('native:send', async (_event, input) => {
     const value = input as { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; text: string };
@@ -297,6 +330,7 @@ function registerHandlers(): void {
     const value = input as { sessionId?: string };
     if (value.sessionId) followCodexSession(value.sessionId);
   });
+  safeIpc('native:links', () => localStore.nativeRoomLinks());
   safeIpc('native:link', (_event, input) => {
     const value = input as { harness: string; sessionId: string };
     return localStore.nativeRoomLink(value.harness, value.sessionId);
@@ -485,6 +519,8 @@ function safeIpc(
   ipcMain.handle(channel, async (event, ...args) => {
     try {
       assertMainWindowSender(event);
+      if (!['app:session-check', 'app:google-sign-in', 'app:logout'].includes(channel) && !appSessionVerified)
+        throw new Error('Sign in with Google to continue.');
       return await handler(event, ...args);
     } catch (error) {
       throw new Error(errorMessage(error));
@@ -510,7 +546,7 @@ function followCodexSession(sessionId: string): void {
 }
 
 function sendToRenderer(channel: string, value: unknown): void {
-  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed())
+  if (appSessionVerified && mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed())
     mainWindow.webContents.send(channel, value);
 }
 

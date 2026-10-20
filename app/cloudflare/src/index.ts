@@ -6,7 +6,9 @@ interface Env {
   ROOMS: DurableObjectNamespace<ChatRoom>;
   SESSION_SECRET: string;
   ADMIN_SECRET: string;
-  APP_ORIGIN: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_JWKS_URL?: string;
+  APP_ORIGIN?: string;
 }
 
 interface Identity {
@@ -29,6 +31,7 @@ type AgentRow = { id: string; ownerId: string; name: string; harness: string; mo
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 const MAX_BODY_BYTES = 64 * 1024;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const DAILY_CHAT_LIMIT = 100;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -38,36 +41,51 @@ export default {
     try {
       if (url.pathname === '/health' && request.method === 'GET') return response({ ok: true, service: 'surprised-face-rooms' }, 200, env);
 
+      if (url.pathname === '/v1/auth/google/challenge' && request.method === 'POST') {
+        if (!env.GOOGLE_CLIENT_ID) return response({ error: 'Google sign-in is not configured yet.' }, 503, env);
+        const nonce = randomToken(32);
+        const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
+        const challenge = await signChallenge({ nonce, exp: expiresAt }, env.SESSION_SECRET);
+        return response({ nonce, challenge }, 200, env);
+      }
+
+      if (url.pathname === '/v1/auth/google/complete' && request.method === 'POST') {
+        if (!env.GOOGLE_CLIENT_ID) return response({ error: 'Google sign-in is not configured yet.' }, 503, env);
+        const input = await readJson<{ idToken?: string; challenge?: string }>(request);
+        const challenge = await verifyChallenge(input.challenge || '', env.SESSION_SECRET);
+        const googleIdentity = await verifyGoogleIdToken(input.idToken || '', challenge.nonce, env.GOOGLE_CLIENT_ID, env.GOOGLE_JWKS_URL);
+        const legacyToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
+        const legacyIdentity = legacyToken ? await verifyLegacySession(legacyToken, env.SESSION_SECRET) : null;
+        const token = randomToken(32);
+        const result = await directory(env).fetch('https://directory/auth/complete', {
+          method: 'POST',
+          body: JSON.stringify({
+            googleSub: googleIdentity.sub,
+            name: googleIdentity.name,
+            nonceHash: await hashText(challenge.nonce),
+            tokenHash: await hashText(token),
+            legacyMemberId: legacyIdentity?.id,
+            expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+          }),
+        });
+        const body = await result.json();
+        return response(result.ok ? { member: body, token } : body, result.status, env);
+      }
+
       if (url.pathname === '/v1/admin/bootstrap' && request.method === 'POST') {
         requireAdmin(request, env);
         const input = await readJson<{ name: string }>(request);
-        const result = await directory(env).fetch('https://directory/bootstrap', { method: 'POST', body: JSON.stringify(input) });
+        const token = randomToken(32);
+        const result = await directory(env).fetch('https://directory/bootstrap', {
+          method: 'POST', body: JSON.stringify({ ...input, tokenHash: await hashText(token), expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString() }),
+        });
         const member = await result.json<Omit<Identity, 'exp'>>();
-        return response({ member, token: await signSession(member, env.SESSION_SECRET) }, result.status, env);
-      }
-
-      if (url.pathname === '/v1/register' && request.method === 'POST') {
-        const input = await readJson<{ name: string }>(request);
-        const result = await directory(env).fetch('https://directory/register', { method: 'POST', body: JSON.stringify(input) });
-        const member = await result.json<Omit<Identity, 'exp'>>();
-        return response(result.ok ? { member, token: await signSession(member, env.SESSION_SECRET) } : member, result.status, env);
-      }
-
-      if (url.pathname === '/v1/join' && request.method === 'POST') {
-        const input = await readJson<{ code: string; name: string }>(request);
-        const result = await directory(env).fetch('https://directory/join', { method: 'POST', body: JSON.stringify(input) });
-        const member = await result.json<Omit<Identity, 'exp'> & { roomId?: string }>();
-        if (result.ok && member.roomId) {
-          await env.ROOMS.get(env.ROOMS.idFromName(member.roomId)).fetch('https://room/member-joined', {
-            method: 'POST', body: JSON.stringify({ participantId: member.id, participantName: member.name }),
-          });
-        }
-        return response(result.ok ? { member, token: await signSession(member, env.SESSION_SECRET) } : member, result.status, env);
+        return response(result.ok ? { member, token } : member, result.status, env);
       }
 
       const protocolToken = request.headers.get('sec-websocket-protocol')?.split(',').map((value) => value.trim()).find((value) => value.startsWith('bearer.'))?.slice('bearer.'.length);
       const identity = await authenticate(request, env, protocolToken);
-      if (!identity) return response({ error: 'Create your account or join a chat first.' }, 401, env);
+      if (!identity) return response({ error: 'Sign in with Google to continue.' }, 401, env);
 
       if (/^\/v1\/hordes(?:\/|$)/.test(url.pathname)) {
         const body = ['POST', 'PUT', 'PATCH'].includes(request.method) ? JSON.stringify(await readJson(request)) : undefined;
@@ -76,6 +94,30 @@ export default {
       }
 
       if (url.pathname === '/v1/me' && request.method === 'GET') return response(identity, 200, env);
+
+      if (url.pathname === '/v1/logout' && request.method === 'POST') {
+        const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || protocolToken || '';
+        await directory(env).fetch(`https://directory/auth/session/${encodeURIComponent(await hashText(token))}`, { method: 'DELETE' });
+        return response({ ok: true }, 200, env);
+      }
+
+      if (url.pathname === '/v1/chat-creations' && request.method === 'POST') {
+        const input = await readJson<{ requestId?: string }>(request);
+        const result = await directory(env).fetch('https://directory/chat-creations/reserve', {
+          method: 'POST', headers: { 'content-type': 'application/json', 'x-actor-id': identity.id },
+          body: JSON.stringify({ requestId: input.requestId, day: new Date().toISOString().slice(0, 10) }),
+        });
+        return response(await result.json(), result.status, env);
+      }
+
+      if (url.pathname === '/v1/chat-creations/release' && request.method === 'POST') {
+        const input = await readJson<{ requestId?: string }>(request);
+        const result = await directory(env).fetch('https://directory/chat-creations/release', {
+          method: 'POST', headers: { 'content-type': 'application/json', 'x-actor-id': identity.id },
+          body: JSON.stringify(input),
+        });
+        return response(await result.json(), result.status, env);
+      }
 
       if (url.pathname === '/v1/members' && request.method === 'GET') {
         const result = await directory(env).fetch('https://directory/members-for-actor', { headers: { 'x-actor-id': identity.id } });
@@ -106,9 +148,10 @@ export default {
       }
 
       if (url.pathname === '/v1/rooms' && request.method === 'POST') {
-        const input = await readJson<{ name: string; defaultAgentId?: string }>(request);
+        const input = await readJson<{ name: string; defaultAgentId?: string; requestId?: string }>(request);
         const result = await directory(env).fetch('https://directory/rooms', {
-          method: 'POST', headers: { 'content-type': 'application/json', 'x-actor-id': identity.id }, body: JSON.stringify(input),
+          method: 'POST', headers: { 'content-type': 'application/json', 'x-actor-id': identity.id },
+          body: JSON.stringify({ ...input, day: new Date().toISOString().slice(0, 10) }),
         });
         return response(await result.json(), result.status, env);
       }
@@ -195,7 +238,7 @@ export default {
           headers.set('x-surprised-face-actor-name', identity.name);
           return stub.fetch(new Request(`https://room/${roomId}/messages`, { method: 'POST', headers, body: JSON.stringify({ ...input, agents }) }));
         }
-        if (operation === 'turns/claim' || /^turns\/[^/]+\/(?:chunk|finish)$/.test(operation)) {
+        if (operation === 'turns/claim' || /^turns\/[^/]+\/(?:chunk|finish|permission)$/.test(operation)) {
           return stub.fetch(new Request(`https://room/${roomId}/${operation}`, { method: request.method, headers, body: request.method === 'GET' ? null : request.body }));
         }
         if (operation === 'events' && request.method === 'GET') return stub.fetch(new Request(`https://room/${roomId}/events${url.search}`, { headers }));
@@ -215,6 +258,9 @@ export class WorkspaceDirectory extends DurableObject<Env> {
     super(ctx, env);
     ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY, member_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS used_oidc_nonces (nonce_hash TEXT PRIMARY KEY, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS chat_creations (member_id TEXT NOT NULL, request_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, room_id TEXT, created_at TEXT NOT NULL, PRIMARY KEY(member_id, request_id));
       CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, room_id TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT);
       CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_by TEXT NOT NULL, default_agent_id TEXT, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS room_members (room_id TEXT NOT NULL, member_id TEXT NOT NULL, PRIMARY KEY(room_id, member_id));
@@ -225,15 +271,21 @@ export class WorkspaceDirectory extends DurableObject<Env> {
     if (!inviteColumns.some((column) => column.name === 'room_id')) ctx.storage.sql.exec('ALTER TABLE invites ADD COLUMN room_id TEXT');
     const roomColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(rooms)').toArray();
     if (!roomColumns.some((column) => column.name === 'default_agent_id')) ctx.storage.sql.exec('ALTER TABLE rooms ADD COLUMN default_agent_id TEXT');
+    const memberColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(members)').toArray();
+    if (!memberColumns.some((column) => column.name === 'google_sub')) ctx.storage.sql.exec('ALTER TABLE members ADD COLUMN google_sub TEXT');
+    ctx.storage.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS members_google_sub ON members(google_sub) WHERE google_sub IS NOT NULL');
   }
 
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (/^\/hordes(?:\/|$)/.test(url.pathname)) return this.hordes.fetch(request);
     if (request.method === 'POST' && url.pathname === '/bootstrap') return this.bootstrap(await readJson(request));
-    if (request.method === 'POST' && url.pathname === '/register') return this.register(await readJson(request));
+    if (request.method === 'POST' && url.pathname === '/auth/complete') return this.completeGoogleAuth(await readJson(request));
+    if (request.method === 'GET' && url.pathname === '/auth/session') return this.getSession(url.searchParams.get('hash') || '');
+    if (request.method === 'DELETE' && url.pathname.startsWith('/auth/session/')) return this.deleteSession(decodeURIComponent(url.pathname.slice('/auth/session/'.length)));
+    if (request.method === 'POST' && url.pathname === '/chat-creations/reserve') return this.reserveChatCreation(request, await readJson(request));
+    if (request.method === 'POST' && url.pathname === '/chat-creations/release') return this.releaseChatCreation(request, await readJson(request));
     if (request.method === 'POST' && url.pathname === '/invites') return this.createInvites(await readJson(request));
-    if (request.method === 'POST' && url.pathname === '/join') return this.join(await readJson(request));
     if (request.method === 'POST' && url.pathname === '/join-room') return this.joinRoom(request, await readJson(request));
     if (request.method === 'GET' && url.pathname === '/rooms') return this.rooms(url.searchParams.get('member') || '');
     if (request.method === 'GET' && url.pathname === '/room-access') return this.roomAccess(url.searchParams);
@@ -248,20 +300,89 @@ export class WorkspaceDirectory extends DurableObject<Env> {
     return json({ error: 'Not found.' }, 404);
   }
 
-  private bootstrap(input: { name?: string }): Response {
+  private bootstrap(input: { name?: string; tokenHash?: string; expiresAt?: string }): Response {
     const name = cleanName(input.name);
     if (this.sql().exec('SELECT id FROM members LIMIT 1').toArray().length) return json({ error: 'The workspace is already initialized.' }, 409);
     const id = crypto.randomUUID();
-    this.sql().exec('INSERT INTO members (id, name, role, created_at) VALUES (?, ?, ?, ?)', id, name, 'owner', now());
-    this.makeRoom(id, 'general');
+    const timestamp = now();
+    this.ctx.storage.transactionSync(() => {
+      this.sql().exec('INSERT INTO members (id, name, role, created_at) VALUES (?, ?, ?, ?)', id, name, 'owner', timestamp);
+      this.makeRoom(id, 'general');
+      if (input.tokenHash && input.expiresAt) this.sql().exec('INSERT INTO auth_sessions (token_hash, member_id, created_at, expires_at) VALUES (?, ?, ?, ?)', input.tokenHash, id, timestamp, input.expiresAt);
+    });
     return json({ id, name, role: 'owner' });
   }
 
-  private register(input: { name?: string }): Response {
+  private completeGoogleAuth(input: { googleSub?: string; name?: string; nonceHash?: string; tokenHash?: string; legacyMemberId?: string; expiresAt?: string }): Response {
+    const googleSub = typeof input.googleSub === 'string' ? input.googleSub : '';
+    const nonceHash = typeof input.nonceHash === 'string' ? input.nonceHash : '';
+    const tokenHash = typeof input.tokenHash === 'string' ? input.tokenHash : '';
+    const expiresAt = typeof input.expiresAt === 'string' ? input.expiresAt : '';
+    if (!googleSub || googleSub.length > 255 || !nonceHash || !tokenHash || !expiresAt) return json({ error: 'Google sign-in could not be completed.' }, 400);
     const name = cleanName(input.name);
-    const id = crypto.randomUUID();
-    this.sql().exec('INSERT INTO members (id, name, role, created_at) VALUES (?, ?, ?, ?)', id, name, 'member', now());
-    return json({ id, name, role: 'member' });
+    const result = this.ctx.storage.transactionSync(() => {
+      if (this.sql().exec('SELECT nonce_hash FROM used_oidc_nonces WHERE nonce_hash=?', nonceHash).toArray().length)
+        return { status: 409, body: { error: 'This Google sign-in has already been used. Please try again.' } };
+
+      let member = input.legacyMemberId
+        ? this.sql().exec<{ id: string; name: string; role: 'owner' | 'member'; google_sub: string | null }>('SELECT id, name, role, google_sub FROM members WHERE id=?', input.legacyMemberId).toArray()[0]
+        : undefined;
+      const linked = this.sql().exec<{ id: string }>('SELECT id FROM members WHERE google_sub=?', googleSub).toArray()[0];
+      if (member && linked && linked.id !== member.id)
+        return { status: 409, body: { error: 'This Google account is already linked to another app account.' } };
+      if (member?.google_sub && member.google_sub !== googleSub)
+        return { status: 409, body: { error: 'This app account is already linked to a different Google account.' } };
+      if (!member && linked)
+        member = this.sql().exec<{ id: string; name: string; role: 'owner' | 'member'; google_sub: string | null }>('SELECT id, name, role, google_sub FROM members WHERE id=?', linked.id).toArray()[0];
+      if (!member) {
+        const id = crypto.randomUUID();
+        this.sql().exec('INSERT INTO members (id, name, role, created_at, google_sub) VALUES (?, ?, ?, ?, ?)', id, name, 'member', now(), googleSub);
+        member = { id, name, role: 'member', google_sub: googleSub };
+      } else if (!member.google_sub) {
+        this.sql().exec('UPDATE members SET google_sub=?, name=? WHERE id=?', googleSub, name, member.id);
+        member.name = name;
+        member.google_sub = googleSub;
+      }
+
+      const timestamp = now();
+      this.sql().exec('DELETE FROM used_oidc_nonces WHERE created_at < ?', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      this.sql().exec('INSERT INTO used_oidc_nonces (nonce_hash, created_at) VALUES (?, ?)', nonceHash, timestamp);
+      this.sql().exec('INSERT INTO auth_sessions (token_hash, member_id, created_at, expires_at) VALUES (?, ?, ?, ?)', tokenHash, member.id, timestamp, expiresAt);
+      return { status: 200, body: { id: member.id, name: member.name, role: member.role } };
+    });
+    return json(result.body, result.status);
+  }
+
+  private getSession(hash: string): Response {
+    const row = this.sql().exec<{ id: string; name: string; role: 'owner' | 'member'; expires_at: string }>(
+      'SELECT m.id, m.name, m.role, s.expires_at FROM auth_sessions s JOIN members m ON m.id=s.member_id WHERE s.token_hash=? AND s.expires_at>?', hash, now(),
+    ).toArray()[0];
+    return row ? json({ id: row.id, name: row.name, role: row.role, exp: Math.floor(Date.parse(row.expires_at) / 1000) }) : json({ error: 'Session expired.' }, 401);
+  }
+
+  private deleteSession(hash: string): Response {
+    this.sql().exec('DELETE FROM auth_sessions WHERE token_hash=?', hash);
+    return json({ ok: true });
+  }
+
+  private reserveChatCreation(request: Request, input: { requestId?: string; day?: string }): Response {
+    const memberId = request.headers.get('x-actor-id') || '';
+    const requestId = typeof input.requestId === 'string' ? input.requestId : '';
+    const day = typeof input.day === 'string' ? input.day : '';
+    if (!memberId || !/^[0-9a-f-]{36}$/i.test(requestId) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'Could not record the new chat.' }, 400);
+    const result = this.ctx.storage.transactionSync(() => this.recordChatCreation(memberId, requestId, day, 'local', null));
+    return json(result.body, result.status);
+  }
+
+  private releaseChatCreation(request: Request, input: { requestId?: string }): Response {
+    const memberId = request.headers.get('x-actor-id') || '';
+    const requestId = typeof input.requestId === 'string' ? input.requestId : '';
+    if (!memberId || !/^[0-9a-f-]{36}$/i.test(requestId)) return json({ error: 'Could not release the new chat reservation.' }, 400);
+    const released = this.sql().exec(
+      "DELETE FROM chat_creations WHERE member_id=? AND request_id=? AND kind='local' RETURNING request_id",
+      memberId, requestId,
+    ).toArray().length > 0;
+    return json({ released });
   }
 
   private async createInvites(input: { roomId?: string; count?: number }): Promise<Response> {
@@ -364,15 +485,43 @@ export class WorkspaceDirectory extends DurableObject<Env> {
     return json({ allowed: true, creator: row.created_by === params.get('member'), memberCount, autoAgentId });
   }
 
-  private createRoom(request: Request, input: { name?: string; defaultAgentId?: string }): Response {
+  private createRoom(request: Request, input: { name?: string; defaultAgentId?: string; requestId?: string; day?: string }): Response {
     const actor = request.headers.get('x-actor-id') || '';
     const member = this.sql().exec<{ id: string }>('SELECT id FROM members WHERE id=?', actor).toArray()[0];
     if (!member) return json({ error: 'Unknown member.' }, 403);
     const agentId = typeof input.defaultAgentId === 'string' ? input.defaultAgentId : '';
     if (agentId && !this.sql().exec('SELECT id FROM agents WHERE id=? AND owner_id=?', agentId, actor).toArray().length)
       return json({ error: 'Choose an agent you own for this chat.' }, 403);
-    const room = this.makeRoom(actor, cleanRoomName(input.name), agentId);
-    return json(room, 201);
+    const requestId = typeof input.requestId === 'string' ? input.requestId : '';
+    const day = typeof input.day === 'string' ? input.day : '';
+    if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'Could not record the new chat.' }, 400);
+    const name = cleanRoomName(input.name);
+    const result = this.ctx.storage.transactionSync(() => {
+      const existing = this.sql().exec<{ room_id: string | null }>('SELECT room_id FROM chat_creations WHERE member_id=? AND request_id=?', actor, requestId).toArray()[0];
+      if (existing?.room_id) {
+        const room = this.sql().exec<{ id: string; name: string; createdBy: string; createdAt: string; defaultAgentId: string | null }>('SELECT id, name, created_by AS createdBy, created_at AS createdAt, default_agent_id AS defaultAgentId FROM rooms WHERE id=?', existing.room_id).toArray()[0];
+        if (room) return { status: 200, body: room };
+      }
+      const quota = this.recordChatCreation(actor, requestId, day, 'shared', null);
+      if (quota.status !== 201) return quota;
+      const room = this.makeRoom(actor, name, agentId);
+      this.sql().exec('UPDATE chat_creations SET room_id=? WHERE member_id=? AND request_id=?', room.id, actor, requestId);
+      return { status: 201, body: room };
+    });
+    return json(result.body, result.status);
+  }
+
+  private recordChatCreation(memberId: string, requestId: string, day: string, kind: 'local' | 'shared', roomId: string | null): { status: number; body: Record<string, unknown> } {
+    const existing = this.sql().exec<{ day: string }>('SELECT day FROM chat_creations WHERE member_id=? AND request_id=?', memberId, requestId).toArray()[0];
+    if (existing) {
+      const used = this.sql().exec<{ count: number }>('SELECT COUNT(*) AS count FROM chat_creations WHERE member_id=? AND day=?', memberId, existing.day).toArray()[0]?.count || 0;
+      return { status: 200, body: { limit: DAILY_CHAT_LIMIT, used, remaining: Math.max(0, DAILY_CHAT_LIMIT - used) } };
+    }
+    const used = this.sql().exec<{ count: number }>('SELECT COUNT(*) AS count FROM chat_creations WHERE member_id=? AND day=?', memberId, day).toArray()[0]?.count || 0;
+    if (used >= DAILY_CHAT_LIMIT)
+      return { status: 429, body: { error: 'You have reached the limit of 100 new chats today. Try again after midnight UTC.', limit: DAILY_CHAT_LIMIT, used, remaining: 0 } };
+    this.sql().exec('INSERT INTO chat_creations (member_id, request_id, day, kind, room_id, created_at) VALUES (?, ?, ?, ?, ?, ?)', memberId, requestId, day, kind, roomId, now());
+    return { status: 201, body: { limit: DAILY_CHAT_LIMIT, used: used + 1, remaining: DAILY_CHAT_LIMIT - used - 1 } };
   }
 
   private registerAgent(request: Request, input: Omit<Agent, 'ownerId'>): Response {
@@ -410,14 +559,19 @@ export class ChatRoom extends DurableObject<Env> {
     ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS events (event_seq INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS messages (message_seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL DEFAULT '', role TEXT NOT NULL, text TEXT NOT NULL, state TEXT NOT NULL, agent_id TEXT, owner_id TEXT, run_id TEXT, client_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(actor_id, client_id));
-      CREATE TABLE IF NOT EXISTS turns (queue_seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, request_message_id TEXT NOT NULL, agent_id TEXT NOT NULL, agent_name TEXT NOT NULL, harness TEXT NOT NULL, model TEXT NOT NULL, owner_id TEXT NOT NULL, requested_by TEXT NOT NULL, state TEXT NOT NULL, reply_id TEXT, context_through_seq INTEGER, next_chunk INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS turns (queue_seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, request_message_id TEXT NOT NULL, agent_id TEXT NOT NULL, agent_name TEXT NOT NULL, harness TEXT NOT NULL, model TEXT NOT NULL, owner_id TEXT NOT NULL, requested_by TEXT NOT NULL, state TEXT NOT NULL, reply_id TEXT, context_through_seq INTEGER, next_chunk INTEGER NOT NULL DEFAULT 0, permitted INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS agent_chunks (turn_id TEXT NOT NULL, chunk_index INTEGER NOT NULL, text TEXT NOT NULL, PRIMARY KEY(turn_id, chunk_index));
       CREATE TABLE IF NOT EXISTS imported_messages (source_id TEXT NOT NULL, source_index INTEGER NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY(source_id, source_index));
+      CREATE TABLE IF NOT EXISTS mention_grants (owner_id TEXT NOT NULL, requester_id TEXT NOT NULL, harness TEXT NOT NULL, decision TEXT NOT NULL, PRIMARY KEY(owner_id, requester_id, harness));
       CREATE INDEX IF NOT EXISTS turns_queue ON turns(state, created_at);
     `);
     const messageColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(messages)').toArray();
     if (!messageColumns.some((column) => column.name === 'actor_name')) {
       ctx.storage.sql.exec("ALTER TABLE messages ADD COLUMN actor_name TEXT NOT NULL DEFAULT ''");
+    }
+    const turnColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(turns)').toArray();
+    if (!turnColumns.some((column) => column.name === 'permitted')) {
+      ctx.storage.sql.exec('ALTER TABLE turns ADD COLUMN permitted INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -445,11 +599,14 @@ export class ChatRoom extends DurableObject<Env> {
       return json({ eventSeq: this.appendEvent('room.renamed', { name: input.name }).eventSeq });
     }
     if (url.pathname.endsWith('/claim') && request.method === 'POST') return this.claimTurn(actor, await readJson(request));
-    const match = /\/turns\/([^/]+)\/(chunk|finish)$/.exec(url.pathname);
+    const match = /\/turns\/([^/]+)\/(chunk|finish|permission)$/.exec(url.pathname);
     if (match && request.method === 'POST') {
       const turnId = match[1]!;
       const action = match[2]!;
-      return action === 'chunk' ? this.appendChunk(actor, turnId, await readJson(request)) : this.finishTurn(actor, turnId, await readJson(request));
+      const body = await readJson(request);
+      if (action === 'chunk') return this.appendChunk(actor, turnId, body);
+      if (action === 'permission') return this.decideMention(actor, turnId, body);
+      return this.finishTurn(actor, turnId, body);
     }
     return json({ error: 'Not found.' }, 404);
   }
@@ -543,17 +700,52 @@ export class ChatRoom extends DurableObject<Env> {
     const sql = this.ctx.storage.sql;
     // Keep declined cross-owner requests pending without blocking runnable turns.
     // Only the authenticated owner can pause or restore their own requests.
-    const waitingState = input.allowRemote ? 'queued' : 'awaiting_permission';
-    const previousState = input.allowRemote ? 'awaiting_permission' : 'queued';
-    const changed = sql.exec<{ id: string }>(
-      'UPDATE turns SET state=?, updated_at=? WHERE owner_id=? AND requested_by<>? AND state=? RETURNING id',
-      waitingState, now(), actor, actor, previousState,
+    const updatedAt = now();
+    const declined = sql.exec<{ id: string; agent_id: string; harness: string; requested_by: string }>(
+      `UPDATE turns SET state='declined', updated_at=?
+       WHERE owner_id=? AND requested_by<>? AND state IN ('queued','awaiting_permission')
+       AND EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='declined')
+       RETURNING id, agent_id, harness, requested_by`,
+      updatedAt, actor, actor,
     ).toArray();
-    if (changed.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: Boolean(input.allowRemote) });
+    for (const turn of declined) {
+      this.appendEvent('turn.permission_decided', { turnId: turn.id, agentId: turn.agent_id, harness: turn.harness, ownerId: actor, requestedBy: turn.requested_by, decision: 'decline' });
+    }
+    const allowRemote = input.allowRemote ? 1 : 0;
+    if (allowRemote) {
+      const restored = sql.exec<{ id: string }>(
+        `UPDATE turns SET state='queued', updated_at=?
+         WHERE owner_id=? AND requested_by<>? AND state='awaiting_permission'
+         AND NOT EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='declined')
+         RETURNING id`,
+        updatedAt, actor, actor,
+      ).toArray();
+      if (restored.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: true });
+    } else {
+      const parked = sql.exec<{ id: string; agent_id: string; agent_name: string; harness: string; requested_by: string }>(
+        `UPDATE turns SET state='awaiting_permission', updated_at=?
+         WHERE owner_id=? AND requested_by<>? AND state='queued'
+         AND permitted=0
+         AND NOT EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='always')
+         AND NOT EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='declined')
+         RETURNING id, agent_id, agent_name, harness, requested_by`,
+        updatedAt, actor, actor,
+      ).toArray();
+      if (parked.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: false });
+      for (const turn of parked) this.announcePermission(actor, turn);
+    }
+    const waiting = sql.exec<{ id: string; agent_id: string; agent_name: string; harness: string; requested_by: string }>(
+      "SELECT id, agent_id, agent_name, harness, requested_by FROM turns WHERE state='awaiting_permission' AND owner_id=?",
+      actor,
+    ).toArray();
+    for (const turn of waiting) this.announcePermission(actor, turn);
     const active = sql.exec('SELECT id FROM turns WHERE state=\'active\' LIMIT 1').toArray()[0];
     if (active) return json({ turn: null, reason: 'another_agent_active' }, 409);
-    const turn = sql.exec<{ id: string; request_message_id: string; agent_id: string; agent_name: string; harness: string; model: string; owner_id: string; requested_by: string }>(
-      'SELECT id, request_message_id, agent_id, agent_name, harness, model, owner_id, requested_by FROM turns WHERE state=\'queued\' AND (owner_id<>? OR requested_by=? OR ?=1) ORDER BY queue_seq LIMIT 1',
+    const turn = sql.exec<{ id: string; request_message_id: string; agent_id: string; agent_name: string; harness: string; model: string; owner_id: string; requested_by: string; permitted: number }>(
+      `SELECT id, request_message_id, agent_id, agent_name, harness, model, owner_id, requested_by, permitted FROM turns
+       WHERE state='queued' AND (owner_id<>? OR requested_by=? OR ?=1 OR permitted=1
+         OR EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='always'))
+       ORDER BY queue_seq LIMIT 1`,
       actor, actor, input.allowRemote ? 1 : 0,
     ).toArray()[0];
     if (!turn) {
@@ -569,7 +761,10 @@ export class ChatRoom extends DurableObject<Env> {
       if (!rechecked) this.appendEvent('turn.queued', { turnId: turn.id, agentId: turn.agent_id, agentName: turn.agent_name, ownerId: turn.owner_id, requestedBy: turn.requested_by, requestMessageId: turn.request_message_id, recheck: true });
       return json({ turn: null, reason: 'earlier_turn_waiting_for_owner' });
     }
-    if (turn.requested_by !== actor && !input.allowRemote) return json({ turn: null, reason: 'remote_requests_disabled' });
+    if (turn.requested_by !== actor && !input.allowRemote) {
+      const grant = sql.exec<{ decision: string }>('SELECT decision FROM mention_grants WHERE owner_id=? AND requester_id=? AND harness=?', turn.owner_id, turn.requested_by, turn.harness).toArray()[0];
+      if (grant?.decision !== 'always' && !turn.permitted) return json({ turn: null, reason: 'remote_requests_disabled' });
+    }
     if (!(input.agentIds || []).includes(turn.agent_id)) return json({ turn: null, reason: 'agent_not_configured_here' });
     const request = sql.exec<{ message_seq: number; text: string }>('SELECT message_seq, text FROM messages WHERE id=?', turn.request_message_id).toArray()[0];
     if (!request) return json({ error: 'Agent request message is missing.' }, 409);
@@ -588,6 +783,63 @@ export class ChatRoom extends DurableObject<Env> {
     ).toArray().map((message) => ({ id: message.id, messageSeq: message.message_seq, participantId: message.actor_id, participantName: message.actor_name, role: message.role, text: message.text, agentId: message.agent_id }));
     const result = { turnId: turn.id, request: { messageId: turn.request_message_id, text: request.text, requestedBy: turn.requested_by }, replyId, agentId: turn.agent_id, agentName: turn.agent_name, ownerId: actor, harness: turn.harness, model: turn.model, contextThroughSeq: frontier, context };
     return json({ turn: result });
+  }
+
+  private announcePermission(ownerId: string, turn: { id: string; agent_id: string; agent_name: string; harness: string; requested_by: string }): void {
+    const announced = this.ctx.storage.sql.exec(
+      "SELECT event_seq FROM events WHERE type='turn.permission_needed' AND json_extract(data,'$.turnId')=? LIMIT 1",
+      turn.id,
+    ).toArray()[0];
+    if (announced) return;
+    this.appendEvent('turn.permission_needed', {
+      turnId: turn.id, agentId: turn.agent_id, agentName: turn.agent_name, harness: turn.harness, ownerId, requestedBy: turn.requested_by,
+    });
+  }
+
+  private decideMention(actor: string, turnId: string, input: { decision?: string }): Response {
+    const decision = input.decision;
+    if (decision !== 'once' && decision !== 'always' && decision !== 'decline') return json({ error: 'Decision must be once, always, or decline.' }, 400);
+    const sql = this.ctx.storage.sql;
+    const turn = sql.exec<{ id: string; agent_id: string; agent_name: string; harness: string; owner_id: string; requested_by: string; state: string }>(
+      'SELECT id, agent_id, agent_name, harness, owner_id, requested_by, state FROM turns WHERE id=?', turnId,
+    ).toArray()[0];
+    if (!turn || turn.owner_id !== actor) return json({ error: 'This turn is not available to this agent owner.' }, 409);
+    if (turn.requested_by === actor) return json({ error: 'Your own mentions do not need permission.' }, 409);
+    const timestamp = now();
+    if (decision === 'decline') {
+      sql.exec(
+        'INSERT INTO mention_grants (owner_id, requester_id, harness, decision) VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, requester_id, harness) DO UPDATE SET decision=excluded.decision',
+        actor, turn.requested_by, turn.harness, 'declined',
+      );
+      const declined = sql.exec<{ id: string; agent_id: string }>(
+        "UPDATE turns SET state='declined', updated_at=? WHERE owner_id=? AND requested_by=? AND harness=? AND state='awaiting_permission' RETURNING id, agent_id",
+        timestamp, actor, turn.requested_by, turn.harness,
+      ).toArray();
+      if (!declined.length && turn.state !== 'awaiting_permission') return json({ error: 'This mention is not waiting for permission.' }, 409);
+      for (const item of declined) {
+        this.appendEvent('turn.permission_decided', { turnId: item.id, agentId: item.agent_id, harness: turn.harness, ownerId: actor, requestedBy: turn.requested_by, decision: 'decline' });
+      }
+      return json({ ok: true });
+    }
+    if (decision === 'always') {
+      sql.exec(
+        'INSERT INTO mention_grants (owner_id, requester_id, harness, decision) VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, requester_id, harness) DO UPDATE SET decision=excluded.decision',
+        actor, turn.requested_by, turn.harness, 'always',
+      );
+    }
+    const restored = sql.exec<{ id: string; agent_id: string; agent_name: string; request_message_id: string }>(
+      decision === 'once'
+        ? "UPDATE turns SET state='queued', permitted=1, updated_at=? WHERE id=? AND owner_id=? AND state='awaiting_permission' RETURNING id, agent_id, agent_name, request_message_id"
+        : "UPDATE turns SET state='queued', updated_at=? WHERE owner_id=? AND requested_by=? AND harness=? AND state='awaiting_permission' RETURNING id, agent_id, agent_name, request_message_id",
+      ...(decision === 'once'
+        ? [timestamp, turn.id, actor]
+        : [timestamp, actor, turn.requested_by, turn.harness]),
+    ).toArray();
+    if (!restored.length) return json({ error: 'This mention is not waiting for permission.' }, 409);
+    for (const item of restored) {
+      this.appendEvent('turn.queued', { turnId: item.id, agentId: item.agent_id, agentName: item.agent_name, ownerId: actor, requestedBy: turn.requested_by, requestMessageId: item.request_message_id });
+    }
+    return json({ ok: true });
   }
 
   private appendChunk(actor: string, turnId: string, input: { index?: number; text?: string }): Response {
@@ -613,14 +865,14 @@ export class ChatRoom extends DurableObject<Env> {
 
   private finishTurn(actor: string, turnId: string, input: { state?: string; error?: string }): Response {
     const sql = this.ctx.storage.sql;
-    const turn = sql.exec<{ reply_id: string; owner_id: string; state: string }>('SELECT reply_id, owner_id, state FROM turns WHERE id=?', turnId).toArray()[0];
+    const turn = sql.exec<{ reply_id: string; owner_id: string; state: string; agent_id: string; harness: string }>('SELECT reply_id, owner_id, state, agent_id, harness FROM turns WHERE id=?', turnId).toArray()[0];
     const state = ['complete', 'failed', 'stopped'].includes(input.state || '') ? input.state as string : 'complete';
     if (!turn || turn.owner_id !== actor) return json({ error: 'This turn is not available to this agent owner.' }, 409);
     if (turn.state !== 'active') return turn.state === state ? json({ ok: true, duplicate: true }) : json({ error: 'This turn is already finished.' }, 409);
     const timestamp = now();
     sql.exec('UPDATE turns SET state=?, updated_at=? WHERE id=?', state, timestamp, turnId);
     sql.exec('UPDATE messages SET state=?, updated_at=? WHERE id=?', state, timestamp, turn.reply_id);
-    const event = this.appendEvent('turn.finished', { turnId, messageId: turn.reply_id, state, error: typeof input.error === 'string' ? input.error.slice(0, 4000) : undefined, finishedAt: timestamp });
+    const event = this.appendEvent('turn.finished', { turnId, messageId: turn.reply_id, agentId: turn.agent_id, harness: turn.harness, state, error: typeof input.error === 'string' ? input.error.slice(0, 4000) : undefined, finishedAt: timestamp });
     return json({ ok: true, eventSeq: event.eventSeq });
   }
 
@@ -646,16 +898,111 @@ export class ChatRoom extends DurableObject<Env> {
 function directory(env: Env) { return env.DIRECTORY.get(env.DIRECTORY.idFromName('workspace')); }
 function response(value: unknown, status: number, env: Env) { return new Response(JSON.stringify(value), { status, headers: { ...jsonHeaders, ...corsHeaders(env) } }); }
 function json(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status, headers: jsonHeaders }); }
-function corsHeaders(env: Env): HeadersInit { return { 'access-control-allow-origin': env.APP_ORIGIN || '*', 'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '86400' }; }
+function corsHeaders(env: Env): HeadersInit { return { ...(env.APP_ORIGIN && env.APP_ORIGIN !== '*' ? { 'access-control-allow-origin': env.APP_ORIGIN, vary: 'Origin' } : {}), 'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '86400' }; }
+
 function now() { return new Date().toISOString(); }
 function cleanName(input: unknown): string { const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : ''; if (!name || name.length > 64) throw new HttpError('Enter a name up to 64 characters.', 400); return name; }
 function cleanRoomName(input: unknown): string { const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : ''; if (!name || name.length > 80) throw new HttpError('Enter a chat name up to 80 characters.', 400); return name; }
 async function readJson<T = Record<string, unknown>>(request: Request): Promise<T> { const length = Number(request.headers.get('content-length') || 0); if (length > MAX_BODY_BYTES) throw new HttpError('Request is too large.', 413); const body = await request.json().catch(() => null); if (!body || typeof body !== 'object') throw new HttpError('Expected a JSON request body.', 400); return body as T; }
 function parseObject(value: string): Record<string, unknown> { try { const parsed = JSON.parse(value); return parsed && typeof parsed === 'object' ? parsed : {}; } catch { return {}; } }
-function randomToken() { const bytes = crypto.getRandomValues(new Uint8Array(24)); return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
+function randomToken(size = 24) { const bytes = crypto.getRandomValues(new Uint8Array(size)); return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
 async function hashText(value: string) { const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
 function base64url(value: Uint8Array) { return btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, ''); }
-async function signSession(member: Identity, secret: string) { const header = base64url(new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))); const payload = base64url(new TextEncoder().encode(JSON.stringify({ sub: member.id, name: member.name, role: member.role, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS }))); const data = `${header}.${payload}`; const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data))); return `${data}.${base64url(signature)}`; }
-async function authenticate(request: Request, env: Env, protocolToken?: string): Promise<Identity | null> { const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || protocolToken || ''; const [header, payload, signature, extra] = token.split('.'); if (!header || !payload || !signature || extra) return null; const data = `${header}.${payload}`; try { const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.SESSION_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']); const decoded = Uint8Array.from(atob(signature.replace(/-/g, '+').replace(/_/g, '/')), (character) => character.charCodeAt(0)); if (!await crypto.subtle.verify('HMAC', key, decoded, new TextEncoder().encode(data))) return null; const value = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Identity & { sub?: string }; const id = typeof value.id === 'string' ? value.id : value.sub; if (!id || typeof value.name !== 'string' || !['owner', 'member'].includes(value.role) || !value.exp || value.exp <= Math.floor(Date.now() / 1000)) return null; return { id, name: value.name, role: value.role, exp: value.exp }; } catch { return null; } }
+async function signChallenge(value: { nonce: string; exp: number }, secret: string) {
+  const payload = base64url(new TextEncoder().encode(JSON.stringify(value)));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)));
+  return `${payload}.${base64url(signature)}`;
+}
+async function verifyChallenge(value: string, secret: string): Promise<{ nonce: string; exp: number }> {
+  const [payload, signature, extra] = value.split('.');
+  if (!payload || !signature || extra) throw new HttpError('Google sign-in challenge is invalid.', 400);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  let decoded: Uint8Array<ArrayBuffer>;
+  try { decoded = decodeBase64url(signature); } catch { throw new HttpError('Google sign-in challenge is invalid.', 400); }
+  if (!await crypto.subtle.verify('HMAC', key, decoded, new TextEncoder().encode(payload))) throw new HttpError('Google sign-in challenge is invalid.', 400);
+  let claims: { nonce?: unknown; exp?: unknown };
+  try { claims = JSON.parse(new TextDecoder().decode(decodeBase64url(payload))); } catch { throw new HttpError('Google sign-in challenge is invalid.', 400); }
+  if (typeof claims.nonce !== 'string' || claims.nonce.length < 32 || typeof claims.exp !== 'number' || claims.exp <= Math.floor(Date.now() / 1000))
+    throw new HttpError('Google sign-in challenge expired. Please try again.', 400);
+  return { nonce: claims.nonce, exp: claims.exp };
+}
+
+type GoogleJwk = JsonWebKey & { kid?: string; use?: string; alg?: string };
+let googleJwksCache: { url: string; keys: GoogleJwk[]; expiresAt: number } | null = null;
+async function verifyGoogleIdToken(token: string, expectedNonce: string, clientId: string, configuredJwksUrl?: string): Promise<{ sub: string; name: string }> {
+  if (token.length > 16_384) throw new HttpError('Google sign-in token is invalid.', 401);
+  const [encodedHeader, encodedClaims, encodedSignature, extra] = token.split('.');
+  if (!encodedHeader || !encodedClaims || !encodedSignature || extra) throw new HttpError('Google sign-in token is invalid.', 401);
+  let header: { alg?: unknown; kid?: unknown };
+  let claims: Record<string, unknown>;
+  try {
+    header = JSON.parse(new TextDecoder().decode(decodeBase64url(encodedHeader)));
+    claims = JSON.parse(new TextDecoder().decode(decodeBase64url(encodedClaims)));
+  } catch { throw new HttpError('Google sign-in token is invalid.', 401); }
+  if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new HttpError('Google sign-in token is invalid.', 401);
+  const jwksUrl = new URL(configuredJwksUrl || 'https://www.googleapis.com/oauth2/v3/certs');
+  if (jwksUrl.protocol !== 'https:' && jwksUrl.hostname !== 'localhost' && jwksUrl.hostname !== '127.0.0.1')
+    throw new HttpError('Google sign-in could not be verified.', 503);
+  const jwk = (await googleJwks(jwksUrl.toString())).find((key) => key.kid === header.kid && (!key.alg || key.alg === 'RS256') && (!key.use || key.use === 'sig'))
+    || (await googleJwks(jwksUrl.toString(), true)).find((key) => key.kid === header.kid && (!key.alg || key.alg === 'RS256') && (!key.use || key.use === 'sig'));
+  if (!jwk) throw new HttpError('Google sign-in could not be verified.', 401);
+  let validSignature = false;
+  try {
+    const publicKey = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    validSignature = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey, decodeBase64url(encodedSignature), new TextEncoder().encode(`${encodedHeader}.${encodedClaims}`));
+  } catch { validSignature = false; }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const issuedAt = Number(claims.iat);
+  const expiresAt = Number(claims.exp);
+  const issuerValid = claims.iss === 'accounts.google.com' || claims.iss === 'https://accounts.google.com';
+  if (!validSignature || !issuerValid || claims.aud !== clientId || claims.nonce !== expectedNonce || typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 255 || !Number.isFinite(issuedAt) || issuedAt > nowSeconds + 60 || !Number.isFinite(expiresAt) || expiresAt <= nowSeconds)
+    throw new HttpError('Google sign-in could not be verified. Please try again.', 401);
+  let name = typeof claims.name === 'string' ? claims.name.trim().replace(/\s+/g, ' ').slice(0, 64) : '';
+  if (!name) name = 'Google user';
+  return { sub: claims.sub, name };
+}
+
+async function googleJwks(url: string, refresh = false): Promise<GoogleJwk[]> {
+  if (!refresh && googleJwksCache?.url === url && googleJwksCache.expiresAt > Date.now()) return googleJwksCache.keys;
+  let responseValue: Response;
+  try { responseValue = await fetch(url, { headers: { accept: 'application/json' }, cf: { cacheTtl: 3600, cacheEverything: true } }); }
+  catch { throw new HttpError('Could not verify Google sign-in right now. Please try again.', 503); }
+  if (!responseValue.ok) throw new HttpError('Could not verify Google sign-in right now. Please try again.', 503);
+  const body = await responseValue.json().catch(() => null) as { keys?: unknown } | null;
+  if (!body || !Array.isArray(body.keys) || !body.keys.length) throw new HttpError('Could not verify Google sign-in right now. Please try again.', 503);
+  const keys = body.keys.filter((item): item is GoogleJwk => Boolean(item && typeof item === 'object' && (item as GoogleJwk).kty === 'RSA'));
+  googleJwksCache = { url, keys, expiresAt: Date.now() + 60 * 60 * 1000 };
+  return keys;
+}
+
+function decodeBase64url(value: string): Uint8Array<ArrayBuffer> {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4));
+  const output = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) output[index] = binary.charCodeAt(index);
+  return output;
+}
+
+async function authenticate(request: Request, env: Env, protocolToken?: string): Promise<Identity | null> {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || protocolToken || '';
+  if (!/^[a-f0-9]{64}$/i.test(token)) return null;
+  const result = await directory(env).fetch(`https://directory/auth/session?hash=${encodeURIComponent(await hashText(token))}`);
+  if (!result.ok) return null;
+  return result.json<Identity>();
+}
+
+async function verifyLegacySession(token: string, secret: string): Promise<Identity | null> {
+  const [header, payload, signature, extra] = token.split('.');
+  if (!header || !payload || !signature || extra) return null;
+  try {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    if (!await crypto.subtle.verify('HMAC', key, decodeBase64url(signature), new TextEncoder().encode(`${header}.${payload}`))) return null;
+    const value = JSON.parse(new TextDecoder().decode(decodeBase64url(payload))) as Identity & { sub?: string };
+    const id = typeof value.id === 'string' ? value.id : value.sub;
+    if (!id || typeof value.name !== 'string' || !['owner', 'member'].includes(value.role) || !value.exp || value.exp <= Math.floor(Date.now() / 1000)) return null;
+    return { id, name: value.name, role: value.role, exp: value.exp };
+  } catch { return null; }
+}
 function requireAdmin(request: Request, env: Env) { if (!env.ADMIN_SECRET || request.headers.get('authorization') !== `Bearer ${env.ADMIN_SECRET}`) throw new HttpError('Admin access denied.', 403); }
 class HttpError extends Error { constructor(message: string, readonly status: number) { super(message); } }

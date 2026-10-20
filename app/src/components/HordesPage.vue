@@ -16,11 +16,10 @@
           </div>
           <img :src="hordeArt" alt="A crowd of people and friendly robots gathered together" />
         </header>
-        <form v-if="!connected" class="connect" @submit.prevent="register">
-          <label>Your name<input v-model="name" required maxlength="80" /></label
-          ><button class="primary" :disabled="busy">Create account</button>
-          <p>An account lets you discover shared projects and contribute.</p>
-        </form>
+        <div v-if="!connected" class="connect">
+          <p>Sign in with Google to discover shared projects and contribute.</p>
+          <button class="primary" @click="emit('signIn')">Continue with Google</button>
+        </div>
         <nav class="section-tabs" aria-label="Hordes views">
           <button :class="{ active: view === 'projects' }" @click="changeView('projects')">
             Projects</button
@@ -493,13 +492,12 @@ import {
   type HordeProject,
 } from '../lib/hordes';
 const props = defineProps<{ connected: boolean; memberId: string }>();
-const emit = defineEmits<{ connected: [] }>();
+const emit = defineEmits<{ signIn: [] }>();
 const api = window.surprisedFace;
 const projects = ref<HordeProject[]>([]);
 const detail = ref<HordeDetail | null>(null);
 const view = ref<'projects' | 'ideas' | 'trash'>('projects');
 const query = ref('');
-const name = ref('');
 const loading = ref(false);
 const busy = ref(false);
 const error = ref('');
@@ -694,17 +692,6 @@ async function restore(id: string): Promise<void> {
   if (await mutate('restore', {}, id)) {
     detail.value = null;
     await refresh();
-  }
-}
-async function register(): Promise<void> {
-  busy.value = true;
-  try {
-    await api.register(name.value.trim());
-    emit('connected');
-  } catch (e) {
-    error.value = errorText(e);
-  } finally {
-    busy.value = false;
   }
 }
 const focusRefresh = () => {

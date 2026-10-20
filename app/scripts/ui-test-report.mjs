@@ -30,6 +30,8 @@ const images = [
   ['hordes-project.png', 'Horde project with skills, orchestration, roles, budget and database discussion'],
   ['hordes-ideas.png', 'Fourteen project concepts with first milestones and distinct orchestration approaches'],
   ['harness-owner-attribution.png', 'Two Codex replies labeled with their distinct owners'],
+  ['google-auth-gate.png', 'Sign-in gate shown before local project discovery'],
+
   ['shared-chat-renamed.png', 'Shared chat renamed by its creator with shared chats at the top'],
   ['harness-no-folder.png', 'New Codex chat started without selecting a project folder'],
   ['harness-mention-cursor.png', 'Mention inserted before existing message text'],

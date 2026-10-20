@@ -17,6 +17,7 @@
     { "tag": "v1", "new_sqlite_classes": ["WorkspaceDirectory", "ChatRoom"] }
   ],
   "vars": {
-    "APP_ORIGIN": "*"
+    "APP_ORIGIN": "",
+    "GOOGLE_CLIENT_ID": "1037750208537-fksu29voi15hutr1gg1rj69320qmvsbk.apps.googleusercontent.com"
   }
 }

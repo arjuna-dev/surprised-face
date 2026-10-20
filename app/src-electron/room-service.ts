@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import type { LocalStore, RoomEvent } from './local-store';
 import type { SettingsStore } from './settings-store';
+import { signInWithGoogle } from './google-auth';
 
 type ApiRoom = { id: string; name: string; createdBy?: string; createdAt?: string; defaultAgentId?: string; default_agent_id?: string };
 type ApiMember = { id: string; name: string; role: 'owner' | 'member' };
@@ -60,6 +61,43 @@ export class RoomService extends EventEmitter {
     return result.body.member;
   }
 
+  async signInWithGoogle(clientId: string, openExternal: (url: string) => Promise<void>): Promise<ApiMember> {
+    const settings = await this.settings.get();
+    const currentToken = settings.connected ? await this.settings.accessToken() : '';
+    const result = await signInWithGoogle({
+      backendUrl: settings.backendUrl,
+      clientId,
+      ...(currentToken ? { currentToken } : {}),
+      openExternal,
+    });
+    await this.settings.saveConnection(settings.backendUrl, result.member, result.token);
+    return result.member;
+  }
+
+  async sessionCheck(): Promise<{ authenticated: boolean; member?: ApiMember }> {
+    const settings = await this.settings.get();
+    if (!settings.connected) return { authenticated: false };
+    const token = await this.settings.accessToken();
+    const result = await this.requestAt<{ id: string; name: string; role: 'owner' | 'member' }>(settings.backendUrl, '/v1/me', {
+      headers: { authorization: `Bearer ${token}` }, allowUnauthorized: true,
+    });
+    if (result.status === 401) return { authenticated: false };
+    return { authenticated: true, member: result.body };
+  }
+
+  async logout(): Promise<void> {
+    const settings = await this.settings.get();
+    if (settings.connected) {
+      const token = await this.settings.accessToken();
+      const result = await this.requestAt<{ ok?: boolean }>(settings.backendUrl, '/v1/logout', {
+        method: 'POST', headers: { authorization: `Bearer ${token}` }, allowUnauthorized: true,
+      });
+      if (result.status !== 401 && !result.body.ok) throw new Error('Could not end the sign-in session. Please try again.');
+    }
+    this.disconnect();
+    await this.settings.clearConnection();
+  }
+
   async join(input: { backendUrl: string; code: string; name: string }): Promise<unknown> {
     const backendUrl = normalizeUrl(input.backendUrl);
     const result = await this.requestAt<{ member: ApiMember; token: string }>(
@@ -116,9 +154,22 @@ export class RoomService extends EventEmitter {
   }
 
   async createRoom(name: string, defaultAgentId = ''): Promise<ApiRoom> {
-    const result = await this.api<ApiRoom>('/v1/rooms', { method: 'POST', body: { name, defaultAgentId } });
+    const result = await this.api<ApiRoom>('/v1/rooms', { method: 'POST', body: { name, defaultAgentId, requestId: randomUUID() } });
     this.store.storeRooms([result.body]);
     return result.body;
+  }
+
+  async reserveChatCreation(requestId: string): Promise<{ limit: number; used: number; remaining: number }> {
+    const result = await this.api<{ limit: number; used: number; remaining: number }>('/v1/chat-creations', {
+      method: 'POST', body: { requestId },
+    });
+    return result.body;
+  }
+
+  async releaseChatCreation(requestId: string): Promise<void> {
+    await this.api<{ released: boolean }>('/v1/chat-creations/release', {
+      method: 'POST', body: { requestId },
+    });
   }
 
   async renameRoom(roomId: string, name: string): Promise<ApiRoom> {
@@ -183,6 +234,13 @@ export class RoomService extends EventEmitter {
     void this.flushOutbox(input.roomId).catch((error: unknown) =>
       this.emit('service/error', errorMessage(error)),
     );
+  }
+
+  async decideMention(roomId: string, turnId: string, decision: 'once' | 'always' | 'decline'): Promise<void> {
+    await this.api(`/v1/rooms/${encodeURIComponent(roomId)}/turns/${encodeURIComponent(turnId)}/permission`, {
+      method: 'POST',
+      body: { decision },
+    });
   }
 
   async claimTurn(roomId: string, agentIds: string[], allowRemote = false): Promise<Record<string, unknown> | null> {
@@ -420,6 +478,7 @@ export class RoomService extends EventEmitter {
       headers?: Record<string, string>;
       body?: unknown;
       allowConflict?: boolean;
+      allowUnauthorized?: boolean;
     },
   ): Promise<ApiResult<T>> {
     let response: Response;
@@ -442,7 +501,7 @@ export class RoomService extends EventEmitter {
     } catch {
       body = { error: text || 'Invalid service response.' };
     }
-    if (!response.ok && !(options.allowConflict && response.status === 409)) {
+    if (!response.ok && !(options.allowConflict && response.status === 409) && !(options.allowUnauthorized && response.status === 401)) {
       const message =
         body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
           ? body.error

@@ -14,6 +14,15 @@ export type CatalogFilters = {
   projectPath: string;
 };
 
+/** A shared room already represents this native session, so the sidebar keeps one row. */
+export function withoutSharedSessions<T extends { id: string; harness: string }>(
+  rows: T[],
+  linkedKeys: Iterable<string>,
+): T[] {
+  const linked = linkedKeys instanceof Set ? linkedKeys : new Set(linkedKeys);
+  return rows.filter((row) => !linked.has(`${row.harness}:${row.id}`));
+}
+
 export function filterLocalConversations<T extends CatalogConversation>(
   rows: T[],
   filters: CatalogFilters,

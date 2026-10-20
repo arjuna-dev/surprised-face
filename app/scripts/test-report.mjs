@@ -19,6 +19,60 @@ for (const match of output.matchAll(/^(ok|not ok) \d+ - (.+)$/gm)) results.set(m
 
 const checks = [
   {
+    name: 'Google sign-in request',
+    test: 'Google authorization uses a system-browser code flow with PKCE and minimal scopes',
+    input: 'A desktop OAuth client, loopback URI, random verifier/state, and a server-issued nonce.',
+    result: 'Authorization uses openid/profile, S256 PKCE, state, and nonce without a client secret.',
+  },
+  {
+    name: 'Google callback validation',
+    test: 'OAuth callback accepts only a matching state and a non-empty authorization code',
+    input: 'Valid, mismatched-state, and Google-denied callback URLs.',
+    result: 'Only a callback with the expected state and code is accepted.',
+  },
+  {
+    name: 'Google browser redirect',
+    test: 'Google sign-in completes the loopback redirect and exchanges the code with PKCE',
+    input: 'Simulate Google returning an authorization code to the temporary localhost callback, then exchange it with PKCE.',
+    result: 'The callback is scrubbed from browser history, no-store security headers are returned, and only the verified code flow reaches the Worker.',
+  },
+  {
+    name: 'Waiting for the owner',
+    test: 'a mention waiting on someone else names that person',
+    input: 'Mukesh tags Aman\'s Codex and the turn is waiting for permission.',
+    result: 'Mukesh sees waiting for Aman. Aman sees waiting for you.',
+  },
+  {
+    name: 'One row for a shared chat',
+    test: 'a local chat linked to a shared room is not listed again',
+    input: 'Codex session a is already linked to a shared room. Sessions b and c are not.',
+    result: 'The local list keeps b and c.',
+  },
+  {
+    name: 'Reply label',
+    test: 'a shared reply is labeled with its owner and harness',
+    input: 'An assistant message belongs to mukesh and Codex.',
+    result: 'The label is mukesh · Codex. A human message keeps the person name.',
+  },
+  {
+    name: 'Harness context append',
+    test: 'new shared messages are appended once to the linked harness session',
+    input: 'A linked Codex session has not seen Maya and Noah, then Maya sends one more message.',
+    result: 'The session receives the first two lines, then only the newer line. Nothing is written back to the room.',
+  },
+  {
+    name: 'Mention stays a turn',
+    test: 'a mention that queued a turn is left for that turn',
+    input: 'A chat line is followed by a mention that already queued a turn.',
+    result: 'The chat line is appended and the mention is left for the harness turn.',
+  },
+  {
+    name: 'Context without a reply',
+    test: 'shared context is saved to the desktop chat without waiting for a model reply',
+    input: 'Codex desktop stores the shared line and does not write an assistant message.',
+    result: 'The append finishes with only the shared line in the session.',
+  },
+  {
     name: 'Harness availability',
     test: 'unavailable harnesses are not advertised for turns',
     input: 'Codex is installed and Hermes is absent.',

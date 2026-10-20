@@ -8,8 +8,8 @@ test('supported harnesses are ready without creating agents or choosing folders'
     agents: [],
   });
   assert.deepEqual(participants.map(({ name, harness, workingDirectory }) => ({ name, harness, workingDirectory })), [
-    { name: 'Codex', harness: 'codex', workingDirectory: '' },
-    { name: 'Hermes', harness: 'hermes', workingDirectory: '' },
+    { name: 'Maya · Codex', harness: 'codex', workingDirectory: '' },
+    { name: 'Maya · Hermes', harness: 'hermes', workingDirectory: '' },
   ]);
   assert.equal(new Set(participants.map((participant) => participant.id)).size, 2);
 });

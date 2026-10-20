@@ -172,6 +172,15 @@ export class HermesAcpClient extends EventEmitter {
    * Start a turn. Returns once Hermes accepted the request; the answer streams as `message`
    * events and the turn ends with `prompt/completed` or `prompt/failed`.
    */
+  /**
+   * Add shared chat text to an existing Hermes session.
+   * The prompt call is how Hermes accepts text. The caller does not copy a reply back into the room.
+   */
+  async appendPlainText(sessionId: string, text: string, cwd?: string): Promise<void> {
+    await this.loadSession(sessionId, cwd);
+    await this.prompt(sessionId, text);
+  }
+
   async prompt(sessionId: string, text: string): Promise<{ accepted: true }> {
     await this.ensureStarted();
     if (this.activePrompts.has(sessionId)) throw new Error('This conversation is still working.');

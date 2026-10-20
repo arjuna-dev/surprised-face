@@ -57,6 +57,7 @@ test('imported agent history keeps its author and original time in the local cop
     assert.equal(message?.createdAt, '2026-10-01T12:00:00.000Z');
     store.saveNativeRoomLink('codex', 'thread-1', 'room-1', 'agent-1');
     assert.deepEqual(store.nativeRoomLink('codex', 'thread-1'), { roomId: 'room-1', agentId: 'agent-1' });
+    assert.deepEqual(store.nativeRoomLinks(), [{ harness: 'codex', sessionId: 'thread-1', roomId: 'room-1' }]);
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });

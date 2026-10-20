@@ -35,12 +35,11 @@ type SharedAgent = { id: string; ownerId: string; name: string; harness: 'codex'
 interface SurprisedFaceApi {
   hordeRequest(input: { action: string; projectId?: string; data?: unknown; deleted?: boolean }): Promise<unknown>;
   settings(): Promise<SurprisedFaceSettings>;
+  sessionCheck(): Promise<{ authenticated: boolean; member?: SharedMember }>;
+  googleSignIn(): Promise<SharedMember>;
   availableHarnesses(): Promise<('codex' | 'hermes')[]>;
   updateSettings(input: Partial<SurprisedFaceSettings>): Promise<SurprisedFaceSettings>;
-  bootstrap(input: unknown): Promise<unknown>;
-  register(name: string): Promise<unknown>;
   copyText(value: string): Promise<{ ok: boolean }>;
-  join(input: unknown): Promise<unknown>;
   joinRoom(code: string): Promise<{ roomId: string }>;
   logout(): Promise<SurprisedFaceSettings>;
   createInvites(roomId: string): Promise<{ code: string; expiresAt: string }[]>;
@@ -54,6 +53,7 @@ interface SurprisedFaceApi {
   members(roomId: string): Promise<SharedMember[]>;
   agents(roomId: string): Promise<SharedAgent[]>;
   runPending(roomId: string): Promise<unknown>;
+  decideMention(input: { roomId: string; turnId: string; decision: 'once' | 'always' | 'decline' }): Promise<unknown>;
   sheepCached(): Promise<{ projects: Record<string, unknown>[]; conversations: Record<string, unknown>[] }>;
   sheepHealth(): Promise<unknown>;
   sheepProjects(): Promise<{ projects: Record<string, unknown>[] }>;
@@ -64,8 +64,9 @@ interface SurprisedFaceApi {
   sheepNativeRecords(input: { harness: string; id: string }): Promise<unknown[]>;
   nativeSend(input: { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; text: string }): Promise<void>;
   nativeFollow(input: { sessionId: string }): Promise<void>;
-  nativeCreate(input: { harness: 'codex' | 'hermes'; cwd: string; title: string }): Promise<{ id: string; harness: 'codex' | 'hermes'; path: string; title: string; updatedAt: string }>;
+  nativeCreate(input: { harness: 'codex' | 'hermes'; cwd: string; title: string }): Promise<{ id: string; harness: 'codex' | 'hermes'; path: string; title: string; updatedAt: string; remainingChatsToday?: number }>;
   nativeLink(input: { harness: string; sessionId: string }): Promise<{ roomId: string; agentId: string } | null>;
+  nativeLinks(): Promise<{ harness: string; sessionId: string; roomId: string }[]>;
   nativeShare(input: { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; title: string; agentName?: string }): Promise<{ room: SharedRoom; invite?: { code: string; expiresAt: string } }>;
   onNativeChatEvent(handler: (value: unknown) => void): () => void;
   codexAccount(refresh?: boolean): Promise<unknown>;

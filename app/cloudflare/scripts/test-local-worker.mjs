@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:net';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createServer as createNetServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
+import { createHmac, generateKeyPairSync, randomBytes, randomUUID, sign as signJwt } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,15 @@ const reportPath = path.join(repoRoot, 'tests.html');
 const wranglerPath = path.join(cloudflareRoot, 'node_modules/wrangler/bin/wrangler.js');
 const sessionSecret = randomBytes(32).toString('hex');
 const adminSecret = randomBytes(32).toString('hex');
+const googleClientId = 'local-test-client.apps.googleusercontent.com';
+const googleKeys = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const googleKeyId = randomBytes(8).toString('hex');
+const googleJwk = { ...googleKeys.publicKey.export({ format: 'jwk' }), kid: googleKeyId, use: 'sig', alg: 'RS256' };
+const jwksServer = createHttpServer((_request, response) => {
+  response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'public, max-age=3600' });
+  response.end(JSON.stringify({ keys: [googleJwk] }));
+});
+const jwksPort = await listenServer(jwksServer);
 const stateDir = await mkdtemp(path.join(path.resolve('/tmp'), 'surprised-face-worker-test-'));
 const port = await reservePort();
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -27,6 +37,7 @@ try {
     wranglerPath, 'dev', '--local', '--ip', '127.0.0.1', '--port', String(port),
     '--persist-to', stateDir, '--show-interactive-dev-session=false',
     '--var', `SESSION_SECRET:${sessionSecret}`, '--var', `ADMIN_SECRET:${adminSecret}`,
+    '--var', `GOOGLE_CLIENT_ID:${googleClientId}`, '--var', `GOOGLE_JWKS_URL:http://127.0.0.1:${jwksPort}/certs`,
   ], { cwd: cloudflareRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   worker.stdout.setEncoding('utf8').on('data', (chunk) => { output.stdout += chunk; });
   worker.stderr.setEncoding('utf8').on('data', (chunk) => { output.stderr += chunk; });
@@ -40,10 +51,31 @@ try {
   const boot = await api('/v1/admin/bootstrap', { admin: adminSecret, body: { name: 'Maya' } });
   assert.equal(boot.status, 200, 'owner can initialize the workspace');
   const owner = boot.body.member;
-  const ownerToken = boot.body.token;
-  const selfSignup = await api('/v1/register', { body: { name: 'Nia' } });
-  assert.equal(selfSignup.status, 200, 'a person can create an app identity without a Cloudflare bootstrap key');
-  assert.deepEqual((await api('/v1/rooms', { token: selfSignup.body.token })).body.rooms, [], 'a new identity has no access to existing chats');
+  const legacyOwnerToken = makeLegacyToken(owner);
+  assert.equal((await api('/v1/me', { token: legacyOwnerToken })).status, 401, 'legacy sessions cannot access chat data before Google linking');
+  const badChallenge = (await api('/v1/auth/google/challenge', { body: {} })).body;
+  const badAudience = await api('/v1/auth/google/complete', {
+    body: { idToken: makeGoogleToken('google-sub-maya', 'Maya', badChallenge.nonce, 'other-client.apps.googleusercontent.com'), challenge: badChallenge.challenge },
+  });
+  assert.equal(badAudience.status, 401, 'the Worker rejects an ID token minted for a different OAuth client');
+  const ownerLogin = await googleLogin('google-sub-maya', 'Maya', legacyOwnerToken);
+  assert.equal(ownerLogin.member.id, owner.id, 'a verified Google sign-in links the existing member only with its valid legacy session');
+  const conflictChallenge = (await api('/v1/auth/google/challenge', { body: {} })).body;
+  const conflictingLink = await api('/v1/auth/google/complete', {
+    token: legacyOwnerToken,
+    body: { idToken: makeGoogleToken('google-sub-other', 'Maya', conflictChallenge.nonce), challenge: conflictChallenge.challenge },
+  });
+  assert.equal(conflictingLink.status, 409, 'an existing account cannot be linked to a second Google identity');
+  const ownerToken = ownerLogin.token;
+  const unauthenticatedProjects = await api('/v1/rooms');
+  assert.equal(unauthenticatedProjects.status, 401, 'unauthenticated requests cannot read chat data');
+  assert.equal((await api('/v1/register', { body: { name: 'Nia' } })).status, 401, 'public name-only registration is disabled');
+  assert.equal((await api('/v1/join', { body: { code: 'invite-code', name: 'Nia' } })).status, 401, 'invite codes cannot create unauthenticated accounts');
+  const niaLogin = await googleLogin('google-sub-nia', 'Nia');
+  assert.deepEqual((await api('/v1/rooms', { token: niaLogin.token })).body.rooms, [], 'a new Google account has no access to existing chats');
+  assert.equal((await googleLogin('google-sub-nia', 'Nia')).member.id, niaLogin.member.id, 'signing in again returns the existing Google-linked account');
+  const replay = await api('/v1/auth/google/complete', { body: ownerLogin.completion });
+  assert.equal(replay.status, 409, 'the same OIDC nonce cannot be replayed to mint another session');
   const identity = await api('/v1/me', { token: ownerToken });
   assert.equal(identity.body.id, owner.id, 'session identity exposes the member ID');
 
@@ -58,13 +90,15 @@ try {
   await api(`/v1/rooms/${roomId}/turns/${soloTurn.body.turn.turnId}/finish`, { token: ownerToken, body: { state: 'complete' } });
   const inviteResult = await api(`/v1/rooms/${roomId}/invites`, { token: ownerToken, body: { count: 2 } });
   assert.equal(inviteResult.status, 200, 'chat member can create codes for that chat');
-  const joResult = await api('/v1/join', { body: { code: inviteResult.body.invites[0].code, name: 'Jo' } });
-  const leeResult = await api('/v1/join', { body: { code: inviteResult.body.invites[1].code, name: 'Lee' } });
-  assert.equal(joResult.status, 200, 'first collaborator can join');
-  assert.equal(leeResult.status, 200, 'second collaborator can join');
-  assert.equal((await api('/v1/join', { body: { code: inviteResult.body.invites[0].code, name: 'Again' } })).status, 403, 'an invite cannot be used twice');
-  const jo = { member: joResult.body.member, token: joResult.body.token };
-  const lee = { member: leeResult.body.member, token: leeResult.body.token };
+  const joLogin = await googleLogin('google-sub-jo', 'Jo');
+  const leeLogin = await googleLogin('google-sub-lee', 'Lee');
+  const joJoin = await api('/v1/rooms/join', { token: joLogin.token, body: { code: inviteResult.body.invites[0].code } });
+  const leeJoin = await api('/v1/rooms/join', { token: leeLogin.token, body: { code: inviteResult.body.invites[1].code } });
+  assert.equal(joJoin.status, 200, 'Google-authenticated collaborator can join a chat');
+  assert.equal(leeJoin.status, 200, 'another authenticated collaborator can join a chat');
+  assert.equal((await api('/v1/rooms/join', { token: joLogin.token, body: { code: inviteResult.body.invites[0].code } })).status, 403, 'an invite cannot be used twice');
+  const jo = { member: joLogin.member, token: joLogin.token };
+  const lee = { member: leeLogin.member, token: leeLogin.token };
 
   const hordeInput = { name: 'Earth Commons', summary: 'A walkable planet.', category: 'Worlds', repositoryUrl: 'https://github.com/example/earth', strategy: { parallelism: 4 }, skills: [{ name: 'Tile builder', instructions: 'Validate seams.', tools: ['Blender'] }] };
   const hc = await api('/v1/hordes', { token: ownerToken, body: hordeInput });
@@ -208,6 +242,39 @@ try {
   const permissionEvents = (await api(`/v1/rooms/${queueId}/events?after=0`, { token: ownerToken })).body.events;
   assert.ok(permissionEvents.some(event => event.type === 'turn.availability'), 'permission changes wake connected owners to retry eligible turns');
   assert.ok(permissionEvents.some(event => event.type === 'turn.queued' && event.recheck === true), 'already installed desktops are also woken through their existing queue event handler');
+  const finished = (await api(`/v1/rooms/${roomId}/events?after=0`, { token: jo.token })).body.events.find((event) => event.type === 'turn.finished' && event.turnId === firstTurn.body.turn.turnId);
+  assert.equal(finished?.agentId, 'jo-codex', 'a finished turn includes the harness id');
+  assert.equal(finished?.harness, 'codex', 'a finished turn includes the harness name');
+
+  const promptRoom = await api('/v1/rooms', { token: ownerToken, body: { name: 'Mention prompt' } });
+  const promptId = promptRoom.body.id;
+  const promptInvite = await api(`/v1/rooms/${promptId}/invites`, { token: ownerToken, body: { count: 1 } });
+  await api('/v1/rooms/join', { token: jo.token, body: { code: promptInvite.body.invites[0].code } });
+  const firstPrompt = await api(`/v1/rooms/${promptId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex first', agentIds: ['jo-codex'] } });
+  const parked = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(parked.body.reason, 'remote_requests_disabled', 'the first mention from another person waits');
+  const promptEvents = (await api(`/v1/rooms/${promptId}/events?after=0`, { token: jo.token })).body.events;
+  assert.ok(promptEvents.some((event) => event.type === 'turn.permission_needed' && event.turnId === firstPrompt.body.turnIds[0] && event.agentId === 'jo-codex' && event.harness === 'codex'), 'the owner is asked once for that mention');
+  assert.equal((await api(`/v1/rooms/${promptId}/turns/${firstPrompt.body.turnIds[0]}/permission`, { token: jo.token, body: { decision: 'once' } })).status, 200, 'allow once releases that mention');
+  const allowedOnce = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(allowedOnce.body.turn?.turnId, firstPrompt.body.turnIds[0], 'allow once runs that mention without the global switch');
+  await api(`/v1/rooms/${promptId}/turns/${allowedOnce.body.turn.turnId}/finish`, { token: jo.token, body: { state: 'complete' } });
+  const secondPrompt = await api(`/v1/rooms/${promptId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex second', agentIds: ['jo-codex'] } });
+  await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal((await api(`/v1/rooms/${promptId}/turns/${secondPrompt.body.turnIds[0]}/permission`, { token: jo.token, body: { decision: 'decline' } })).status, 200, 'decline records the refusal');
+  const ownAfterDecline = await api(`/v1/rooms/${promptId}/messages`, { token: jo.token, body: { clientId: randomUUID(), text: '@jo-codex mine', agentIds: ['jo-codex'] } });
+  const ownAfter = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(ownAfter.body.turn?.turnId, ownAfterDecline.body.turnIds[0], 'a declined mention does not block a later own mention');
+  await api(`/v1/rooms/${promptId}/turns/${ownAfter.body.turn.turnId}/finish`, { token: jo.token, body: { state: 'complete' } });
+  await api(`/v1/rooms/${promptId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex third', agentIds: ['jo-codex'] } });
+  const declinedClaim = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(declinedClaim.body.turn, null, 'a remembered decline does not run that person\'s later mention');
+  await api('/v1/rooms/join', { token: lee.token, body: { code: (await api(`/v1/rooms/${promptId}/invites`, { token: ownerToken, body: { count: 1 } })).body.invites[0].code } });
+  const fourthPrompt = await api(`/v1/rooms/${promptId}/messages`, { token: lee.token, body: { clientId: randomUUID(), text: '@jo-codex from lee', agentIds: ['jo-codex'] } });
+  await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal((await api(`/v1/rooms/${promptId}/turns/${fourthPrompt.body.turnIds[0]}/permission`, { token: jo.token, body: { decision: 'always' } })).status, 200, 'allow always remembers this person and harness');
+  const alwaysClaim = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(alwaysClaim.body.turn?.turnId, fourthPrompt.body.turnIds[0], 'an allowed person can call the harness again without another prompt');
 
   const duplicate = await api(`/v1/rooms/${roomId}/messages`, {
     token: ownerToken, body: { clientId: firstClientId, text: '@Jo Codex check this', agentIds: ['jo-codex'] },
@@ -221,10 +288,34 @@ try {
   assert.ok(events.body.events.some((event) => event.type === 'message.created' && event.participantName === 'Maya'));
   assert.ok(laterMessage.body.messageSeq > firstTurn.body.turn.context.at(-1).messageSeq, 'messages sent while streaming receive later message positions');
 
+  const abandonedQuotaId = randomUUID();
+  assert.equal((await api('/v1/chat-creations', { token: niaLogin.token, body: { requestId: abandonedQuotaId } })).status, 201, 'a native chat start reserves quota before launching the harness');
+  const releaseQuota = await api('/v1/chat-creations/release', { token: niaLogin.token, body: { requestId: abandonedQuotaId } });
+  assert.equal(releaseQuota.status, 200, 'a failed native start can release its reservation');
+  assert.equal(releaseQuota.body.released, true, 'only the reservation created by this account is released');
+  const firstQuotaId = randomUUID();
+  const firstQuota = await api('/v1/chat-creations', { token: niaLogin.token, body: { requestId: firstQuotaId } });
+  assert.equal(firstQuota.status, 201, 'an authenticated account can reserve its first new chat');
+  assert.equal(firstQuota.body.used, 1, 'releasing a failed launch restores the quota count');
+  const duplicateQuota = await api('/v1/chat-creations', { token: niaLogin.token, body: { requestId: firstQuotaId } });
+  assert.equal(duplicateQuota.body.used, 1, 'retries of one chat reservation do not consume extra quota');
+  const concurrentQuota = await Promise.all(Array.from({ length: 100 }, () => api('/v1/chat-creations', { token: niaLogin.token, body: { requestId: randomUUID() } })));
+  assert.equal(concurrentQuota.filter((item) => item.status === 201).length, 99, 'concurrent requests cannot exceed 100 new chats for one account in a UTC day');
+  assert.equal(concurrentQuota.filter((item) => item.status === 429).length, 1, 'the 101st concurrent new chat is rejected by the server');
+  assert.equal((await api('/v1/rooms', { token: niaLogin.token, body: { name: 'Over quota' } })).status, 429, 'shared chat creation uses the same account-wide daily limit');
+  assert.equal((await api('/v1/chat-creations', { token: ownerToken, body: { requestId: randomUUID() } })).status, 201, 'daily quota is scoped to the authenticated account');
+  assert.equal((await api('/v1/logout', { token: niaLogin.token, body: {} })).status, 200, 'sign-out revokes the app session');
+  assert.equal((await api('/v1/me', { token: niaLogin.token })).status, 401, 'revoked sessions cannot be reused');
+
   const checks = [
     ['Hordes', 'Real database: project CRUD, roles, revision conflicts, skills, budgets, discussion, deletion and restore.', 'Pass'],
-    ['Session identity', 'Owner and invited members authenticate with their participant IDs.', 'Pass'],
-    ['App account creation', 'A new person can register without a Cloudflare key and cannot read existing chats.', 'Pass'],
+    ['Google sign-in', 'A generated Google ID token with a trusted test RSA key creates or reuses an account; an existing member links only with its valid legacy session.', 'Pass'],
+    ['OAuth token verification', 'Wrong audiences and conflicting account links are rejected; one-time OIDC nonces cannot be replayed.', 'Pass'],
+    ['Opaque session lifecycle', 'The Worker stores a hash of the app session, denies old sessions, and revokes a session at sign-out.', 'Pass'],
+    ['Authentication required', 'Name-only registration and invite-based account creation are disabled; chat data requires a verified account session.', 'Pass'],
+    ['Daily chat limit', 'Concurrent local reservations and shared room creation stop at 100 per account per UTC day; request retries do not double count.', 'Pass'],
+    ['Failed local chat start', 'A failed native launch releases only its own reservation so it does not consume the user’s daily limit.', 'Pass'],
+
     ['Chat invite access', 'Codes admit people to one chat; new chats stay private until invited.', 'Pass'],
     ['Chat ownership and rename', 'The chat creator is its owner, and only that person can rename the chat for every member.', 'Pass'],
     ['Solo and group agent routing', 'Solo chats call their owner agent automatically; group chats require a mention.', 'Pass'],
@@ -250,6 +341,7 @@ try {
     await Promise.race([once(worker, 'close'), delay(2_000)]);
   }
   await rm(stateDir, { recursive: true, force: true });
+  await new Promise((resolve) => jwksServer.close(resolve));
 }
 
 async function connectSocket(roomId, token) {
@@ -300,21 +392,56 @@ async function api(route, { token, admin, body, method } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   if (admin) headers.authorization = `Bearer ${admin}`;
+  const targetBody = route === '/v1/rooms' && body && typeof body === 'object' && !body.requestId
+    ? { ...body, requestId: randomUUID() }
+    : body;
   const response = await fetch(new URL(route, baseUrl), {
     method: method || (body === undefined ? 'GET' : 'POST'),
     headers,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(targetBody === undefined ? {} : { body: JSON.stringify(targetBody) }),
   });
   const result = await response.json().catch(() => ({}));
   return { status: response.status, body: result };
 }
 
 async function reservePort() {
-  const server = createServer();
+  const server = createNetServer();
   await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
   const { port: chosenPort } = server.address();
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   return chosenPort;
+}
+
+async function listenServer(server) {
+  await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
+  return server.address().port;
+}
+
+async function googleLogin(sub, name, legacyToken) {
+  const challenge = (await api('/v1/auth/google/challenge', { body: {} })).body;
+  const completion = { idToken: makeGoogleToken(sub, name, challenge.nonce), challenge: challenge.challenge };
+  const result = await api('/v1/auth/google/complete', { token: legacyToken, body: completion });
+  assert.equal(result.status, 200, `Google sign-in should complete for ${name}: ${JSON.stringify(result.body)}`);
+  assert.equal('email' in result.body.member, false, 'the sign-in response does not expose an email address');
+  return { ...result.body, completion };
+}
+
+function makeGoogleToken(sub, name, nonce, audience = googleClientId) {
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const header = encode({ alg: 'RS256', kid: googleKeyId, typ: 'JWT' });
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const claims = encode({
+    iss: 'https://accounts.google.com', aud: audience, sub, name, email: `${sub}@example.test`,
+    nonce, iat: nowSeconds, exp: nowSeconds + 300,
+  });
+  const content = `${header}.${claims}`;
+  return `${content}.${signJwt('RSA-SHA256', Buffer.from(content), googleKeys.privateKey).toString('base64url')}`;
+}
+
+function makeLegacyToken(member) {
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const content = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: member.id, name: member.name, role: member.role, exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60 })}`;
+  return `${content}.${createHmac('sha256', sessionSecret).update(content).digest('base64url')}`;
 }
 
 function once(emitter, event) {
@@ -326,9 +453,15 @@ function safeLogs() {
 }
 
 async function updateReport(checks, logs) {
-  const report = await readFile(reportPath, 'utf8');
+  let report = await readFile(reportPath, 'utf8');
   const startMarker = '<!-- WORKER_TEST_REPORT_START -->';
   const endMarker = '<!-- WORKER_TEST_REPORT_END -->';
+  if (!report.includes(startMarker) || !report.includes(endMarker)) {
+    const mainClose = report.lastIndexOf('</main>');
+    if (mainClose < 0) throw new Error('The Tests page is missing its main content area.');
+    const section = `\n      <section><h2>Cloudflare Worker</h2>${startMarker}${endMarker}</section>\n      `;
+    report = `${report.slice(0, mainClose)}${section}${report.slice(mainClose)}`;
+  }
   const start = report.indexOf(startMarker);
   const end = report.indexOf(endMarker);
   if (start < 0 || end < start) throw new Error('Local Worker report markers are missing from tests.html.');

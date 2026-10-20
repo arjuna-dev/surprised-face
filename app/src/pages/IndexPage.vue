@@ -1,5 +1,21 @@
 <template>
+  <main v-if="authState !== 'authenticated'" class="auth-gate" aria-labelledby="auth-title">
+    <section class="auth-card">
+      <span class="auth-brand">:o <small>/ surprised-face</small></span>
+      <h1 id="auth-title">Sign in to continue</h1>
+      <p>Use your Google account to open your chats and local projects.</p>
+      <button class="primary-button auth-button" :disabled="authLoading || authState === 'checking'" @click="signInWithGoogle">
+        <LoaderCircle v-if="authLoading || authState === 'checking'" :size="17" class="spin" />
+        <LogIn v-else :size="17" />
+        {{ authState === 'checking' ? 'Checking sign-in…' : authLoading ? 'Opening Google…' : 'Continue with Google' }}
+      </button>
+      <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
+      <button v-if="authError && !authLoading" class="auth-retry" @click="checkAuthentication">Try again</button>
+      <small class="auth-privacy">Sign-in uses your Google account ID and display name. Project names, chat history, and email are not sent during sign-in.</small>
+    </section>
+  </main>
   <div
+    v-else
     class="app-shell"
     :data-theme="settingsDraft.theme"
     :class="{
@@ -44,7 +60,7 @@
       </div>
     </header>
 
-    <HordesPage v-if="hordesVisited" v-show="activeMode === 'hordes'" id="hordes-workspace" role="tabpanel" aria-labelledby="hordes-tab" :connected="settings.connected" :member-id="settings.member?.id || ''" @connected="refreshHordeIdentity" />
+    <HordesPage v-if="hordesVisited" v-show="activeMode === 'hordes'" id="hordes-workspace" role="tabpanel" aria-labelledby="hordes-tab" :connected="settings.connected" :member-id="settings.member?.id || ''" @sign-in="signInWithGoogle" />
     <div v-show="activeMode === 'chat'" id="chat-workspace" class="workspace" role="tabpanel" aria-labelledby="chat-tab">
       <aside v-if="leftOpen" class="left-sidebar">
         <div class="sidebar-search">
@@ -198,9 +214,6 @@
                 <section class="settings-section">
                   <h3>Chat sharing</h3>
                   <p class="section-help">:o handles the chat service. Open a chat and choose Invite friend to share it.</p>
-                  <label
-                    >Your name<input v-model="settingsDraft.displayName" placeholder="Name"
-                  /></label>
                     <div class="connection-forms">
                       <div class="connection-card">
                         <strong>Join a chat</strong
@@ -511,7 +524,8 @@
                 }}<template v-if="agent.model"> · {{ agent.model }}</template></small
               ></span
             >
-            <span class="agent-state" :class="harnessState(agent.id)">{{ harnessState(agent.id) }}</span>
+            <button v-if="harnessState(agent.id) === 'waiting' && agent.ownerId === settings.member?.id" type="button" class="agent-state waiting" @click="showMentionPrompt(agent)">{{ harnessStateLabel(agent) }}</button>
+            <span v-else class="agent-state" :class="harnessState(agent.id)">{{ harnessStateLabel(agent) }}</span>
           </div>
           <p v-if="selectedRoom && !visibleHarnesses.length" class="sidebar-note">No harnesses are available in this chat.</p>
         </div>
@@ -545,13 +559,23 @@
     <ChatDialog v-if="joinOpen" title="Join chat" return-focus=".room-actions [aria-label='Join a chat']" @close="joinOpen = false">
       <form class="join-form" aria-label="Join chat" @submit.prevent="submitJoinChat">
         <label>Invite code<input v-model="joinDraft" aria-label="Invite code" autocomplete="off" autofocus required /></label>
-        <label v-if="!settings.connected">Name<input v-model="joinName" aria-label="Your name" autocomplete="name" required /></label>
         <p v-if="joinError" class="dialog-error" role="alert">{{ joinError }}</p>
         <div class="dialog-actions">
           <button type="button" class="outline-button" @click="joinOpen = false">Cancel</button>
-          <button type="submit" class="primary-button" :disabled="joining || !joinDraft.trim() || (!settings.connected && !joinName.trim())">{{ joining ? 'Joining...' : 'Join chat' }}</button>
+          <button type="submit" class="primary-button" :disabled="joining || !joinDraft.trim()">{{ joining ? 'Joining...' : 'Join chat' }}</button>
         </div>
       </form>
+    </ChatDialog>
+
+    <ChatDialog v-if="visibleMentionPrompt" title="Allow this mention" return-focus=".right-section h2" @close="visibleMentionPrompt = null">
+      <div class="invite-content">
+        <p>{{ mentionRequesterName }} wants to use your {{ harnessLabel(visibleMentionPrompt.harness) }}.</p>
+        <div class="dialog-actions">
+          <button type="button" class="outline-button" @click="answerMention('decline')">Decline</button>
+          <button type="button" class="outline-button" @click="answerMention('once')">Allow once</button>
+          <button type="button" class="primary-button" @click="answerMention('always')">Allow always</button>
+        </div>
+      </div>
     </ChatDialog>
 
     <ChatDialog v-if="renameRoomId" title="Rename shared chat" return-focus=".room-heading .title-edit" @close="renameRoomId = ''">
@@ -612,9 +636,11 @@ import {
 } from 'lucide-vue-next';
 import ChatDialog from '../components/ChatDialog.vue';
 import HordesPage from '../components/HordesPage.vue';
-import { filterLocalConversations } from '../lib/catalog-filters';
+import { filterLocalConversations, withoutSharedSessions } from '../lib/catalog-filters';
+
 import { projectPathForConversation } from '../lib/project-chats';
 import { displayTranscriptMessages } from '../lib/native-transcript';
+import { harnessStatusLabel, sharedReplyLabel } from '../lib/reply-label';
 import { insertMentionAtCursor, mentionAtCursor } from '../lib/mentions';
 
 type LocalConversation = {
@@ -630,7 +656,8 @@ type LocalConversation = {
 };
 type LocalProject = Record<string, unknown>;
 type NativeMessage = { role: string; content: string; at?: string };
-type AgentState = 'queued' | 'working';
+type AgentState = 'queued' | 'working' | 'waiting';
+type MentionPrompt = { roomId: string; turnId: string; agentId: string; harness: string; requestedBy: string };
 type PermissionRequest = {
   harness: 'codex' | 'hermes';
   id: number | string;
@@ -646,7 +673,6 @@ const activeMode = ref<'chat' | 'hordes'>('chat');
 const hordesVisited = ref(false);
 watch(activeMode, mode => { if (mode === 'hordes') hordesVisited.value = true; });
 const api = window.surprisedFace;
-async function refreshHordeIdentity(): Promise<void> { settings.value = await api.settings(); await loadWorkspace(); }
 const settings = ref<SurprisedFaceSettings>({
   backendUrl: '',
   displayName: '',
@@ -656,6 +682,9 @@ const settings = ref<SurprisedFaceSettings>({
   agents: [],
   connected: false,
 });
+const authState = ref<'checking' | 'required' | 'authenticated'>('checking');
+const authLoading = ref(false);
+const authError = ref('');
 const settingsDraft = ref<{
   backendUrl: string;
   displayName: string;
@@ -687,6 +716,7 @@ let roomReadVersion = 0;
 const selectedProject = ref<LocalProject | null>(null);
 const projects = ref<LocalProject[]>([]);
 const conversations = ref<LocalConversation[]>([]);
+const linkedSessionKeys = ref<string[]>([]);
 const selectedNative = ref<LocalConversation | null>(null);
 const newChatHarness = ref<'codex' | 'hermes'>('codex');
 const availableHarnesses = ref<('codex' | 'hermes')[]>([]);
@@ -729,7 +759,6 @@ const inviteCopying = ref(false);
 const inviteCopied = ref(false);
 const joinOpen = ref(false);
 const joinDraft = ref('');
-const joinName = ref('');
 const joinError = ref('');
 const joining = ref(false);
 const renameRoomId = ref('');
@@ -742,6 +771,8 @@ const draft = ref('');
 const sharedComposer = ref<HTMLTextAreaElement | null>(null);
 const mentionCursor = ref(0);
 const agentStates = ref<Record<string, Record<string, AgentState>>>({});
+const mentionPrompts = ref<MentionPrompt[]>([]);
+const visibleMentionPrompt = ref<MentionPrompt | null>(null);
 const connectedRoomIds = ref(new Set<string>());
 const permissionRequest = ref<PermissionRequest | null>(null);
 const notice = ref('');
@@ -757,6 +788,7 @@ let codexRefreshPending = false;
 const hermesStatusText = ref('');
 const messageViewport = ref<HTMLElement | null>(null);
 const unsubscribers: (() => void)[] = [];
+let authGeneration = 0;
 const selectedRoom = computed(
   () => rooms.value.find((room) => room.id === currentRoomId.value) || null,
 );
@@ -833,15 +865,11 @@ const filteredConversations = computed(() =>
     projectPath: '',
   }),
 );
-const unfiledConversations = computed(() => filteredConversations.value.filter((item) =>
+const unfiledConversations = computed(() => withoutSharedSessions(filteredConversations.value.filter((item) =>
   !projects.value.some((project) => belongsToProject(item, project)),
-));
+), linkedSessionKeys.value));
 const canJoin = computed(() =>
-  Boolean(
-    settingsDraft.value.backendUrl.trim() &&
-    (settings.value.connected || settingsDraft.value.displayName.trim()) &&
-    inviteCode.value.trim(),
-  ),
+  Boolean(settings.value.connected && inviteCode.value.trim()),
 );
 const activeMention = computed(() => mentionAtCursor(draft.value, mentionCursor.value));
 const mentionOptions = computed(() => {
@@ -877,31 +905,12 @@ watch([catalogQuery, harnessFilter], () => {
 watch(messages, () => void scrollToBottom(), { deep: true });
 
 onMounted(async () => {
-  try {
-    settings.value = await api.settings();
-    settingsDraft.value = {
-      backendUrl: settings.value.backendUrl,
-      displayName: settings.value.displayName,
-      theme: settings.value.theme,
-    };
-    allowAgentRuns.value = settings.value.allowRemoteAgentRequests;
-    availableHarnesses.value = await api.availableHarnesses();
-    if (!availableHarnesses.value.includes(newChatHarness.value) && availableHarnesses.value[0]) newChatHarness.value = availableHarnesses.value[0];
-    settingsReady = true;
-    try {
-      const saved = await api.sheepCached();
-      if (saved.projects.length || saved.conversations.length) applyCatalog(saved);
-    } catch {
-      // A missing local cache is recoverable through live discovery.
-    }
-    void refreshCatalog();
-    catalogTimer = window.setInterval(() => {
-      void refreshCatalog();
-    }, 60_000);
-    if (settings.value.connected) await loadWorkspace();
-  } catch (error) {
-    showError(error);
-  }
+  window.addEventListener('focus', refreshCodexOnFocus);
+  await checkAuthentication();
+});
+
+function subscribeAuthenticatedEvents(): void {
+  if (unsubscribers.length) return;
   unsubscribers.push(api.onRoomEvent(handleRoomEvent));
   unsubscribers.push(api.onOutboxChanged((value) => {
     const roomId = string(object(value)?.roomId);
@@ -914,11 +923,95 @@ onMounted(async () => {
   unsubscribers.push(api.onCodexEvent(handleCodexAccountEvent));
   unsubscribers.push(api.onHermesRequest(handleHermesRequest));
   unsubscribers.push(api.onNativeChatEvent(handleNativeChatEvent));
-  window.addEventListener('focus', refreshCodexOnFocus);
-});
+}
+
+function unsubscribeAuthenticatedEvents(): void {
+  for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
+}
+
+async function checkAuthentication(): Promise<void> {
+  if (authLoading.value) return;
+  authLoading.value = true;
+  authError.value = '';
+  let shouldLoad = false;
+  try {
+    const session = await api.sessionCheck();
+    if (!session.authenticated) {
+      authState.value = 'required';
+      return;
+    }
+    settings.value = await api.settings();
+    settingsDraft.value = {
+      backendUrl: settings.value.backendUrl,
+      displayName: settings.value.displayName,
+      theme: settings.value.theme,
+    };
+    allowAgentRuns.value = settings.value.allowRemoteAgentRequests;
+    authState.value = 'authenticated';
+    shouldLoad = true;
+  } catch (error) {
+    authState.value = 'required';
+    authError.value = messageOf(error);
+  } finally {
+    authLoading.value = false;
+  }
+  if (shouldLoad) {
+    try { await loadAuthenticatedData(); }
+    catch (error) { showError(error); }
+  }
+}
+
+async function signInWithGoogle(): Promise<void> {
+  if (authLoading.value) return;
+  authLoading.value = true;
+  authError.value = '';
+  let shouldLoad = false;
+  try {
+    await api.googleSignIn();
+    settings.value = await api.settings();
+    settingsDraft.value = {
+      backendUrl: settings.value.backendUrl,
+      displayName: settings.value.displayName,
+      theme: settings.value.theme,
+    };
+    allowAgentRuns.value = settings.value.allowRemoteAgentRequests;
+    authState.value = 'authenticated';
+    shouldLoad = true;
+  } catch (error) {
+    authState.value = 'required';
+    authError.value = messageOf(error);
+  } finally {
+    authLoading.value = false;
+  }
+  if (shouldLoad) {
+    try { await loadAuthenticatedData(); }
+    catch (error) { showError(error); }
+  }
+}
+
+async function loadAuthenticatedData(): Promise<void> {
+  subscribeAuthenticatedEvents();
+  const generation = ++authGeneration;
+  availableHarnesses.value = await api.availableHarnesses();
+  if (generation !== authGeneration || authState.value !== 'authenticated') return;
+  if (!availableHarnesses.value.includes(newChatHarness.value) && availableHarnesses.value[0]) newChatHarness.value = availableHarnesses.value[0];
+  settingsReady = true;
+  try {
+    const saved = await api.sheepCached();
+    if (generation !== authGeneration || authState.value !== 'authenticated') return;
+    if (saved.projects.length || saved.conversations.length) applyCatalog(saved);
+  } catch {
+    // A missing local cache is recoverable through live discovery.
+  }
+  void refreshCatalog();
+  void loadLinkedSessions();
+  if (catalogTimer) window.clearInterval(catalogTimer);
+  catalogTimer = window.setInterval(() => void refreshCatalog(), 60_000);
+  await loadWorkspace();
+}
 
 onUnmounted(() => {
-  for (const unsubscribe of unsubscribers) unsubscribe();
+  unsubscribeAuthenticatedEvents();
   if (catalogTimer) window.clearInterval(catalogTimer);
   if (noticeTimer) clearTimeout(noticeTimer);
   if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
@@ -927,10 +1020,13 @@ onUnmounted(() => {
 let catalogTimer: number | null = null;
 
 async function loadWorkspace(): Promise<void> {
+  const generation = authGeneration;
   try {
     const roomRows = await api.rooms();
+    if (generation !== authGeneration || authState.value !== 'authenticated') return;
     rooms.value = roomRows;
     const snapshots = await Promise.all(roomRows.map((room) => api.roomMessages(room.id)));
+    if (generation !== authGeneration || authState.value !== 'authenticated') return;
     roomHarnesses.value = Object.fromEntries(
       roomRows.map((room, index) => [
         room.id,
@@ -947,7 +1043,16 @@ async function loadWorkspace(): Promise<void> {
     if (current) await selectRoom(current);
     else if (roomRows[0]) await selectRoom(roomRows[0]);
   } catch (error) {
-    showError(error);
+    if (generation === authGeneration && authState.value === 'authenticated') showError(error);
+  }
+}
+
+async function loadLinkedSessions(): Promise<void> {
+  try {
+    const links = await api.nativeLinks();
+    linkedSessionKeys.value = links.map((link) => `${link.harness}:${link.sessionId}`);
+  } catch {
+    // The local list stays visible if the link lookup fails.
   }
 }
 
@@ -962,13 +1067,17 @@ function applyCatalog(result: { projects: Record<string, unknown>[]; conversatio
 }
 
 async function refreshCatalog(): Promise<void> {
-  if (catalogLoading.value) return;
+  if (catalogLoading.value || authState.value !== 'authenticated') return;
+  const generation = authGeneration;
   catalogLoading.value = true;
   catalogError.value = '';
   try {
     const result = await api.sheepRefresh();
+    if (generation !== authGeneration || authState.value !== 'authenticated') return;
     applyCatalog(result);
+    await loadLinkedSessions();
   } catch (error) {
+    if (generation !== authGeneration || authState.value !== 'authenticated') return;
     catalogError.value = messageOf(error)
       .replace(/Sheep/g, 'Local catalog')
       .replace(/sheep/g, 'local catalog');
@@ -1063,6 +1172,7 @@ async function sendNativeDraft(): Promise<void> {
       nativeTranscript.value = { messages: [] };
       conversations.value = [conversation, ...conversations.value.filter((item) => conversationKey(item) !== conversationKey(conversation))];
       if (selectedProject.value) projects.value = [selectedProject.value, ...projects.value.filter((item) => projectKey(item) !== projectKey(selectedProject.value!))];
+      if (typeof conversation.remainingChatsToday === 'number') showNotice(`${conversation.remainingChatsToday} new chats left today`);
     }
     const conversation = selectedNative.value;
     nativeDraft.value = '';
@@ -1109,16 +1219,12 @@ async function shareNativeConversation(): Promise<void> {
   beginInvite(conversation.title || 'Chat');
   nativeError.value = '';
   try {
-    if (!settings.value.connected) {
-      await api.register(settingsDraft.value.displayName.trim());
-      settings.value = await api.settings();
-      await loadWorkspace();
-    }
     const result = await api.nativeShare({
       harness: conversation.harness as 'codex' | 'hermes', sessionId: conversation.id,
       cwd: conversation.path || '', title: conversation.title || 'Chat',
       ...(conversation.agent ? { agentName: conversation.agent } : {}),
     });
+    linkedSessionKeys.value = [...new Set([...linkedSessionKeys.value, conversationKey(conversation)])];
     rooms.value = [...rooms.value.filter((room) => room.id !== result.room.id), result.room];
     await selectRoom(result.room);
     setInviteCode(result.invite?.code);
@@ -1184,6 +1290,10 @@ function harnessState(id: string): 'idle' | AgentState {
   return agentStates.value[currentRoomId.value]?.[id] || 'idle';
 }
 
+function harnessStateLabel(agent: SharedAgent): string {
+  return harnessStatusLabel(harnessState(agent.id), ownerName(agent.ownerId), agent.ownerId === settings.value.member?.id);
+}
+
 async function sendDraft(): Promise<void> {
   if (!selectedRoom.value || !draft.value.trim() || sending.value) return;
   const roomId = selectedRoom.value.id;
@@ -1232,12 +1342,34 @@ function handleRoomEvent(value: unknown): void {
     rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, name: event.name as string } : room);
   }
   const agentId = string(event.agentId) || '';
-  if (agentId && ['turn.queued', 'turn.started', 'turn.finished'].includes(string(event.type))) {
+  if (agentId && ['turn.queued', 'turn.started', 'turn.finished', 'turn.permission_needed', 'turn.permission_decided'].includes(string(event.type))) {
     const current = { ...(agentStates.value[roomId] || {}) };
-    if (event.type === 'turn.queued') current[agentId] = 'queued';
+    if (event.type === 'turn.queued') {
+      const ownerId = string(event.ownerId);
+      const requestedBy = string(event.requestedBy);
+      const waitingOnOwner = Boolean(ownerId && requestedBy && ownerId !== requestedBy && ownerId !== settings.value.member?.id);
+      current[agentId] = waitingOnOwner ? 'waiting' : 'queued';
+    }
     if (event.type === 'turn.started') current[agentId] = 'working';
-    if (event.type === 'turn.finished') delete current[agentId];
+    if (event.type === 'turn.finished' || event.type === 'turn.permission_decided') delete current[agentId];
+    if (event.type === 'turn.permission_needed') current[agentId] = 'waiting';
     agentStates.value = { ...agentStates.value, [roomId]: current };
+  }
+  if (event.type === 'turn.permission_needed' && string(event.ownerId) === settings.value.member?.id && string(event.turnId)) {
+    const prompt = {
+      roomId,
+      turnId: string(event.turnId) || '',
+      agentId,
+      harness: string(event.harness) || 'codex',
+      requestedBy: string(event.requestedBy) || '',
+    };
+    if (!mentionPrompts.value.some((item) => item.turnId === prompt.turnId)) mentionPrompts.value = [...mentionPrompts.value, prompt];
+    if (roomId === currentRoomId.value) visibleMentionPrompt.value = prompt;
+  }
+  if (event.type === 'turn.permission_decided' || event.type === 'turn.started') {
+    const turnId = string(event.turnId) || '';
+    mentionPrompts.value = mentionPrompts.value.filter((item) => item.turnId !== turnId);
+    if (visibleMentionPrompt.value?.turnId === turnId) visibleMentionPrompt.value = null;
   }
   if (roomId === currentRoomId.value && (event.type === 'member.joined' || event.type === 'agent.updated')) {
     void Promise.all([api.members(roomId), api.agents(roomId)])
@@ -1368,7 +1500,7 @@ async function joinWorkspace(): Promise<void> {
   connecting.value = true;
   connectionError.value = '';
   try {
-    await acceptChatCode(inviteCode.value.trim(), settingsDraft.value.displayName.trim());
+    await acceptChatCode(inviteCode.value.trim());
     inviteCode.value = '';
     showNotice('Joined chat.');
   } catch (error) {
@@ -1379,31 +1511,42 @@ async function joinWorkspace(): Promise<void> {
 }
 
 async function logout(): Promise<void> {
-  settings.value = await api.logout();
-  rooms.value = [];
-  members.value = [];
-  agents.value = [];
-  messages.value = [];
-  currentRoomId.value = '';
+  try {
+    await api.logout();
+    unsubscribeAuthenticatedEvents();
+    authGeneration++;
+    authState.value = 'required';
+    authError.value = '';
+    settings.value = { backendUrl: '', displayName: '', member: null, theme: 'mint-charcoal', allowRemoteAgentRequests: false, agents: [], connected: false };
+    settingsDraft.value = { backendUrl: '', displayName: '', theme: 'mint-charcoal' };
+    allowAgentRuns.value = false;
+    settingsReady = false;
+    projects.value = [];
+    conversations.value = [];
+    rooms.value = [];
+    members.value = [];
+    agents.value = [];
+    messages.value = [];
+    currentRoomId.value = '';
+    selectedNative.value = null;
+    selectedProject.value = null;
+    if (catalogTimer) window.clearInterval(catalogTimer);
+    catalogTimer = null;
+  } catch (error) {
+    connectionError.value = messageOf(error);
+  }
 }
 
 function joinChat(): void {
   joinDraft.value = '';
-  joinName.value = settings.value.displayName || settingsDraft.value.displayName;
   joinError.value = '';
   joinOpen.value = true;
 }
 
-async function acceptChatCode(code: string, name: string): Promise<void> {
-  let roomId = '';
-  const before = new Set(rooms.value.map((room) => room.id));
-  if (settings.value.connected) roomId = (await api.joinRoom(code)).roomId;
-  else {
-    await api.join({ backendUrl: settings.value.backendUrl, code, name });
-    settings.value = await api.settings();
-  }
+async function acceptChatCode(code: string): Promise<void> {
+  const roomId = (await api.joinRoom(code)).roomId;
   await loadWorkspace();
-  const room = rooms.value.find((item) => item.id === roomId) || rooms.value.find((item) => !before.has(item.id));
+  const room = rooms.value.find((item) => item.id === roomId);
   if (room) await selectRoom(room);
 }
 
@@ -1412,7 +1555,7 @@ async function submitJoinChat(): Promise<void> {
   joining.value = true;
   joinError.value = '';
   try {
-    await acceptChatCode(joinDraft.value.trim(), joinName.value.trim());
+    await acceptChatCode(joinDraft.value.trim());
     joinOpen.value = false;
     showNotice('Joined chat');
   } catch (error) { joinError.value = messageOf(error); }
@@ -1609,6 +1752,7 @@ function handleCodexAccountEvent(value: unknown): void {
 }
 
 function refreshCodexOnFocus(): void {
+  if (authState.value !== 'authenticated') return;
   if (settingsOpen.value || codexLoginPending.value) void checkCodex(false, false);
 }
 
@@ -1637,7 +1781,10 @@ function belongsToProject(conversation: LocalConversation, project: LocalProject
   return projectPathForConversation(conversation.path, projects.value) === string(project.path);
 }
 function projectConversations(project: LocalProject): LocalConversation[] {
-  return filteredConversations.value.filter((conversation) => belongsToProject(conversation, project));
+  return withoutSharedSessions(
+    filteredConversations.value.filter((conversation) => belongsToProject(conversation, project)),
+    linkedSessionKeys.value,
+  );
 }
 function projectName(project: LocalProject): string {
   return (
@@ -1660,21 +1807,51 @@ function harnessInitial(harness: string): string {
     )[harness] || harness.slice(0, 1).toUpperCase()
   );
 }
+const mentionRequesterName = computed(() => {
+  const id = visibleMentionPrompt.value?.requestedBy;
+  return members.value.find((member) => member.id === id)?.name || 'Someone';
+});
+
+function showMentionPrompt(agent: SharedAgent): void {
+  const prompt = mentionPrompts.value.find((item) => item.roomId === currentRoomId.value && item.agentId === agent.id);
+  if (prompt) visibleMentionPrompt.value = prompt;
+}
+
+async function answerMention(decision: 'once' | 'always' | 'decline'): Promise<void> {
+  const prompt = visibleMentionPrompt.value;
+  if (!prompt) return;
+  visibleMentionPrompt.value = null;
+  mentionPrompts.value = mentionPrompts.value.filter((item) => item.turnId !== prompt.turnId);
+  try {
+    await api.decideMention({ roomId: prompt.roomId, turnId: prompt.turnId, decision });
+  } catch (error) {
+    showError(error);
+  }
+}
+
 function authorName(message: SharedMessage): string {
   if (message.role === 'assistant') {
     const agent = agents.value.find((item) => item.id === message.agentId);
-    const harness = message.harness || agent?.harness || '';
-    return ownedHarnessName(harness, message.ownerId || agent?.ownerId || '', message.agentName || agent?.name || '');
+    const harness = message.harness || agent?.harness;
+    const ownerId = message.ownerId || agent?.ownerId || '';
+    return sharedReplyLabel({
+      role: 'assistant',
+      harnessLabel: harness ? harnessLabel(harness) : 'Harness',
+      ownerName: ownerId ? ownerName(ownerId) : '',
+    });
+
   }
-  return (
-    message.participantName ||
-    members.value.find((member) => member.id === message.participantId)?.name ||
-    (message.participantId === settings.value.member?.id ? settings.value.displayName : 'Member')
-  );
+  return sharedReplyLabel({
+    role: 'user',
+    participantName:
+      message.participantName ||
+      members.value.find((member) => member.id === message.participantId)?.name ||
+      (message.participantId === settings.value.member?.id ? settings.value.displayName : 'Member'),
+  });
 }
 function ownedHarnessName(harness: string, ownerId: string, fallbackName = ''): string {
   const owner = members.value.find((member) => member.id === ownerId)?.name;
-  if (owner) return `${owner}'s ${harnessLabel(harness)}`;
+  if (owner) return sharedReplyLabel({ role: 'assistant', harnessLabel: harnessLabel(harness), ownerName: owner });
   return fallbackName || (harness ? harnessLabel(harness) : 'Harness');
 }
 function ownerName(ownerId: string): string {
@@ -1749,6 +1926,38 @@ function showNotice(value: string): void {
   min-height: 600px;
   overflow: hidden;
 }
+.auth-gate {
+  min-width: 900px;
+  min-height: 600px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: #fafaf7;
+  color: #302d2e;
+  font: 14px/1.5 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.auth-card {
+  width: min(380px, calc(100vw - 48px));
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 40px;
+  border: 1px solid #e4e6e0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 54px #302d2e12;
+  text-align: center;
+}
+.auth-brand { color: #302d2e; font-size: 20px; font-weight: 700; letter-spacing: -0.04em; }
+.auth-brand small { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.auth-card h1 { margin: 8px 0 0; font-size: 24px; line-height: 1.2; }
+.auth-card p { margin: 0; color: #626563; }
+.auth-gate .auth-button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 6px; background: #302d2e; color: #fff; font-weight: 600; cursor: pointer; }
+.auth-gate .auth-button:disabled { opacity: 0.65; cursor: wait; }
+.auth-error { color: #b4232c !important; }
+.auth-retry { padding: 0; border: 0; background: transparent; color: #176e49; cursor: pointer; text-decoration: underline; }
+.auth-privacy { max-width: 320px; color: #777b77; font-size: 12px; }
+.auth-gate button:focus-visible { outline: 3px solid #5eb783; outline-offset: 3px; }
 .app-shell {
   --bg: #f7f8fa;
   --panel: #fff;
@@ -2377,8 +2586,16 @@ button:disabled {
 .agent-state.working {
   color: var(--red);
 }
-.agent-state.queued {
+.agent-state.queued,
+.agent-state.waiting {
   color: #d69743;
+}
+button.agent-state {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 .room-rule p {
   margin: 0;
