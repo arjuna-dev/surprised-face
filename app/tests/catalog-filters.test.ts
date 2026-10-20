@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { filterLocalConversations } from '../src/lib/catalog-filters';
+import { filterLocalConversations, withoutSharedSessions } from '../src/lib/catalog-filters';
 
 const conversations = [
   { id: 'a', title: 'Design notes', harness: 'codex', agentId: 'design-agent', path: '/work/game' },
@@ -51,5 +51,12 @@ test('project filtering tolerates local chats without a working folder', () => {
       projectPath: '/work/game',
     }).map((item) => item.id),
     ['match'],
+  );
+});
+
+test('a local chat linked to a shared room is not listed again', () => {
+  assert.deepEqual(
+    withoutSharedSessions(conversations, ['codex:a']).map((item) => item.id),
+    ['b', 'c'],
   );
 });

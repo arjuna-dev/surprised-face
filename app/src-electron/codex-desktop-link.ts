@@ -107,6 +107,58 @@ export class CodexDesktopLink {
     throw new Error('Codex did not finish the reply.');
   }
 
+  /**
+   * Add shared chat text to the open desktop thread.
+   * Uses the same text input as a turn, then returns when that text is saved.
+   * It does not wait for or return a model reply.
+   */
+  async appendPlainText(input: { threadId: string; text: string; cwd?: string }): Promise<void> {
+    await this.connect();
+    const previousCount = this.readSession().messages.length;
+    const acceptTimeoutMs = this.options.acceptTimeoutMs ?? 8_000;
+    const requestId = randomUUID();
+    const response = this.request({
+      type: 'request',
+      requestId,
+      sourceClientId: this.clientId,
+      version: 2,
+      method: 'thread-follower-start-turn',
+      params: {
+        conversationId: input.threadId,
+        turnStart: {
+          request: {
+            threadId: input.threadId,
+            input: [{ type: 'text', text: input.text, text_elements: [] }],
+            ...(input.cwd ? { cwd: input.cwd } : {}),
+          },
+          context: {},
+        },
+      },
+    }, acceptTimeoutMs).then((message) => {
+      const error = typeof message.error === 'string' ? message.error : '';
+      if (message.resultType === 'error' || error) {
+        if (/no-client-found|owner became unavailable|unavailable/i.test(error)) throw new CodexDesktopUnavailable(error || 'Codex desktop is not owning this chat.');
+        throw new Error(error || 'Codex desktop rejected the message.');
+      }
+    });
+    const appeared = this.waitFor(() => this.hasNewUserText(input.text, previousCount), acceptTimeoutMs).then((found) => {
+      if (!found) throw new CodexDesktopUnavailable('Codex desktop did not accept the message.');
+    });
+    try {
+      await Promise.any([response, appeared]);
+    } catch (error) {
+      const errors = error instanceof AggregateError ? error.errors : [error];
+      if (!this.hasNewUserText(input.text, previousCount)) {
+        const rejected = errors.find((item) => item instanceof Error && !(item instanceof CodexDesktopUnavailable));
+        throw rejected ?? errors.find((item) => item instanceof CodexDesktopUnavailable) ?? new CodexDesktopUnavailable();
+      }
+    }
+    if (!this.hasNewUserText(input.text, previousCount)) {
+      const found = await this.waitFor(() => this.hasNewUserText(input.text, previousCount), acceptTimeoutMs);
+      if (!found) throw new Error('Codex desktop accepted the message, but it was not saved to the chat.');
+    }
+  }
+
   close(): void {
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);

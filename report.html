@@ -66,7 +66,9 @@
       <section>
         <h2>Harness turns</h2>
         <ul>
-          <li><a href="app/src-electron/harness-participants.ts">Harness registration</a> creates stable internal participant IDs for installed Codex and Hermes adapters. Saved IDs remain claimable for older shared chats. The interface shows one harness per owner and marks it idle, queued, or working.</li>
+          <li><a href="app/src-electron/harness-participants.ts">Harness registration</a> creates stable internal participant IDs for installed Codex and Hermes adapters and names each one with its owner, for example Maya · Codex. Saved IDs remain claimable for older shared chats. A reply header uses that owner and harness. The sidebar shows idle, queued, working, waiting for you, or waiting for the other owner.</li>
+          <li>A native session that is already linked to a shared room stays in that shared row. It is left out of Projects and Other local chats, even when the Codex title and the room name differ.</li>
+          <li>The first mention of someone else's harness waits on that owner's computer. The owner can allow it once, allow that person and harness from then on, or decline. A decline does not run the mention and does not block later messages. Mentions of your own harness run without that prompt. The global remote switch still defaults to off.</li>
           <li>When a queued turn starts, <a href="app/src-electron/agent-runner.ts">the runner</a> sends the unseen completed shared messages to the native adapter. A single new message goes through as written. Multiple messages keep their source participant labels. The runner adds no generated identity or shared-chat instruction preamble.</li>
           <li>Codex app-server and Hermes ACP emit reply text as it arrives. The runner batches small deltas for 80 milliseconds before appending ordered chunks to the room. The chat displays these chunks inside one reserved reply.</li>
           <li>For a Codex session already owned by Codex Desktop, <a href="app/src-electron/codex-desktop-link.ts">the desktop link</a> submits the turn to that owner and copies saved assistant text into the room as the session file grows. This path can only display text after Desktop has saved it. :o does not write the native session file.</li>
@@ -77,7 +79,7 @@
         <h2>Chat copies</h2>
         <ul>
           <li>Every committed room message and reply update refreshes an <a href="app/src-electron/harness-context-mirror.ts">app-owned JSON context copy</a> for Codex and Hermes under the :o profile. Each copy contains ordered text, source participant IDs and names, state, and the applied event sequence.</li>
-          <li>The native Codex and Hermes session journals remain owned by those tools. Shared messages that arrived while a harness was idle are included on its next requested turn through the adapter.</li>
+          <li>The native Codex and Hermes session journals remain owned by those tools. After a room message is stored, <a href="app/src-electron/harness-session-sync.ts">harness sync</a> appends new plain-text lines to the linked local session. A mention that queued a turn is left for that turn. The sync does not write those lines back into the room database. Codex desktop reads the line back from its session file; the sync does not wait for a model reply.</li>
           <li>Sheep reads local projects, chats, and selected native history. The catalog shows its saved copy first and refreshes discovery in the background.</li>
         </ul>
       </section>

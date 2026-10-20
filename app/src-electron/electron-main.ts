@@ -20,6 +20,7 @@ import { RoomService } from './room-service';
 import { SettingsStore, type HarnessName } from './settings-store';
 import { harnessParticipants } from './harness-participants';
 import { HarnessContextMirror } from './harness-context-mirror';
+import { HarnessSessionSync } from './harness-session-sync';
 import { SheepBridge } from './sheep-bridge';
 import { isSafeAppNavigation } from './navigation-policy';
 import { projectsForUi, projectsFromConversations, sortProjectsByRecent } from './local-projects';
@@ -40,6 +41,7 @@ let hermes: HermesAcpClient;
 let agentRunner: AgentRunner;
 let nativeChat: NativeChatService;
 let harnessContextMirror: HarnessContextMirror;
+let harnessSessionSync: HarnessSessionSync;
 let availableHarnesses: HarnessName[] = [];
 let appSessionVerified = false;
 const codexSessionFollows = new Map<string, CodexSessionFollow>();
@@ -67,6 +69,17 @@ if (!ownsSingleInstanceLock) {
         workingDirectory: () => os.homedir(),
         clientVersion: app.getVersion(),
       });
+      harnessSessionSync = new HarnessSessionSync(localStore, async (input) => {
+        if (input.harness === 'codex') {
+          const link = new CodexDesktopLink({
+            socketPath: process.env.CODEX_IPC_SOCKET || path.join(os.homedir(), '.codex', 'ipc', 'ipc.sock'),
+            sessionFile: findCodexSessionFile(input.sessionId, path.join(os.homedir(), '.codex', 'sessions')),
+          });
+          await link.appendPlainText({ threadId: input.sessionId, text: input.text, cwd: input.cwd }).finally(() => link.close());
+          return;
+        }
+        await hermes.appendPlainText(input.sessionId, input.text, input.cwd);
+      }, 300, (error) => sendToRenderer('app:error', errorMessage(error)));
       const desktop = {
         startTurn: (input: { threadId: string; text: string; cwd?: string; onDelta?: (text: string) => void }) => {
           const link = new CodexDesktopLink({
@@ -115,6 +128,7 @@ function bindEvents(): void {
     if (roomId && ['message.created', 'message.delta', 'turn.started', 'turn.finished'].includes(stringValue(event?.type) || '')) {
       void harnessContextMirror.sync(roomId).catch((error: unknown) => sendToRenderer('app:error', errorMessage(error)));
     }
+    if (roomId && (event?.type === 'message.created' || event?.type === 'turn.finished')) harnessSessionSync.schedule(roomId);
     if (event?.type === 'turn.queued' || event?.type === 'turn.finished' || event?.type === 'turn.availability') {
       if (roomId) setTimeout(() => void agentRunner.runPending(roomId), 0);
     }
@@ -212,6 +226,11 @@ function registerHandlers(): void {
   });
   safeIpc('app:members', (_event, roomId) => roomService.members(String(roomId)));
   safeIpc('app:agents', (_event, roomId) => roomService.agents(String(roomId)));
+  safeIpc('app:decide-mention', async (_event, input) => {
+    const value = input as { roomId: string; turnId: string; decision: 'once' | 'always' | 'decline' };
+    await roomService.decideMention(String(value.roomId), String(value.turnId), value.decision);
+    return { ok: true };
+  });
   safeIpc('app:run-pending', async (_event, roomId) => {
     await agentRunner.runPending(String(roomId));
     return { ok: true };
@@ -310,6 +329,7 @@ function registerHandlers(): void {
     const value = input as { sessionId?: string };
     if (value.sessionId) followCodexSession(value.sessionId);
   });
+  safeIpc('native:links', () => localStore.nativeRoomLinks());
   safeIpc('native:link', (_event, input) => {
     const value = input as { harness: string; sessionId: string };
     return localStore.nativeRoomLink(value.harness, value.sessionId);

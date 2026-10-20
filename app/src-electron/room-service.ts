@@ -225,6 +225,13 @@ export class RoomService extends EventEmitter {
     );
   }
 
+  async decideMention(roomId: string, turnId: string, decision: 'once' | 'always' | 'decline'): Promise<void> {
+    await this.api(`/v1/rooms/${encodeURIComponent(roomId)}/turns/${encodeURIComponent(turnId)}/permission`, {
+      method: 'POST',
+      body: { decision },
+    });
+  }
+
   async claimTurn(roomId: string, agentIds: string[], allowRemote = false): Promise<Record<string, unknown> | null> {
     const result = await this.api<{ turn?: Record<string, unknown> | null }>(
       `/v1/rooms/${encodeURIComponent(roomId)}/turns/claim`,
