@@ -22,7 +22,7 @@ import { harnessParticipants } from './harness-participants';
 import { HarnessContextMirror } from './harness-context-mirror';
 import { SheepBridge } from './sheep-bridge';
 import { isSafeAppNavigation } from './navigation-policy';
-import { projectsForUi, sortProjectsByRecent } from './local-projects';
+import { projectsForUi, projectsFromConversations, sortProjectsByRecent } from './local-projects';
 import { displayTranscriptMessages } from '../src/lib/native-transcript';
 import { configureAppProfile } from './app-data-path';
 
@@ -237,7 +237,11 @@ function registerHandlers(): void {
     }>('refresh');
     localStore.replaceCatalog('conversation', result.conversations || [], !result.conversationSourceError);
     result.conversations = conversationCatalog(result.conversationSourceError ? localStore.catalog('conversation') : result.conversations || []);
-    const projects = sortProjectsByRecent(projectsForUi(result.projects || []), (result.conversations || []) as { path?: string; updatedAt?: string }[]);
+    const conversations = (result.conversations || []) as { path?: string; updatedAt?: string }[];
+    const projects = sortProjectsByRecent(
+      projectsFromConversations(result.projects || [], conversations),
+      conversations,
+    );
     localStore.replaceCatalog('project', projects);
     return { ...result, projects };
   });

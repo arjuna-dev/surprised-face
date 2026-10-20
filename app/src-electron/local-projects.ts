@@ -3,6 +3,7 @@ import path from 'node:path';
 import { projectPathForConversation } from '../src/lib/project-chats';
 
 type LocalProject = Record<string, unknown>;
+type ConversationLocation = { path?: string; updatedAt?: string };
 
 export function projectsForUi<T extends LocalProject>(projects: T[]): T[] {
   return projects.filter((project) => {
@@ -25,6 +26,33 @@ export function projectsForUi<T extends LocalProject>(projects: T[]): T[] {
       return false;
     }
   });
+}
+
+export function projectsFromConversations<T extends LocalProject>(
+  projects: T[],
+  conversations: ConversationLocation[],
+): (T | LocalProject)[] {
+  const visibleProjects = projectsForUi(projects);
+  const knownPaths = new Set(
+    visibleProjects
+      .map((project) => typeof project.path === 'string' ? path.resolve(project.path) : '')
+      .filter(Boolean),
+  );
+  const inferred = new Map<string, LocalProject>();
+
+  for (const conversation of conversations) {
+    const location = typeof conversation.path === 'string' ? conversation.path.trim() : '';
+    if (!location || !path.isAbsolute(location)) continue;
+    const normalized = path.resolve(location);
+    if (knownPaths.has(normalized) || projectPathForConversation(normalized, visibleProjects)) continue;
+    inferred.set(normalized, {
+      name: path.basename(normalized),
+      path: normalized,
+      discovered: true,
+    });
+  }
+
+  return projectsForUi([...visibleProjects, ...inferred.values()]);
 }
 
 export function sortProjectsByRecent<T extends LocalProject>(
