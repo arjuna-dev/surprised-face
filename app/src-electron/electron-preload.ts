@@ -8,12 +8,11 @@ function subscribe(channel: string, handler: (value: unknown) => void): () => vo
 
 contextBridge.exposeInMainWorld('surprisedFace', {
   settings: () => ipcRenderer.invoke('app:settings'),
+  sessionCheck: () => ipcRenderer.invoke('app:session-check'),
+  googleSignIn: () => ipcRenderer.invoke('app:google-sign-in'),
   availableHarnesses: () => ipcRenderer.invoke('app:available-harnesses'),
   updateSettings: (input: unknown) => ipcRenderer.invoke('app:update-settings', input),
-  bootstrap: (input: unknown) => ipcRenderer.invoke('app:bootstrap', input),
-  register: (name: string) => ipcRenderer.invoke('app:register', name),
   copyText: (value: string) => ipcRenderer.invoke('app:copy-text', value),
-  join: (input: unknown) => ipcRenderer.invoke('app:join', input),
   joinRoom: (code: string) => ipcRenderer.invoke('app:join-room', code),
   logout: () => ipcRenderer.invoke('app:logout'),
   createInvites: (roomId: string) => ipcRenderer.invoke('app:create-invites', roomId),

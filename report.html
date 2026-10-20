@@ -39,14 +39,29 @@
     <main class="page">
       <h1>How it works</h1>
       <section>
+        <h2>Sign-in and privacy</h2>
+        <ul>
+          <li>At startup, <a href="app/src/pages/IndexPage.vue">the interface</a> checks the saved app session before asking Electron for local project or chat data. Google sign-in opens the system browser. <a href="app/src-electron/google-auth.ts">The Electron main process</a> validates the loopback callback state and PKCE exchange, then sends the ID token to the Worker.</li>
+          <li><a href="app/cloudflare/src/index.ts">The Worker</a> verifies Google's ID-token signature, issuer, client audience, expiry, and one-time nonce. It stores the Google subject and display name, issues a random app session, and stores only the session token hash. Existing account linking requires a valid prior session; it does not match email or name.</li>
+          <li>The app requests `openid profile`; project names and chat history are not part of the Google sign-in request. Electron stores the app session with `safeStorage`. Sign-out revokes that session in the Worker.</li>
+        </ul>
+      </section>
+      <section>
         <h2>Chats</h2>
         <ol>
-          <li>The <a href="app/src/pages/IndexPage.vue">desktop view</a> lists shared chats first, then local projects and chats. It detects installed Codex and Hermes adapters. A new chat can use a selected project or the home folder. No harness setup form or working folder setting is required.</li>
+          <li>After sign-in, the <a href="app/src/pages/IndexPage.vue">desktop view</a> lists shared chats first, then local projects and chats. It detects installed Codex and Hermes adapters. A new chat can use a selected project or the home folder. No harness setup form or working folder setting is required.</li>
           <li>The <a href="app/cloudflare/src/index.ts">room directory</a> records each chat's creator. The People list marks that person as owner for that chat. Only that owner can rename it. A rename emits a room event so connected members see the new title.</li>
           <li>A person writes through the :o composer. The <a href="app/src-electron/room-service.ts">room bridge</a> sends shared messages to the service, which orders them and delivers them to authorized members. The local SQLite cache applies each event in order.</li>
           <li>In a one-person chat, the selected harness can answer an ordinary message. In a group chat, a person mentions a harness. <a href="app/src/lib/mentions.ts">Mention matching</a> follows the cursor, including an @ before existing text or an @ followed by a space. The room queues one harness turn at a time.</li>
           <li>Invite friend shares a native Codex or Hermes chat by importing its readable history into a room. An invite grants access to that chat. The <a href="app/cloudflare/src/index.ts">room service</a> still calls harness participants agents in its internal protocol.</li>
         </ol>
+      </section>
+      <section>
+        <h2>Daily chat limit</h2>
+        <ul>
+          <li>The Electron main process reserves a count with the Worker before starting a new local Codex or Hermes chat, and releases it if the harness fails to start. Shared chat creation records its count in the same SQLite transaction that creates the room.</li>
+          <li>The directory Durable Object counts by account and UTC date. Retrying the same request ID does not count twice; opening or joining an existing chat does not count. The limit is 100 chat starts per account per UTC day.</li>
+        </ul>
       </section>
       <section>
         <h2>Harness turns</h2>

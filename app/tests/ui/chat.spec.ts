@@ -1,10 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 
-async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boolean; twoHarnesses?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean; hermesUnavailable?: boolean } = {}) {
+async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boolean; twoHarnesses?: boolean; failCreate?: boolean; connected?: boolean; leaveSignedOut?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean; hermesUnavailable?: boolean } = {}) {
   await page.addInitScript((options) => {
     const events: Record<string, ((value: unknown) => void)[]> = {};
     const state = {
       calls: [] as { method: string; input: unknown }[], clipboard: '', failCreate: Boolean(options.failCreate),
+      settingsReadsBeforeSession: 0,
       failSettings: Boolean(options.failSettings), failInvite: Boolean(options.failInvite),
       account: options.signedOut ? null : { type: 'chatgpt', email: 'maya@example.test', planType: 'plus' },
       settings: { backendUrl: 'https://fixture.invalid', displayName: 'Maya', member: { id: 'maya', name: 'Maya', role: options.foreignOwned ? 'owner' : 'member' }, theme: 'mint-charcoal', agents: [], allowRemoteAgentRequests: false, connected: options.connected !== false },
@@ -23,7 +24,9 @@ async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boo
     // Match Electron's unsupported window.prompt rather than accepting browser dialogs.
     window.prompt = () => { throw new Error('prompt() is and will not be supported.'); };
     Object.assign(window, { uiFixture: state, emitCodex: (value: unknown) => { for (const handler of events.codexEvent || []) handler(value); }, emitNative: (value: unknown) => { for (const handler of events.native || []) handler(value); }, emitRoom: (value: unknown) => { for (const handler of events.room || []) handler(value); }, surprisedFace: {
-      settings: async () => structuredClone(state.settings),
+      settings: async () => { if (!state.settings.connected) state.settingsReadsBeforeSession++; return structuredClone(state.settings); },
+      sessionCheck: async () => { call('sessionCheck', null); return { authenticated: state.settings.connected }; },
+      googleSignIn: async () => { call('googleSignIn', null); state.settings.connected = true; return state.settings.member; },
       availableHarnesses: async () => options.hermesUnavailable ? ['codex'] : ['codex', 'hermes'],
       updateSettings: async (input: Record<string, unknown>) => {
         call('updateSettings', input);
@@ -50,7 +53,7 @@ async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boo
         room.name = input.name.trim();
         return structuredClone(room);
       },
-      sheepCached: async () => ({ projects: [{ name: 'Design', path: '/work/design' }], conversations: options.slowCatalog || options.failCatalog ? [{ id: 'cached-1', harness: 'codex', title: 'Saved conversation', path: '/work/design' }] : [] }),
+      sheepCached: async () => { call('sheepCached', null); return { projects: [{ name: 'Design', path: '/work/design' }], conversations: options.slowCatalog || options.failCatalog ? [{ id: 'cached-1', harness: 'codex', title: 'Saved conversation', path: '/work/design' }] : [] }; },
       sheepRefresh: async () => {
         if (options.slowCatalog) await new Promise(resolve => setTimeout(resolve, 5000));
         if (options.failCatalog) throw new Error('Catalog refresh unavailable');
@@ -93,7 +96,6 @@ async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boo
           handler({ ...input, type: 'completed' });
         }
       },
-      register: async (name: string) => { call('register', name); state.settings.connected = true; return state.settings.member; },
       nativeShare: async (input: unknown) => {
         call('nativeShare', input);
         const room = { id: 'chat-1', name: 'Local design', createdBy: 'maya' };
@@ -114,14 +116,48 @@ async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boo
       copyText: async (text: string) => { call('copyText', text); if (options.failCopy) return { ok: false }; state.clipboard = text; return { ok: true }; },
       joinRoom: async (code: string) => { call('joinRoom', code); if (code === 'invalid') throw new Error('This invite code is invalid.'); state.rooms.push({ id: 'joined-chat', name: 'Friends', createdBy: 'friend' }); return { roomId: 'joined-chat' }; },
       join: async (input: unknown) => { call('join', input); state.settings.connected = true; state.rooms.push({ id: 'joined-chat', name: 'Friends', createdBy: 'friend' }); return { roomId: 'joined-chat' }; },
+      logout: async () => { call('logout', null); state.settings.connected = false; return structuredClone(state.settings); },
       onNativeChatEvent: on('native'), onRoomEvent: on('room'), onRoomConnection: on('connection'), onAppError: on('error'),
       onOutboxChanged: on('outbox'),
       onAgentActivity: on('activity'), onCodexRequest: on('codex'), onHermesRequest: on('hermes'),
     } });
   }, options);
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeVisible();
+  if (options.connected === false) {
+    await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeVisible();
+    if (!options.leaveSignedOut) {
+      await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeVisible();
+    }
+  } else await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeVisible();
 }
+
+test('Google authentication gates local project discovery until sign-in completes', async ({ page }) => {
+  await fixture(page, { connected: false, leaveSignedOut: true });
+  await expect(page.getByRole('heading', { name: 'Sign in to continue' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Design', exact: true })).toHaveCount(0);
+  let calls = await page.evaluate(() => (window as any).uiFixture.calls.map((entry: { method: string }) => entry.method));
+  expect(calls).not.toContain('sheepCached');
+  expect(calls).not.toContain('sheepRefresh');
+  expect(await page.evaluate(() => (window as any).uiFixture.settingsReadsBeforeSession)).toBe(0);
+  await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toHaveCSS('background-color', 'rgb(48, 45, 46)');
+  await page.screenshot({ path: '../output/playwright/google-auth-gate.png' });
+  await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeVisible();
+  calls = await page.evaluate(() => (window as any).uiFixture.calls.map((entry: { method: string }) => entry.method));
+  expect(calls).toContain('googleSignIn');
+});
+
+test('signing out revokes the app session and returns to the Google sign-in gate', async ({ page }) => {
+  await fixture(page);
+  await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in to continue' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Design', exact: true })).toHaveCount(0);
+  const calls = await page.evaluate(() => (window as any).uiFixture.calls.map((entry: { method: string }) => entry.method));
+  expect(calls).toContain('logout');
+});
 
 test('an empty chat view has no phantom invite and selecting a project enables its composer', async ({ page }) => {
   await fixture(page);
@@ -274,11 +310,11 @@ test('invite generation shows loading and lets a failed request retry inside the
   expect(await page.evaluate(() => (window as any).uiFixture.clipboard)).toBe('');
 });
 
-test('join dialog contains keyboard focus, closes on its backdrop, and accepts a new account name', async ({ page }) => {
+test('join dialog contains keyboard focus, closes on its backdrop, and accepts a code after Google sign-in', async ({ page }) => {
   await fixture(page, { connected: false });
   await page.getByRole('button', { name: 'Join a chat', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Join chat', exact: true });
-  await expect(dialog.getByRole('textbox', { name: 'Your name', exact: true })).toHaveValue('Maya');
+  await expect(dialog.getByRole('textbox', { name: 'Your name', exact: true })).toHaveCount(0);
   for (let index = 0; index < 8; index++) {
     await page.keyboard.press('Tab');
     expect(await page.evaluate(() => Boolean(document.activeElement?.closest('dialog')))).toBe(true);
@@ -290,7 +326,7 @@ test('join dialog contains keyboard focus, closes on its backdrop, and accepts a
   await dialog.getByRole('textbox', { name: 'Invite code', exact: true }).fill('new-person-code');
   await dialog.getByRole('button', { name: 'Join chat', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Friends', exact: true })).toBeVisible();
-  expect(await page.evaluate(() => (window as any).uiFixture.calls)).toContainEqual({ method: 'join', input: { backendUrl: 'https://fixture.invalid', code: 'new-person-code', name: 'Maya' } });
+  expect(await page.evaluate(() => (window as any).uiFixture.calls)).toContainEqual({ method: 'joinRoom', input: 'new-person-code' });
 });
 
 test('changing the composer project keeps the draft and New chat resets it', async ({ page }) => {
@@ -337,7 +373,7 @@ test('composer and project controls fit a smaller desktop window', async ({ page
 });
 
 for (const connected of [true, false]) {
-  test(`Settings accepts a chat invite for a ${connected ? 'connected' : 'new'} account`, async ({ page }) => {
+  test(`Settings accepts a chat invite after ${connected ? 'an existing' : 'a new Google'} sign-in`, async ({ page }) => {
     await fixture(page, { connected });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const code = page.getByRole('textbox', { name: 'Invite code', exact: true });
@@ -347,9 +383,7 @@ for (const connected of [true, false]) {
     await page.getByRole('button', { name: 'Join chat', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Friends', exact: true })).toBeVisible();
     const calls = await page.evaluate(() => (window as unknown as { uiFixture: { calls: { method: string; input: unknown }[] } }).uiFixture.calls);
-    expect(calls).toContainEqual(connected
-      ? { method: 'joinRoom', input: 'friend-settings-code' }
-      : { method: 'join', input: { backendUrl: 'https://fixture.invalid', code: 'friend-settings-code', name: 'Maya' } });
+    expect(calls).toContainEqual({ method: 'joinRoom', input: 'friend-settings-code' });
   });
 }
 
@@ -382,10 +416,9 @@ test('appearance and general settings save automatically and stay selected after
   await expect(page.locator('.app-shell')).toHaveAttribute('data-theme', 'cobalt-red');
   await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.theme)).toBe('cobalt-red');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Your name', exact: true }).fill('Maya updated');
+  await expect(page.getByRole('textbox', { name: 'Your name', exact: true })).toHaveCount(0);
   await page.getByRole('checkbox', { name: /Run harness mentions/ }).check();
   await expect(page.getByText('Settings saved automatically', { exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.displayName)).toBe('Maya updated');
   await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.allowRemoteAgentRequests)).toBe(true);
   await page.getByRole('button', { name: /Mint \+ charcoal/ }).click();
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
@@ -394,7 +427,7 @@ test('appearance and general settings save automatically and stay selected after
   await page.reload();
   await expect(page.locator('.app-shell')).toHaveAttribute('data-theme', 'mint-charcoal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Your name', exact: true })).toHaveValue('Maya updated');
+  await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toBeVisible();
 });
 
 test('rapid appearance changes save in order without reverting the latest selection', async ({ page }) => {

@@ -26,6 +26,7 @@ const chatSpecs = specs.filter((spec) => !publicSpecs.includes(spec));
 const resultTable = (items) => items.map((spec) => `<tr><th scope="row">${escape(spec.title)}</th><td>${spec.ok ? 'Pass' : 'Fail'}</td></tr>`).join('\n');
 const countResults = (items) => `${items.filter((spec) => spec.ok).length} passed · ${items.filter((spec) => !spec.ok).length} failed`;
 const images = [
+  ['google-auth-gate.png', 'Sign-in gate shown before local project discovery'],
   ['shared-chat-renamed.png', 'Shared chat renamed by its creator with shared chats at the top'],
   ['harness-no-folder.png', 'New Codex chat started without selecting a project folder'],
   ['harness-mention-cursor.png', 'Mention inserted before existing message text'],

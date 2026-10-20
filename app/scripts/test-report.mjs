@@ -19,6 +19,24 @@ for (const match of output.matchAll(/^(ok|not ok) \d+ - (.+)$/gm)) results.set(m
 
 const checks = [
   {
+    name: 'Google sign-in request',
+    test: 'Google authorization uses a system-browser code flow with PKCE and minimal scopes',
+    input: 'A desktop OAuth client, loopback URI, random verifier/state, and a server-issued nonce.',
+    result: 'Authorization uses openid/profile, S256 PKCE, state, and nonce without a client secret.',
+  },
+  {
+    name: 'Google callback validation',
+    test: 'OAuth callback accepts only a matching state and a non-empty authorization code',
+    input: 'Valid, mismatched-state, and Google-denied callback URLs.',
+    result: 'Only a callback with the expected state and code is accepted.',
+  },
+  {
+    name: 'Google browser redirect',
+    test: 'Google sign-in completes the loopback redirect and exchanges the code with PKCE',
+    input: 'Simulate Google returning an authorization code to the temporary localhost callback, then exchange it with PKCE.',
+    result: 'The callback is scrubbed from browser history, no-store security headers are returned, and only the verified code flow reaches the Worker.',
+  },
+  {
     name: 'Harness availability',
     test: 'unavailable harnesses are not advertised for turns',
     input: 'Codex is installed and Hermes is absent.',
