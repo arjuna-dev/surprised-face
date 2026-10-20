@@ -453,7 +453,7 @@ export function normalizeReasoningEffort(value: unknown): CodexReasoningEffort |
     : undefined;
 }
 
-function resolveCodexExecutable(): string | null {
+export function resolveCodexExecutable(): string | null {
   const explicitPath = process.env.CODEX_APP_BIN || process.env.CODEX_BIN || '';
 
   if (isLaunchableCodex(explicitPath)) {

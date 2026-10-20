@@ -1,12 +1,14 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, statSync } from 'node:fs';
+import os from 'node:os';
 import { CodexDesktopUnavailable } from './codex-desktop-link';
 import type { NativeDisplayMessage } from '../src/lib/native-transcript';
 import type { CodexAppServer } from './codex-app-server';
 import type { HermesAcpClient, HermesEvent } from './hermes-acp';
 import type { LocalStore } from './local-store';
 import type { RoomService } from './room-service';
-import type { LocalAgentSettings, SettingsStore } from './settings-store';
+import type { HarnessName, LocalAgentSettings, SettingsStore } from './settings-store';
+import { harnessParticipants } from './harness-participants';
 
 type AgentTurn = {
   turnId: string;
@@ -26,6 +28,8 @@ type StreamState = {
   agentId: string;
   chunkIndex: number;
   sawText: boolean;
+  buffer: string;
+  flushTimer: ReturnType<typeof setTimeout> | undefined;
   finishing: boolean;
   failure: string;
   chain: Promise<void>;
@@ -47,7 +51,8 @@ export class AgentRunner extends EventEmitter {
     private readonly settings: SettingsStore,
     private readonly codex: CodexAppServer,
     private readonly hermes: HermesAcpClient,
-    private readonly desktop: { startTurn(input: { threadId: string; text: string; cwd?: string }): Promise<NativeDisplayMessage[]> } | null = null,
+    private readonly desktop: { startTurn(input: { threadId: string; text: string; cwd?: string; onDelta?: (text: string) => void }): Promise<NativeDisplayMessage[]> } | null = null,
+    private readonly availableHarnesses: () => HarnessName[] = () => ['codex', 'hermes'],
   ) {
     super();
     this.codex.on('event', (event: unknown) => this.handleCodexEvent(event));
@@ -65,9 +70,10 @@ export class AgentRunner extends EventEmitter {
     try {
       const settings = await this.settings.get();
       if (!settings.connected) return;
-      const turn = await this.rooms.claimTurn(roomId, settings.agents.map((agent) => agent.id), settings.allowRemoteAgentRequests) as AgentTurn | null;
+      const participants = harnessParticipants(settings, this.availableHarnesses());
+      const turn = await this.rooms.claimTurn(roomId, participants.map((agent) => agent.id), settings.allowRemoteAgentRequests) as AgentTurn | null;
       if (!turn) return;
-      const agent = settings.agents.find((item) => item.id === turn.agentId);
+      const agent = participants.find((item) => item.id === turn.agentId);
       if (!agent) return;
       ranTurn = true;
       try {
@@ -93,18 +99,18 @@ export class AgentRunner extends EventEmitter {
   private async execute(roomId: string, turn: AgentTurn, agent: LocalAgentSettings): Promise<void> {
     if (turn.ownerId !== (await this.settings.get()).member?.id) throw new Error('This agent is configured for another member.');
     if (turn.harness !== agent.harness) throw new Error('The registered harness and local agent settings do not match.');
-    if (!agent.workingDirectory || !existsSync(agent.workingDirectory) || !statSync(agent.workingDirectory).isDirectory()) {
-      throw new Error(`Choose an existing working folder for ${agent.name} in Settings.`);
-    }
     const previous = this.store.agentSession(roomId, agent.id);
+    const candidate = previous?.working_directory || agent.workingDirectory;
+    const workingDirectory = candidate && existsSync(candidate) && statSync(candidate).isDirectory() ? candidate : os.homedir();
+    const activeAgent = { ...agent, workingDirectory };
     const isSameSession = previous?.harness === agent.harness
-      && previous.working_directory === agent.workingDirectory
+      && previous.working_directory === workingDirectory
       && previous.model === agent.model;
-    const context = await this.contextPrompt(roomId, turn, agent, isSameSession ? previous.context_through_seq : 0, Boolean(isSameSession));
+    const context = this.contextPrompt(turn, agent, isSameSession ? previous.context_through_seq : 0, Boolean(isSameSession));
     if (agent.harness === 'codex') {
-      await this.executeCodex(roomId, turn, agent, context, isSameSession ? previous : undefined);
+      await this.executeCodex(roomId, turn, activeAgent, context, isSameSession ? previous : undefined);
     } else {
-      await this.executeHermes(roomId, turn, agent, context, isSameSession ? previous : undefined);
+      await this.executeHermes(roomId, turn, activeAgent, context, isSameSession ? previous : undefined);
     }
   }
 
@@ -117,15 +123,18 @@ export class AgentRunner extends EventEmitter {
   ): Promise<void> {
     if (previous && this.desktop && !this.resumedCodexThreads.has(previous.native_session_id)) {
       let replies: NativeDisplayMessage[] | undefined;
+      const state = this.createStream(roomId, turn.turnId, previous.native_session_id, agent.id);
       try {
-        replies = await this.desktop.startTurn({ threadId: previous.native_session_id, text: prompt, cwd: agent.workingDirectory });
+        replies = await this.desktop.startTurn({ threadId: previous.native_session_id, text: prompt, cwd: agent.workingDirectory, onDelta: (text) => this.addChunk(state, text) });
       } catch (error) {
         // Only a confirmed unavailable desktop permits trying another writer.
         if (!(error instanceof CodexDesktopUnavailable) && !(error instanceof Error && error.name === 'CodexDesktopUnavailable')) throw error;
       }
       if (replies) {
-        const state = this.createStream(roomId, turn.turnId, previous.native_session_id, agent.id);
-        for (const reply of replies) if (reply.role === 'assistant' && reply.content) this.addChunk(state, reply.content);
+        if (!state.sawText) {
+          const reply = replies.filter((item) => item.role === 'assistant').at(-1);
+          if (reply?.content) this.addChunk(state, reply.content);
+        }
         this.store.saveAgentSession({ roomId, agentId: agent.id, harness: agent.harness, sessionId: previous.native_session_id, cwd: agent.workingDirectory, model: agent.model, contextThroughSeq: turn.contextThroughSeq });
         await this.finishStream(state, 'complete');
         if (state.failure) throw new Error(state.failure);
@@ -195,38 +204,27 @@ export class AgentRunner extends EventEmitter {
     }
   }
 
-  private async contextPrompt(roomId: string, turn: AgentTurn, agent: LocalAgentSettings, afterSeq: number, continuing: boolean): Promise<string> {
+  private contextPrompt(turn: AgentTurn, agent: LocalAgentSettings, afterSeq: number, continuing: boolean): string {
     const messages = turn.context.filter((message) => {
       if (message.messageSeq <= afterSeq) return false;
       if (continuing && message.role === 'assistant' && message.agentId === agent.id) return false;
       return Boolean(message.text.trim());
     });
-    const memberNames = new Map<string, string>();
-    const agentNames = new Map<string, string>();
-    const [members, agents] = await Promise.all([
-      this.rooms.members(roomId).catch(() => []),
-      this.rooms.agents(roomId).catch(() => []),
-    ]);
-    for (const member of members) memberNames.set(member.id, member.name);
-    for (const other of agents) agentNames.set(other.id, other.name);
+    if (messages.length === 0) return turn.request.text;
+    if (messages.length === 1) return messages[0]!.text;
     const transcript = messages.map((message) => {
       const author = message.role === 'assistant'
-        ? message.agentName || (message.agentId ? agentNames.get(message.agentId) : '') || 'Agent'
-        : message.participantName || memberNames.get(message.participantId) || 'Human';
+        ? message.agentName || message.agentId || 'Harness'
+        : message.participantName || message.participantId || 'Person';
       return `${author}:\n${message.text}`;
     }).join('\n\n');
-    return [
-      `You are ${agent.name}, participating in a shared chat.`,
-      'The conversation below is the shared context available before this turn began.',
-      'Respond to the latest request directed to you. Do not answer for other agents or people.',
-      transcript || turn.request.text,
-    ].join('\n\n');
+    return transcript;
   }
 
   private createStream(roomId: string, turnId: string, sessionId: string, agentId: string): StreamState {
     let resolve!: () => void;
     const complete = new Promise<void>((done) => { resolve = done; });
-    return { roomId, turnId, sessionId, agentId, chunkIndex: 0, sawText: false, finishing: false, failure: '', chain: Promise.resolve(), complete, resolve };
+    return { roomId, turnId, sessionId, agentId, chunkIndex: 0, sawText: false, buffer: '', flushTimer: undefined, finishing: false, failure: '', chain: Promise.resolve(), complete, resolve };
   }
 
   private handleCodexEvent(value: unknown): void {
@@ -284,21 +282,34 @@ export class AgentRunner extends EventEmitter {
   private addChunk(state: StreamState, text: string): void {
     if (!text || state.finishing) return;
     state.sawText = true;
-    const index = state.chunkIndex++;
-    state.chain = state.chain.then(async () => {
-      if (state.failure) return;
-      try {
-        await this.rooms.appendAgentChunk(state.roomId, state.turnId, index, text);
-      } catch (error) {
-        state.failure = errorMessage(error);
-      }
-    });
+    state.buffer += text;
+    if (state.buffer.length >= 8_000) this.flushStream(state);
+    else if (!state.flushTimer) state.flushTimer = setTimeout(() => this.flushStream(state), 80);
+  }
+
+  private flushStream(state: StreamState): void {
+    if (state.flushTimer) clearTimeout(state.flushTimer);
+    state.flushTimer = undefined;
+    while (state.buffer) {
+      const text = state.buffer.slice(0, 12_000);
+      state.buffer = state.buffer.slice(text.length);
+      const index = state.chunkIndex++;
+      state.chain = state.chain.then(async () => {
+        if (state.failure) return;
+        try {
+          await this.rooms.appendAgentChunk(state.roomId, state.turnId, index, text);
+        } catch (error) {
+          state.failure = errorMessage(error);
+        }
+      });
+    }
   }
 
   private async finishStream(state: StreamState, status: 'complete' | 'failed' | 'stopped', error?: string): Promise<void> {
     if (state.finishing) return state.complete;
     state.finishing = true;
     if (error) state.failure = error;
+    this.flushStream(state);
     await state.chain;
     const finalStatus = state.failure && status === 'complete' ? 'failed' : status;
     try { await this.rooms.finishAgentTurn(state.roomId, state.turnId, finalStatus, state.failure || error); }

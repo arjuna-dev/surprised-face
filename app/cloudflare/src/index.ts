@@ -141,6 +141,16 @@ export default {
           const result = await directory(env).fetch(`https://directory/room-members?room=${encodeURIComponent(roomId)}`);
           return response(await result.json(), result.status, env);
         }
+        if (!operation && request.method === 'PATCH') {
+          if (!access.creator) return response({ error: 'Only the chat owner can rename it.' }, 403, env);
+          const input = await readJson<{ name: string }>(request);
+          const result = await directory(env).fetch(`https://directory/rooms/${encodeURIComponent(roomId)}`, {
+            method: 'PATCH', headers: { 'content-type': 'application/json', 'x-actor-id': identity.id }, body: JSON.stringify(input),
+          });
+          const body = await result.json<{ id?: string; name?: string }>();
+          if (result.ok) await stub.fetch(`https://room/${roomId}/renamed`, { method: 'POST', body: JSON.stringify({ name: body.name }) });
+          return response(body, result.status, env);
+        }
         if (operation === 'agents' && request.method === 'GET') {
           const result = await directory(env).fetch(`https://directory/room-agents?room=${encodeURIComponent(roomId)}`);
           return response(await result.json(), result.status, env);
@@ -222,6 +232,7 @@ export class WorkspaceDirectory extends DurableObject<Env> {
     if (request.method === 'GET' && url.pathname === '/members-for-actor') return this.membersForActor(request.headers.get('x-actor-id') || '');
     if (request.method === 'GET' && url.pathname === '/agents-for-actor') return this.agentsForActor(request.headers.get('x-actor-id') || '');
     if (request.method === 'POST' && url.pathname === '/rooms') return this.createRoom(request, await readJson(request));
+    if (request.method === 'PATCH' && url.pathname.startsWith('/rooms/')) return this.renameRoom(request, url.pathname.slice('/rooms/'.length), await readJson(request));
     if (request.method === 'POST' && url.pathname === '/agents') return this.registerAgent(request, await readJson(request));
     if (request.method === 'GET' && url.pathname.startsWith('/agents/')) return this.getAgent(decodeURIComponent(url.pathname.slice('/agents/'.length)));
     return json({ error: 'Not found.' }, 404);
@@ -286,17 +297,26 @@ export class WorkspaceDirectory extends DurableObject<Env> {
   }
 
   private rooms(memberId: string): Response {
-    const rows = this.sql().exec<{ id: string; name: string; created_at: string }>(
-      'SELECT r.id, r.name, r.created_at, r.default_agent_id FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.member_id=? ORDER BY r.created_at', memberId,
+    const rows = this.sql().exec<{ id: string; name: string; createdBy: string; createdAt: string; defaultAgentId: string | null }>(
+      'SELECT r.id, r.name, r.created_by AS createdBy, r.created_at AS createdAt, r.default_agent_id AS defaultAgentId FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.member_id=? ORDER BY r.created_at', memberId,
     ).toArray();
     return json({ rooms: rows });
   }
 
   private roomMembers(roomId: string): Response {
     const members = this.sql().exec<{ id: string; name: string; role: string }>(
-      'SELECT p.id, p.name, p.role FROM members p JOIN room_members m ON m.member_id=p.id WHERE m.room_id=? ORDER BY p.created_at', roomId,
+      "SELECT p.id, p.name, CASE WHEN p.id=r.created_by THEN 'owner' ELSE 'member' END AS role FROM members p JOIN room_members m ON m.member_id=p.id JOIN rooms r ON r.id=m.room_id WHERE m.room_id=? ORDER BY p.created_at", roomId,
     ).toArray();
     return json({ members });
+  }
+
+  private renameRoom(request: Request, roomId: string, input: { name?: string }): Response {
+    const actor = request.headers.get('x-actor-id') || '';
+    const name = cleanRoomName(input.name);
+    const changed = this.sql().exec<{ id: string; name: string; created_by: string; created_at: string }>(
+      'UPDATE rooms SET name=? WHERE id=? AND created_by=? RETURNING id,name,created_by,created_at', name, roomId, actor,
+    ).toArray()[0];
+    return changed ? json({ id: changed.id, name: changed.name, createdBy: changed.created_by, createdAt: changed.created_at }) : json({ error: 'Only the chat owner can rename it.' }, 403);
   }
 
   private roomAgents(roomId: string): Response {
@@ -409,6 +429,10 @@ export class ChatRoom extends DurableObject<Env> {
     if (url.pathname.endsWith('/agent-updated') && request.method === 'POST') {
       const input = await readJson<{ agentId: string; ownerId: string }>(request);
       return json({ eventSeq: this.appendEvent('agent.updated', input).eventSeq });
+    }
+    if (url.pathname.endsWith('/renamed') && request.method === 'POST') {
+      const input = await readJson<{ name: string }>(request);
+      return json({ eventSeq: this.appendEvent('room.renamed', { name: input.name }).eventSeq });
     }
     if (url.pathname.endsWith('/claim') && request.method === 'POST') return this.claimTurn(actor, await readJson(request));
     const match = /\/turns\/([^/]+)\/(chunk|finish)$/.exec(url.pathname);

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { LocalStore, RoomEvent } from './local-store';
 import type { SettingsStore } from './settings-store';
 
-type ApiRoom = { id: string; name: string; createdAt?: string; defaultAgentId?: string };
+type ApiRoom = { id: string; name: string; createdBy?: string; createdAt?: string; defaultAgentId?: string; default_agent_id?: string };
 type ApiMember = { id: string; name: string; role: 'owner' | 'member' };
 type ApiAgent = {
   id: string;
@@ -81,8 +81,12 @@ export class RoomService extends EventEmitter {
 
   async rooms(): Promise<ApiRoom[]> {
     const result = await this.api<{ rooms: ApiRoom[] }>('/v1/rooms');
-    this.store.storeRooms(result.body.rooms || []);
-    return result.body.rooms || [];
+    const rooms = (result.body.rooms || []).map((room) => {
+      const defaultAgentId = room.defaultAgentId || room.default_agent_id;
+      return { ...room, ...(defaultAgentId ? { defaultAgentId } : {}) };
+    });
+    this.store.storeRooms(rooms);
+    return rooms;
   }
 
   async members(roomId: string): Promise<ApiMember[]> {
@@ -102,6 +106,12 @@ export class RoomService extends EventEmitter {
 
   async createRoom(name: string, defaultAgentId = ''): Promise<ApiRoom> {
     const result = await this.api<ApiRoom>('/v1/rooms', { method: 'POST', body: { name, defaultAgentId } });
+    this.store.storeRooms([result.body]);
+    return result.body;
+  }
+
+  async renameRoom(roomId: string, name: string): Promise<ApiRoom> {
+    const result = await this.api<ApiRoom>(`/v1/rooms/${encodeURIComponent(roomId)}`, { method: 'PATCH', body: { name } });
     this.store.storeRooms([result.body]);
     return result.body;
   }

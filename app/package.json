@@ -1,7 +1,7 @@
 {
   "name": "surprised-face",
   "version": "0.1.0",
-  "description": "Shared chats with local AI agents and harnesses.",
+  "description": "Shared chats with locally available AI harnesses.",
   "productName": "surprised-face",
   "desktopName": "surprised-face",
   "type": "module",

@@ -1,10 +1,11 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import {
   CodexAppServer,
+  resolveCodexExecutable,
   type ServerRequestResponse,
   type StartThreadInput,
   type StartTurnInput,
@@ -16,7 +17,9 @@ import { CodexDesktopLink } from './codex-desktop-link';
 import { CodexSessionFollow, findCodexSessionFile } from './codex-session-follow';
 import { LocalStore } from './local-store';
 import { RoomService } from './room-service';
-import { SettingsStore, type LocalAgentSettings } from './settings-store';
+import { SettingsStore, type HarnessName } from './settings-store';
+import { harnessParticipants } from './harness-participants';
+import { HarnessContextMirror } from './harness-context-mirror';
 import { SheepBridge } from './sheep-bridge';
 import { isSafeAppNavigation } from './navigation-policy';
 import { projectsForUi, sortProjectsByRecent } from './local-projects';
@@ -35,6 +38,8 @@ let codex: CodexAppServer;
 let hermes: HermesAcpClient;
 let agentRunner: AgentRunner;
 let nativeChat: NativeChatService;
+let harnessContextMirror: HarnessContextMirror;
+let availableHarnesses: HarnessName[] = [];
 const codexSessionFollows = new Map<string, CodexSessionFollow>();
 
 if (!ownsSingleInstanceLock) {
@@ -50,6 +55,7 @@ if (!ownsSingleInstanceLock) {
     .whenReady()
     .then(async () => {
       localStore = new LocalStore(path.join(app.getPath('userData'), 'surprised-face.sqlite'));
+      harnessContextMirror = new HarnessContextMirror(app.getPath('userData'), localStore);
       settingsStore = new SettingsStore(app.getPath('userData'));
       sheepBridge = new SheepBridge();
       roomService = new RoomService(settingsStore, localStore);
@@ -60,7 +66,7 @@ if (!ownsSingleInstanceLock) {
         clientVersion: app.getVersion(),
       });
       const desktop = {
-        startTurn: (input: { threadId: string; text: string; cwd?: string }) => {
+        startTurn: (input: { threadId: string; text: string; cwd?: string; onDelta?: (text: string) => void }) => {
           const link = new CodexDesktopLink({
             socketPath: process.env.CODEX_IPC_SOCKET || path.join(os.homedir(), '.codex', 'ipc', 'ipc.sock'),
             sessionFile: findCodexSessionFile(input.threadId, path.join(os.homedir(), '.codex', 'sessions')),
@@ -68,7 +74,7 @@ if (!ownsSingleInstanceLock) {
           return link.startTurn(input).finally(() => link.close());
         },
       };
-      agentRunner = new AgentRunner(roomService, localStore, settingsStore, codex, hermes, desktop);
+      agentRunner = new AgentRunner(roomService, localStore, settingsStore, codex, hermes, desktop, () => availableHarnesses);
       nativeChat = new NativeChatService(codex, hermes, desktop);
 
       bindEvents();
@@ -104,8 +110,11 @@ function bindEvents(): void {
   roomService.on('event', (payload) => {
     sendToRenderer('room:event', payload);
     const event = asObject(asObject(payload)?.event);
+    const roomId = stringValue(asObject(payload)?.roomId);
+    if (roomId && ['message.created', 'message.delta', 'turn.started', 'turn.finished'].includes(stringValue(event?.type) || '')) {
+      void harnessContextMirror.sync(roomId).catch((error: unknown) => sendToRenderer('app:error', errorMessage(error)));
+    }
     if (event?.type === 'turn.queued' || event?.type === 'turn.finished' || event?.type === 'turn.availability') {
-      const roomId = stringValue(asObject(payload)?.roomId);
       if (roomId) setTimeout(() => void agentRunner.runPending(roomId), 0);
     }
   });
@@ -128,6 +137,7 @@ function bindEvents(): void {
 
 function registerHandlers(): void {
   safeIpc('app:settings', () => settingsStore.get());
+  safeIpc('app:available-harnesses', () => detectAvailableHarnesses());
   safeIpc('app:update-settings', async (_event, input) => {
     const previous = await settingsStore.get();
     const settings = await settingsStore.update(input as Parameters<SettingsStore['update']>[0]);
@@ -178,8 +188,13 @@ function registerHandlers(): void {
       typeof input === 'string' ? '' : stringField((input as Record<string, unknown>)?.defaultAgentId),
     ),
   );
+  safeIpc('app:rename-room', async (_event, input) => {
+    const value = input as { roomId: string; name: string };
+    return roomService.renameRoom(String(value.roomId), String(value.name));
+  });
   safeIpc('app:open-room', async (_event, roomId) => {
     await roomService.openRoom(String(roomId));
+    await harnessContextMirror.sync(String(roomId));
     return roomService.messages(String(roomId));
   });
   safeIpc('app:room-messages', (_event, roomId) => roomService.messages(String(roomId)));
@@ -191,30 +206,9 @@ function registerHandlers(): void {
   });
   safeIpc('app:members', (_event, roomId) => roomService.members(String(roomId)));
   safeIpc('app:agents', (_event, roomId) => roomService.agents(String(roomId)));
-  safeIpc('app:save-agent', async (_event, value) => {
-    const agent = value as LocalAgentSettings;
-    const settings = await settingsStore.get();
-    const agents = [...settings.agents.filter((item) => item.id !== agent.id), agent];
-    await settingsStore.update({ agents });
-    if (settings.connected)
-      await roomService.registerAgent({
-        id: agent.id,
-        name: agent.name,
-        harness: agent.harness,
-        model: agent.model,
-      });
-    return settingsStore.get();
-  });
   safeIpc('app:run-pending', async (_event, roomId) => {
     await agentRunner.runPending(String(roomId));
     return { ok: true };
-  });
-  safeIpc('app:choose-folder', async () => {
-    const options: OpenDialogOptions = { properties: ['openDirectory', 'createDirectory'] };
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, options)
-      : await dialog.showOpenDialog(options);
-    return result.canceled ? null : result.filePaths[0] || null;
   });
 
   safeIpc('sheep:cached', () => {
@@ -280,8 +274,9 @@ function registerHandlers(): void {
   safeIpc('native:create', async (_event, input) => {
     const value = input as { harness: 'codex' | 'hermes'; cwd: string; title: string };
     const settings = await settingsStore.get();
-    const agent = settings.agents.find((item) => item.harness === value.harness && item.workingDirectory === value.cwd);
-    const session = await nativeChat.create({ harness: value.harness, cwd: value.cwd, ...(agent?.model ? { model: agent.model } : {}) });
+    const cwd = value.cwd || os.homedir();
+    const agent = harnessParticipants(settings).find((item) => item.harness === value.harness);
+    const session = await nativeChat.create({ harness: value.harness, cwd, ...(agent?.model ? { model: agent.model } : {}) });
     const chat = { id: session.sessionId, harness: session.harness, path: session.cwd, title: value.title.trim().slice(0, 80) || 'New chat', updatedAt: new Date().toISOString() };
     localStore.cache('app-conversation', chat.id, chat.harness, chat);
     return chat;
@@ -291,7 +286,7 @@ function registerHandlers(): void {
     const chat = localStore.catalog('app-conversation').find((item) => item.id === value.sessionId && item.harness === value.harness);
     if (chat) localStore.cache('app-conversation', value.sessionId, value.harness, { ...chat, updatedAt: new Date().toISOString() });
     if (value.harness === 'codex') followCodexSession(value.sessionId);
-    await nativeChat.send(value);
+    await nativeChat.send({ ...value, cwd: value.cwd || os.homedir() });
   });
   safeIpc('native:follow', (_event, input) => {
     const value = input as { sessionId?: string };
@@ -372,7 +367,8 @@ function conversationCatalog(discovered: Record<string, unknown>[]): Record<stri
 async function connectExistingRooms(): Promise<void> {
   const settings = await settingsStore.get();
   if (!settings.connected) return;
-  for (const agent of settings.agents) {
+  const available = await detectAvailableHarnesses();
+  for (const agent of harnessParticipants(settings, available)) {
     try {
       await roomService.registerAgent({
         id: agent.id,
@@ -388,6 +384,7 @@ async function connectExistingRooms(): Promise<void> {
   for (const room of rooms) {
     try {
       await roomService.openRoom(room.id);
+      await harnessContextMirror.sync(room.id);
     } catch (error) {
       sendToRenderer('app:error', errorMessage(error));
     }
@@ -398,8 +395,8 @@ async function connectExistingRooms(): Promise<void> {
 async function shareNativeChat(input: { harness: 'codex' | 'hermes'; sessionId: string; cwd: string; title: string; agentName?: string }) {
   const settings = await settingsStore.get();
   if (!settings.connected || !settings.member) throw new Error('Connect to the room service before inviting a friend.');
-  if (!['codex', 'hermes'].includes(input.harness) || !input.sessionId || !input.cwd)
-    throw new Error('This chat needs a Codex or Hermes session and working folder before it can be shared.');
+  if (!['codex', 'hermes'].includes(input.harness) || !input.sessionId)
+    throw new Error('Choose a Codex or Hermes chat before sharing it.');
   if (nativeChat.isActive(input.harness, input.sessionId)) throw new Error('Wait for the current agent reply before inviting a friend.');
   const transcript = await sheepBridge.request<Record<string, unknown>>('conversations.read', { harness: input.harness, id: input.sessionId });
   const entries = displayTranscriptMessages(transcript).map((message, index) => {
@@ -409,19 +406,13 @@ async function shareNativeChat(input: { harness: 'codex' | 'hermes'; sessionId: 
     if (typeof message?.at === 'string') entry.at = message.at;
     return entry;
   });
-  let agent = settings.agents.find((item) => item.harness === input.harness && item.workingDirectory === input.cwd);
-  if (!agent) {
-    agent = {
-      id: `agent-${settings.member.id.slice(0, 8)}-${input.harness}-${createHash('sha256').update(input.cwd).digest('hex').slice(0, 8)}`,
-      name: input.agentName || `${settings.displayName || 'My'} ${input.harness === 'codex' ? 'Codex' : 'Hermes'}`,
-      harness: input.harness,
-      model: '',
-      workingDirectory: input.cwd,
-    };
-    await settingsStore.update({ agents: [...settings.agents, agent] });
-  }
-  await roomService.registerAgent({ id: agent.id, name: agent.name, harness: agent.harness, model: agent.model });
   const linked = localStore.nativeRoomLink(input.harness, input.sessionId);
+  const available = await detectAvailableHarnesses();
+  const participants = harnessParticipants(settings, available);
+  const agent = participants.find((item) => item.id === linked?.agentId)
+    || participants.find((item) => item.harness === input.harness);
+  if (!agent) throw new Error('This harness is unavailable on this computer.');
+  await roomService.registerAgent({ id: agent.id, name: agent.name, harness: agent.harness, model: agent.model });
   const room = linked
     ? (await roomService.rooms()).find((item) => item.id === linked.roomId)
     : await roomService.createRoom(input.title || 'Chat', agent.id);
@@ -430,11 +421,22 @@ async function shareNativeChat(input: { harness: 'codex' | 'hermes'; sessionId: 
   if (!localStore.agentSession(room.id, agent.id) && (await roomService.members(room.id)).length === 1) {
     const sourceId = createHash('sha256').update(`${input.harness}:${input.sessionId}`).digest('hex');
     const lastMessageSeq = await roomService.importMessages(room.id, sourceId, agent.id, entries);
-    localStore.saveAgentSession({ roomId: room.id, agentId: agent.id, harness: agent.harness, sessionId: input.sessionId, cwd: input.cwd, model: agent.model, contextThroughSeq: lastMessageSeq });
+    localStore.saveAgentSession({ roomId: room.id, agentId: agent.id, harness: agent.harness, sessionId: input.sessionId, cwd: input.cwd || os.homedir(), model: agent.model, contextThroughSeq: lastMessageSeq });
   }
   await roomService.openRoom(room.id);
+  await harnessContextMirror.sync(room.id);
   const invite = (await roomService.createInvites(room.id, 1))[0];
   return { room, invite };
+}
+
+async function detectAvailableHarnesses(): Promise<HarnessName[]> {
+  const available: HarnessName[] = [];
+  if (resolveCodexExecutable()) available.push('codex');
+  try {
+    if ((await hermes.status()).installed) available.push('hermes');
+  } catch { /* An unavailable harness is omitted from the local list. */ }
+  availableHarnesses = available;
+  return available;
 }
 
 async function createWindow(): Promise<void> {

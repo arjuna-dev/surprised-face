@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { CodexDesktopUnavailable } from './codex-desktop-link';
 
 type DesktopTurnBridge = {
-  startTurn(input: { threadId: string; text: string; cwd?: string }): Promise<unknown>;
+  startTurn(input: { threadId: string; text: string; cwd?: string; onDelta?: (text: string) => void }): Promise<unknown>;
 };
 
 type Harness = 'codex' | 'hermes';
@@ -60,7 +60,7 @@ export class NativeChatService extends EventEmitter {
 
   async send(input: NativeChatInput): Promise<void> {
     const { harness, sessionId, cwd, text } = input;
-    if (!sessionId || !cwd || !text.trim()) throw new Error('Choose a chat with a working folder and enter a message.');
+    if (!sessionId || !cwd || !text.trim()) throw new Error('Choose a chat and enter a message.');
     const key = `${harness}:${sessionId}`;
     if (this.active.has(key)) throw new Error('This chat is still answering.');
     const tryDesktop = harness === 'codex' && Boolean(this.desktop) && !this.owned.has(key);
@@ -75,7 +75,7 @@ export class NativeChatService extends EventEmitter {
     try {
       if (harness === 'codex' && this.desktop && !this.owned.has(key)) {
         try {
-          await this.desktop.startTurn({ threadId: sessionId, text, cwd });
+          await this.desktop.startTurn({ threadId: sessionId, text, cwd, onDelta: (delta) => this.delta(key, delta) });
           this.finish(key, 'completed');
           return;
         } catch (error) {

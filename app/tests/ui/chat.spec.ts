@@ -1,15 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
 
-async function fixture(page: Page, options: { room?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean } = {}) {
+async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boolean; twoHarnesses?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean; hermesUnavailable?: boolean } = {}) {
   await page.addInitScript((options) => {
     const events: Record<string, ((value: unknown) => void)[]> = {};
     const state = {
       calls: [] as { method: string; input: unknown }[], clipboard: '', failCreate: Boolean(options.failCreate),
       failSettings: Boolean(options.failSettings), failInvite: Boolean(options.failInvite),
       account: options.signedOut ? null : { type: 'chatgpt', email: 'maya@example.test', planType: 'plus' },
-      settings: { backendUrl: 'https://fixture.invalid', displayName: 'Maya', member: { id: 'maya', name: 'Maya', role: 'member' }, theme: 'mint-charcoal', agents: [], allowRemoteAgentRequests: false, connected: options.connected !== false },
-      rooms: options.room ? [{ id: 'chat-1', name: 'Design review' }] : [],
-      sharedMessages: [] as Record<string, unknown>[], sharedAgents: [] as Record<string, unknown>[],
+      settings: { backendUrl: 'https://fixture.invalid', displayName: 'Maya', member: { id: 'maya', name: 'Maya', role: options.foreignOwned ? 'owner' : 'member' }, theme: 'mint-charcoal', agents: [], allowRemoteAgentRequests: false, connected: options.connected !== false },
+      rooms: options.room ? [{ id: 'chat-1', name: 'Design review', createdBy: options.foreignOwned ? 'mukesh' : 'maya' }] : [],
+      sharedMessages: [] as Record<string, unknown>[], sharedAgents: options.room ? [
+        { id: 'maya-codex', name: 'Codex', ownerId: 'maya', harness: 'codex', model: '' },
+        ...(options.twoHarnesses ? [{ id: 'maya-hermes', name: 'Hermes', ownerId: 'maya', harness: 'hermes', model: '' }] : []),
+      ] as Record<string, unknown>[] : [] as Record<string, unknown>[],
       pendingOutbox: [] as Record<string, unknown>[],
       conversations: [{ id: 'local-1', harness: 'codex', title: 'Local design', path: '/work/design', updatedAt: '2026-10-05T10:00:00Z' }],
     };
@@ -19,8 +22,9 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
     const on = (name: string) => (handler: (value: unknown) => void) => { (events[name] ||= []).push(handler); return () => {}; };
     // Match Electron's unsupported window.prompt rather than accepting browser dialogs.
     window.prompt = () => { throw new Error('prompt() is and will not be supported.'); };
-    Object.assign(window, { uiFixture: state, emitCodex: (value: unknown) => { for (const handler of events.codexEvent || []) handler(value); }, emitNative: (value: unknown) => { for (const handler of events.native || []) handler(value); }, surprisedFace: {
+    Object.assign(window, { uiFixture: state, emitCodex: (value: unknown) => { for (const handler of events.codexEvent || []) handler(value); }, emitNative: (value: unknown) => { for (const handler of events.native || []) handler(value); }, emitRoom: (value: unknown) => { for (const handler of events.room || []) handler(value); }, surprisedFace: {
       settings: async () => structuredClone(state.settings),
+      availableHarnesses: async () => options.hermesUnavailable ? ['codex'] : ['codex', 'hermes'],
       updateSettings: async (input: Record<string, unknown>) => {
         call('updateSettings', input);
         if (state.failSettings) { state.failSettings = false; throw new Error('Could not save settings.'); }
@@ -39,6 +43,13 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
       onCodexEvent: on('codexEvent'),
       hermesStatus: async () => ({ installed: true, version: 'Fixture Hermes' }),
       rooms: async () => structuredClone(state.rooms),
+      renameRoom: async (input: { roomId: string; name: string }) => {
+        call('renameRoom', input);
+        const room = state.rooms.find((item) => item.id === input.roomId);
+        if (!room) throw new Error('Chat not found.');
+        room.name = input.name.trim();
+        return structuredClone(room);
+      },
       sheepCached: async () => ({ projects: [{ name: 'Design', path: '/work/design' }], conversations: options.slowCatalog || options.failCatalog ? [{ id: 'cached-1', harness: 'codex', title: 'Saved conversation', path: '/work/design' }] : [] }),
       sheepRefresh: async () => {
         if (options.slowCatalog) await new Promise(resolve => setTimeout(resolve, 5000));
@@ -50,8 +61,9 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
         { role: 'user', content: 'A sample conversation' },
         { role: 'assistant', content: 'Sample reply' },
       ] }),
-      roomMessages: async () => state.sharedMessages, pendingMessages: async () => state.pendingOutbox, openRoom: async () => state.sharedMessages,
+      roomMessages: async () => structuredClone(state.sharedMessages), pendingMessages: async () => structuredClone(state.pendingOutbox), openRoom: async () => structuredClone(state.sharedMessages),
       sendMessage: async (input: { roomId: string; text: string }) => {
+        call('sendMessage', input);
         const createdAt = new Date().toISOString();
         state.pendingOutbox = [{ client_id: 'client-1', room_id: input.roomId, text: input.text, agent_ids: '[]', created_at: createdAt, error: null }];
         state.sharedMessages.push({ id: 'cloud-new', roomId: input.roomId, messageSeq: 1, participantId: 'maya', participantName: 'Maya', role: 'user', text: input.text, createdAt, state: 'complete' });
@@ -62,7 +74,9 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
         }, 50);
         return { ok: true };
       },
-      members: async () => [{ id: 'maya', name: 'Maya', role: 'member' }], agents: async () => state.sharedAgents, runPending: async () => ({}),
+      members: async () => options.foreignOwned
+        ? [{ id: 'maya', name: 'Maya', role: 'owner' }, { id: 'mukesh', name: 'Mukesh', role: 'member' }]
+        : [{ id: 'maya', name: 'Maya', role: 'member' }], agents: async () => state.sharedAgents, runPending: async () => ({}),
       nativeLink: async () => null,
       nativeCreate: async (input: { harness: string; cwd: string; title: string }) => {
         call('nativeCreate', input);
@@ -75,14 +89,14 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
       nativeSend: async (input: { harness: string; sessionId: string; text: string }) => {
         call('nativeSend', input);
         for (const handler of events.native || []) {
-          handler({ ...input, type: 'delta', text: 'Hello from your agent' });
+          handler({ ...input, type: 'delta', text: 'Hello from Codex' });
           handler({ ...input, type: 'completed' });
         }
       },
       register: async (name: string) => { call('register', name); state.settings.connected = true; return state.settings.member; },
       nativeShare: async (input: unknown) => {
         call('nativeShare', input);
-        const room = { id: 'chat-1', name: 'Local design' };
+        const room = { id: 'chat-1', name: 'Local design', createdBy: 'maya' };
         state.rooms.push(room);
         state.sharedAgents = [{ id: 'maya-codex', name: 'Maya Codex', ownerId: 'maya', harness: 'codex', model: '' }];
         state.sharedMessages = [
@@ -98,8 +112,8 @@ async function fixture(page: Page, options: { room?: boolean; failCreate?: boole
         return options.emptyInvite ? [] : [{ code: 'fixture-chat-code', expiresAt: '2026-10-12' }];
       },
       copyText: async (text: string) => { call('copyText', text); if (options.failCopy) return { ok: false }; state.clipboard = text; return { ok: true }; },
-      joinRoom: async (code: string) => { call('joinRoom', code); if (code === 'invalid') throw new Error('This invite code is invalid.'); state.rooms.push({ id: 'joined-chat', name: 'Friends' }); return { roomId: 'joined-chat' }; },
-      join: async (input: unknown) => { call('join', input); state.settings.connected = true; state.rooms.push({ id: 'joined-chat', name: 'Friends' }); return { roomId: 'joined-chat' }; },
+      joinRoom: async (code: string) => { call('joinRoom', code); if (code === 'invalid') throw new Error('This invite code is invalid.'); state.rooms.push({ id: 'joined-chat', name: 'Friends', createdBy: 'friend' }); return { roomId: 'joined-chat' }; },
+      join: async (input: unknown) => { call('join', input); state.settings.connected = true; state.rooms.push({ id: 'joined-chat', name: 'Friends', createdBy: 'friend' }); return { roomId: 'joined-chat' }; },
       onNativeChatEvent: on('native'), onRoomEvent: on('room'), onRoomConnection: on('connection'), onAppError: on('error'),
       onOutboxChanged: on('outbox'),
       onAgentActivity: on('activity'), onCodexRequest: on('codex'), onHermesRequest: on('hermes'),
@@ -126,10 +140,10 @@ test('project plus and composer selectors create a Hermes chat and send its firs
   await page.getByRole('button', { name: 'Design', exact: true }).hover();
   await page.getByRole('button', { name: 'New chat in Design', exact: true }).click();
   await page.getByRole('combobox', { name: 'Project' }).selectOption('/work/garden');
-  await page.getByRole('combobox', { name: 'Agent', exact: true }).selectOption('hermes');
+  await page.getByRole('combobox', { name: 'Harness', exact: true }).selectOption('hermes');
   await page.getByRole('textbox', { name: 'Message' }).fill('Plan my garden');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(page.getByText('Hello from your agent', { exact: true })).toBeVisible();
+  await expect(page.getByText('Hello from Codex', { exact: true })).toBeVisible();
   const calls = await page.evaluate(() => (window as unknown as { uiFixture: { calls: unknown[] } }).uiFixture.calls);
   expect(calls).toContainEqual({ method: 'nativeCreate', input: { harness: 'hermes', cwd: '/work/garden', title: 'Plan my garden' } });
   expect(calls).toContainEqual({ method: 'nativeSend', input: { harness: 'hermes', sessionId: 'new-hermes', cwd: '/work/garden', text: 'Plan my garden' } });
@@ -148,7 +162,7 @@ test('New chat survives Electron prompt restrictions and a failed first send kee
   await expect(page.getByText('Codex needs sign-in. Open Settings.', { exact: true })).toBeVisible();
   await expect(page.getByText('Something went wrong in this view.', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.getByText('Hello from your agent', { exact: true })).toBeVisible();
+  await expect(page.getByText('Hello from Codex', { exact: true })).toBeVisible();
 });
 
 test('an open Codex chat follows later desktop messages and hides harness page context', async ({ page }) => {
@@ -369,7 +383,7 @@ test('appearance and general settings save automatically and stay selected after
   await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.theme)).toBe('cobalt-red');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('textbox', { name: 'Your name', exact: true }).fill('Maya updated');
-  await page.getByRole('checkbox', { name: /Run agent mentions/ }).check();
+  await page.getByRole('checkbox', { name: /Run harness mentions/ }).check();
   await expect(page.getByText('Settings saved automatically', { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.displayName)).toBe('Maya updated');
   await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.allowRemoteAgentRequests)).toBe(true);
@@ -485,9 +499,112 @@ test('shared chat explains disabled remote mentions and opens the owner control'
   await fixture(page, { room: true });
   await expect(page.getByText('Mentions from other people are paused on this computer.', { exact: true })).toBeVisible();
   await page.screenshot({ path: '../output/playwright/agent-mentions-paused.png' });
-  await page.getByRole('button', { name: 'Manage agent mentions', exact: true }).click();
-  await page.getByRole('checkbox', { name: /Run agent mentions/ }).check();
+  await page.getByRole('button', { name: 'Manage harness mentions', exact: true }).click();
+  await page.getByRole('checkbox', { name: /Run harness mentions/ }).check();
   await expect.poll(() => page.evaluate(() => (window as any).uiFixture.settings.allowRemoteAgentRequests)).toBe(true);
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
   await expect(page.getByText('Mentions from other people are paused on this computer.', { exact: true })).toHaveCount(0);
+});
+
+test('harnesses need no agent setup or working folder for a new chat', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByText('Local agents', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Working folder', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
+  await page.getByRole('button', { name: 'New chat', exact: true }).first().click();
+  await page.getByRole('textbox', { name: 'Message' }).fill('Hello without a project');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByText('Hello from Codex', { exact: true })).toBeVisible();
+  const calls = await page.evaluate(() => (window as any).uiFixture.calls);
+  expect(calls).toContainEqual({ method: 'nativeCreate', input: { harness: 'codex', cwd: '', title: 'Hello without a project' } });
+  await page.screenshot({ path: '../output/playwright/harness-no-folder.png' });
+});
+
+test('new chats list only locally available harnesses', async ({ page }) => {
+  await fixture(page, { hermesUnavailable: true });
+  await page.getByRole('button', { name: 'New chat', exact: true }).first().click();
+  const selector = page.getByRole('combobox', { name: 'Harness', exact: true });
+  await expect(selector.locator('option')).toHaveText(['Codex']);
+});
+
+test('a mention before existing text opens suggestions at the cursor', async ({ page }) => {
+  await fixture(page, { room: true });
+  const composer = page.getByRole('textbox', { name: 'Message' });
+  await composer.fill('existing text');
+  await composer.press('Home');
+  await composer.pressSequentially('@ ');
+  await expect(page.getByRole('button', { name: /@codex/ })).toBeVisible();
+  await page.getByRole('button', { name: /@codex/ }).click();
+  await expect(composer).toHaveValue('@codex existing text');
+  await page.screenshot({ path: '../output/playwright/harness-mention-cursor.png' });
+  await page.getByRole('button', { name: 'Send message' }).click();
+  const calls = await page.evaluate(() => (window as any).uiFixture.calls);
+  expect(calls).toContainEqual({ method: 'sendMessage', input: { roomId: 'chat-1', text: '@codex existing text', agentIds: ['maya-codex'] } });
+});
+
+test('a solo chat chooses its harness even when several are registered', async ({ page }) => {
+  await fixture(page, { room: true, twoHarnesses: true });
+  await expect(page.locator('.right-section .agent-state')).toHaveCount(2);
+  await page.getByRole('textbox', { name: 'Message' }).fill('Hello');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  const calls = await page.evaluate(() => (window as any).uiFixture.calls);
+  expect(calls).toContainEqual({ method: 'sendMessage', input: { roomId: 'chat-1', text: 'Hello', agentIds: ['maya-codex'] } });
+});
+
+test('the harness sidebar returns to idle after a streamed reply', async ({ page }) => {
+  await fixture(page, { room: true });
+  const status = page.locator('.right-section .agent-state');
+  await expect(page.getByRole('heading', { name: 'Harnesses', exact: true })).toBeVisible();
+  await expect(status).toHaveText('idle');
+  await page.evaluate(() => (window as any).emitRoom({ roomId: 'chat-1', event: { type: 'turn.queued', agentId: 'maya-codex' } }));
+  await expect(status).toHaveText('queued');
+  await page.evaluate(() => {
+    const state = (window as any).uiFixture;
+    state.sharedMessages.push({ id: 'reply-1', roomId: 'chat-1', messageSeq: 1, participantId: 'maya-codex', participantName: 'Codex', role: 'assistant', text: '', state: 'streaming', agentId: 'maya-codex', agentName: 'Codex', harness: 'codex', createdAt: new Date().toISOString() });
+    (window as any).emitRoom({ roomId: 'chat-1', event: { type: 'turn.started', agentId: 'maya-codex' } });
+  });
+  await expect(status).toHaveText('working');
+  await page.evaluate(() => {
+    (window as any).uiFixture.sharedMessages[0].text = 'First words';
+    (window as any).emitRoom({ roomId: 'chat-1', event: { type: 'message.delta', agentId: 'maya-codex' } });
+  });
+  await expect(page.getByText('First words', { exact: true })).toBeVisible();
+  await expect(page.getByText(/is replying/)).toHaveCount(0);
+  await page.screenshot({ path: '../output/playwright/harness-streaming.png' });
+  await page.evaluate(() => {
+    (window as any).uiFixture.sharedMessages[0].state = 'complete';
+    (window as any).emitRoom({ roomId: 'chat-1', event: { type: 'turn.finished', agentId: 'maya-codex' } });
+  });
+  await expect(status).toHaveText('idle');
+});
+
+test('shared chats lead the sidebar and the actual chat creator is labeled owner', async ({ page }) => {
+  await fixture(page, { room: true, foreignOwned: true });
+  await expect(page.locator('.sidebar-scroll > .sidebar-section-head').first()).toContainText('Shared chats');
+  const people = page.locator('.right-section').filter({ has: page.getByRole('heading', { name: 'People', exact: true }) });
+  await expect(people).toContainText('Mukeshowner');
+  await expect(people).not.toContainText('Mayaowner');
+  await expect(page.getByRole('button', { name: 'Rename Design review' })).toHaveCount(0);
+});
+
+test('a chat owner renames the shared chat from the sidebar or header', async ({ page }) => {
+  await fixture(page, { room: true });
+  await page.getByRole('button', { name: 'Rename Design review' }).first().click();
+  await page.getByRole('textbox', { name: 'Chat title' }).fill('Planning together');
+  await page.getByRole('button', { name: 'Save title' }).click();
+  await expect(page.getByRole('heading', { name: 'Planning together' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Planning together', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Rename Planning together' }).last().click();
+  await page.getByRole('textbox', { name: 'Chat title' }).fill('Shared plan');
+  await page.getByRole('button', { name: 'Save title' }).click();
+  await expect(page.getByRole('heading', { name: 'Shared plan' })).toBeVisible();
+  await page.screenshot({ path: '../output/playwright/shared-chat-renamed.png', fullPage: true });
+  await page.evaluate(() => (window as unknown as { emitRoom: (value: unknown) => void }).emitRoom({ roomId: 'chat-1', event: { type: 'room.renamed', name: 'Title from another window' } }));
+  await expect(page.getByRole('heading', { name: 'Title from another window' })).toBeVisible();
+  const calls = await page.evaluate(() => (window as unknown as { uiFixture: { calls: { method: string; input: unknown }[] } }).uiFixture.calls);
+  expect(calls.filter((call) => call.method === 'renameRoom').map((call) => call.input)).toEqual([
+    { roomId: 'chat-1', name: 'Planning together' },
+    { roomId: 'chat-1', name: 'Shared plan' },
+  ]);
 });

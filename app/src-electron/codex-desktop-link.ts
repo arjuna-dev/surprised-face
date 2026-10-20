@@ -43,7 +43,7 @@ export class CodexDesktopLink {
     await this.connectPromise;
   }
 
-  async startTurn(input: { threadId: string; text: string; cwd?: string }): Promise<NativeDisplayMessage[]> {
+  async startTurn(input: { threadId: string; text: string; cwd?: string; onDelta?: (text: string) => void }): Promise<NativeDisplayMessage[]> {
     await this.connect();
     const previousCount = this.readSession().messages.length;
     const acceptTimeoutMs = this.options.acceptTimeoutMs ?? 8_000;
@@ -88,9 +88,23 @@ export class CodexDesktopLink {
       const found = await this.waitFor(() => this.hasNewUserText(input.text, previousCount), acceptTimeoutMs);
       if (!found) throw new Error('Codex desktop accepted the message, but it was not saved to the chat.');
     }
-    const settled = await this.waitFor(() => this.turnSettled(input.text, previousCount), 45 * 60_000);
-    if (!settled) throw new Error('Codex did not finish the reply.');
-    return this.readSession().messages;
+    const started = Date.now();
+    let emitted = '';
+    while (Date.now() - started <= 45 * 60_000) {
+      const session = this.readSession();
+      const newMessages = session.messages.slice(previousCount);
+      const requestIndex = newMessages.findIndex((message) => message.role === 'user' && message.content.trim() === input.text.trim());
+      if (requestIndex >= 0) {
+        const answer = newMessages.slice(requestIndex + 1).filter((message) => message.role === 'assistant').map((message) => message.content).join('\n\n');
+        if (input.onDelta && answer.startsWith(emitted) && answer.length > emitted.length) {
+          input.onDelta(answer.slice(emitted.length));
+          emitted = answer;
+        }
+        if (session.settled) return session.messages;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    throw new Error('Codex did not finish the reply.');
   }
 
   close(): void {
@@ -209,11 +223,6 @@ export class CodexDesktopLink {
 
   private hasNewUserText(text: string, previousCount: number): boolean {
     return this.readSession().messages.slice(previousCount).some((message) => message.role === 'user' && message.content.trim() === text.trim());
-  }
-
-  private turnSettled(text: string, previousCount: number): boolean {
-    const session = this.readSession();
-    return session.settled && this.hasNewUserText(text, previousCount);
   }
 
   private async waitFor(predicate: () => boolean, timeoutMs: number): Promise<boolean> {

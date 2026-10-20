@@ -2,7 +2,7 @@
 
 - Project name: **surprised-face**.
 - Logo and planned CLI command: **`:o`**.
-- Chats for people and their local agents, with invites scoped to one chat.
+- Chats for people and their locally available harnesses, with invites scoped to one chat.
 - Each person keeps their harness, models, tools, credentials, and spending limits.
 - Use cases include projects, friends, community hordes, and Orchestra mode for one person coordinating several local harnesses.
 
@@ -22,7 +22,7 @@
 
 Open the design pages directly in a browser. `app/` contains the Electron app and Cloudflare Worker source. The shared room Worker is deployed at [surprised-face-rooms.camus-00.workers.dev](https://surprised-face-rooms.camus-00.workers.dev); its health endpoint responds. Cloudflare lists the account on Workers Free with no payment method on file. The pilot workspace is initialized and its owner app is connected.
 
-The deployed Worker gives each chat its own invite codes and membership. The current macOS arm64 app package is at `app/dist/electron/Packaged/surprised-face-0.1.0-mac-arm64.dmg`; open this build to use the updated chat flow.
+The deployed Worker gives each chat its own invite codes and membership. Run the current source with `npm run dev:electron` in `app/`. A macOS arm64 package can be built with `npm run build:electron`.
 
 ## Structure
 
@@ -30,15 +30,15 @@ The deployed Worker gives each chat its own invite codes and membership. The cur
 | --- | --- |
 | Identity directory | Member identities, room membership, and agent directory. It does not grant access to every chat. |
 | Chat | One conversation with its own members and invite codes. |
-| Agent participant | Named assistant with an owner, harness connection, model, and native session. |
+| Harness participant | An available local harness owned by a member, with a native session when running. |
 | Horde | Coordinated agent runs backed by contributors' token budgets, models, and compute. |
 | Mission | Shared goal, bounded tasks, contribution offers, artifacts, and acceptance criteria. |
 
 ## Orchestra mode
 
-- One person coordinates multiple local agents through different harnesses in :o.
-- Mention agents to assign implementation, review, research, or other operations.
-- Agents take turns within a chat. Separate task chats can run in parallel; serialize access to a shared native session.
+- One person coordinates multiple locally available harnesses in :o.
+- Mention harnesses to assign implementation, review, research, or other operations.
+- Harnesses take turns within a chat. Separate task chats can run in parallel; serialize access to a shared native session.
 - Use separate branches/worktrees when agents change code concurrently.
 - Local collaboration does not require another human or a shared cloud room. The intended local coordinator uses the bridge and SQLite to keep task queues, chat order, and results on the device.
 - Use Sheep's harness discovery, project/chat list, and native-session reader behind the app's local JSON bridge.
@@ -72,23 +72,23 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 
 | Input | Route |
 | --- | --- |
-| Human message | UI -> local bridge -> shared room -> other authorized bridges and UIs. In a one-person chat, the selected owner agent can answer automatically. |
-| Tagged agent request | Room checks permission and queues the turn. When the chat is free, save context and reply position -> owner's bridge -> selected harness. |
-| Agent output | Owner's bridge -> shared room -> all authorized subscribers. Text fills the existing reply; files become attachments. |
+| Human message | UI -> local bridge -> shared room -> other authorized bridges and UIs. In a one-person chat, the selected owner harness can answer automatically. |
+| Tagged harness request | Room checks permission and queues the turn. When the chat is free, save context and reply position -> owner's bridge -> selected harness. |
+| Harness output | Owner's bridge -> shared room -> all authorized subscribers. Text fills the existing reply; files become attachments. |
 | Agent request | :o local adapter -> Codex app-server or Hermes ACP. The harness terminal UI, slash commands, and hotkeys are not embedded in this app. |
 
-## Agent participation
+## Harness participation
 
 | Mode | Behavior |
 | --- | --- |
-| One-person chat | The owner's sole or selected agent answers an ordinary message immediately. |
-| Group chat | An agent acts when a person mentions its ID. The owner must enable remote agent requests for requests from others. |
+| One-person chat | The owner's selected harness answers an ordinary message immediately. |
+| Group chat | A harness acts when a person mentions it. The owner must enable remote harness requests for requests from others. |
 | Configured conditions, optional | Owner enables rules for particular channels, events, schedules, or meaningful contributions. Limits apply to context, actions, tokens, time, concurrency, and cooldowns. |
 
 - Conditions ignore agent messages by default. Deduplicate triggering events and bound causal chains to prevent loops.
 - Model-based detection spends tokens too. Make its scope and budget explicit.
 - Show the agent and owner, whose tokens it uses, and stop controls. Context bookkeeping stays internal; reading the chat must not require inspecting it.
-- Agents return work or an answer. Ordinary messages run the owner agent in a one-person chat; group messages need `@agent_name`. Configured conditions are a later option.
+- Harnesses return work or an answer. Ordinary messages run the selected harness in a one-person chat; group messages need a harness mention such as `@codex`. Configured conditions are a later option.
 
 ## Message order and native records
 
@@ -101,7 +101,7 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 7. Reconnecting clients replay saved events. A local cache has one writer; transcript JSON is an export, not a shared file everyone edits.
 
 - Shared records use `user` for humans and `assistant` for agents. Participant IDs, names, owner, harness, model, source IDs, and run context identify the speaker and origin.
-- Native harness sessions remain harness-owned. Submit real requests through adapters; copy available events/results or approved history imports into :o. Do not inject metadata into native files.
+- Native harness sessions remain harness-owned. The bridge writes a JSON copy of each chat's events for every locally available harness whenever the chat changes; submit real requests through adapters. Do not inject metadata into native files.
 - Record native session/turn frontiers and the actual submitted prompt as well as shared context. Private harness history can also affect output.
 - Serialize agent turns within each chat, across all harnesses and native sessions. Separate chats/task rooms can run concurrently; also queue access to a native session shared by multiple rooms. Use branches/worktrees for concurrent repository work.
 
@@ -132,7 +132,7 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 
 - Three humans: you and your two collaborators.
 - Separate chats with independent membership, including private project and friend conversations.
-- Three desktops/local bridges, one named agent per person. Start with two adapter types: Codex app-server and Hermes ACP. Each person chooses their own harness/model.
+- Three desktops/local bridges, with Codex app-server and Hermes ACP available when installed. Each person chooses their own harness/model.
 - Human sends during streaming, mentions, owner approvals, queued agent turns, stop, reconnect, unread notifications, and one shared media output.
 - Reviewed import of existing harness history, preserving source provenance.
 - Pi, OpenCode, Claude, and Copilot adapters follow the pilot. Inventory may display a harness's chats before its runnable adapter exists. See [MVP integration and next steps](Research/mvp-base-and-harness-integration.md).
@@ -141,8 +141,8 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 ## MVP interface
 
 - Desktop appearance choices: Cobalt + red, Mint + charcoal, and Classic. Classic keeps the previous app colors.
-- In chat, humans use blue tags and agents use red tags, with stable participant shades. Mint `#5EB783` and Charcoal `#302D2E` color the alternate app surfaces.
-- The left list shows recent projects with their local chats nested inside, plus shared chats. The right list shows members and agents of the selected chat. Settings opens in the main area and can be closed with the same sidebar button or Back to chat.
+- In chat, humans use blue tags and harnesses use red tags, with stable participant shades. Mint `#5EB783` and Charcoal `#302D2E` color the alternate app surfaces.
+- The left list starts with shared chats, followed by recent projects with their local chats nested inside. The right list shows people and harnesses in the selected chat, including idle status. It labels the chat creator as owner. That person can rename the shared chat from its row or header. Settings opens in the main area and can be closed with the same sidebar button or Back to chat.
 - Selecting a project opens a ready composer with project and Codex/Hermes selectors. A plus icon appears when hovering or focusing a project. The first message creates a native chat in that folder, and the chat remains in the local catalog after restart.
 - The chat header has labeled Invite friend and Join a chat buttons with distinct icons. Invite friend copies a code and shows a larger confirmation below the header, explaining how to send it to a friend. It shares that conversation's readable history into a chat with its own membership; later messages continue through the existing native session. Injected harness setup instructions and raw records stay internal.
 - Names and roles stay visible; color is an additional cue.
@@ -162,7 +162,7 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 
 - Structured interfaces handle prompts, events, approvals, models, and settings where supported.
 - Adapter manifests describe version-specific capabilities; runtime APIs provide catalogs where available.
-- Codex app-server and Hermes ACP handle the first adapter set. The shared UI currently exposes agent name, harness, model, and working folder; other native settings and commands need adapter support.
+- Codex app-server and Hermes ACP handle the first adapter set. Available harnesses appear automatically. A working folder is optional for native chats, and shared chats do not require one. Other native settings and commands need adapter support.
 - See [middleware feasibility](Research/cli-middleware-feasibility.md) and [chat UX research](Research/chat-ux-and-agent-orchestration.md).
 
 ## Run the app

@@ -19,6 +19,42 @@ for (const match of output.matchAll(/^(ok|not ok) \d+ - (.+)$/gm)) results.set(m
 
 const checks = [
   {
+    name: 'Harness availability',
+    test: 'unavailable harnesses are not advertised for turns',
+    input: 'Codex is installed and Hermes is absent.',
+    result: 'Only Codex is offered for shared turns.',
+  },
+  {
+    name: 'No folder setup',
+    test: 'a harness turn needs no configured working folder or instruction preamble',
+    input: 'A shared Codex turn has no configured working folder and says Please help.',
+    result: 'The adapter starts in the default folder and receives Please help without a generated instruction preamble.',
+  },
+  {
+    name: 'Mention at cursor',
+    test: 'mention suggestions follow the cursor before existing text',
+    input: 'Insert @ or @ followed by a space before existing text.',
+    result: 'The mention range is found at the cursor even when text follows it.',
+  },
+  {
+    name: 'Streaming batches',
+    test: 'streamed model deltas are delivered promptly in bounded batches',
+    input: 'Codex emits Hello, a space, and world as separate deltas.',
+    result: 'The room receives Hello world as one ordered chunk before turn completion.',
+  },
+  {
+    name: 'Desktop streaming',
+    test: 'desktop replies are copied as they appear before the turn finishes',
+    input: 'A synthetic Codex desktop session appends two assistant messages before task_complete.',
+    result: 'Both messages reach the stream callback before the desktop turn finishes.',
+  },
+  {
+    name: 'Harness context JSON',
+    test: 'every shared message updates the local context JSON for each harness',
+    input: 'Maya sends Hello, then Noah sends Can you see this? to one room.',
+    result: 'The app-owned Codex and Hermes context files both contain the two ordered messages and current event sequence.',
+  },
+  {
     name: 'Shared native Codex session',
     test: 'a shared Codex chat uses its desktop owner instead of acquiring a second writer',
     input: 'A shared chat is linked to an existing desktop session; a mocked second writer rejects resume.',

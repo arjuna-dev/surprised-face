@@ -66,6 +66,7 @@ try {
 
   const joRooms = await api('/v1/rooms', { token: jo.token });
   assert.deepEqual(joRooms.body.rooms.map((room) => room.id), [roomId], 'a code grants access to its chat');
+  assert.equal(joRooms.body.rooms[0].createdBy, owner.id, 'room owner is the chat creator');
   assert.equal((await api('/v1/members', { token: jo.token })).status, 200, 'older desktops can still read their accessible member list');
   assert.equal((await api('/v1/agents', { token: jo.token })).status, 200, 'older desktops can still read their accessible agent list');
   assert.equal((await api(`/v1/rooms/${roomId}/events?after=0`, { token: jo.token })).body.events.filter((event) => event.type === 'member.joined').length, 2, 'joins publish room membership changes');
@@ -95,6 +96,17 @@ try {
   assert.deepEqual((await api('/v1/rooms', { token: lee.token })).body.rooms.map((room) => room.id), [roomId], 'a chat code never grants access to other chats');
   const members = await api(`/v1/rooms/${roomId}/members`, { token: ownerToken });
   assert.equal(members.body.members.length, 3, 'the chat lists only its participants');
+  assert.equal(members.body.members.find((member) => member.id === owner.id)?.role, 'owner', 'chat creator is marked owner');
+  const joCreatedRoom = await api('/v1/rooms', { token: jo.token, body: { name: 'Jo room' } });
+  const joCreatedInvite = await api(`/v1/rooms/${joCreatedRoom.body.id}/invites`, { token: jo.token, body: { count: 1 } });
+  await api('/v1/rooms/join', { token: ownerToken, body: { code: joCreatedInvite.body.invites[0].code } });
+  const joRoomMembers = await api(`/v1/rooms/${joCreatedRoom.body.id}/members`, { token: ownerToken });
+  assert.equal(joRoomMembers.body.members.find((member) => member.id === jo.member.id)?.role, 'owner', 'member who created the chat owns it');
+  assert.equal(joRoomMembers.body.members.find((member) => member.id === owner.id)?.role, 'member', 'workspace owner is not owner of someone else\'s chat');
+  assert.equal((await api(`/v1/rooms/${joCreatedRoom.body.id}`, { token: ownerToken, method: 'PATCH', body: { name: 'Taken over' } })).status, 403, 'other chat members cannot rename it');
+  assert.equal((await api(`/v1/rooms/${joCreatedRoom.body.id}`, { token: jo.token, method: 'PATCH', body: { name: '  New name  ' } })).body.name, 'New name', 'chat creator can rename it');
+  assert.equal((await api('/v1/rooms', { token: ownerToken })).body.rooms.find((room) => room.id === joCreatedRoom.body.id)?.name, 'New name', 'renamed title reaches other members');
+  assert.ok((await api(`/v1/rooms/${joCreatedRoom.body.id}/events?after=0`, { token: ownerToken })).body.events.some((event) => event.type === 'room.renamed' && event.name === 'New name'), 'rename reaches connected members as a room event');
   const untaggedGroupMessage = await api(`/v1/rooms/${roomId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: 'Hello everyone.' } });
   assert.equal(untaggedGroupMessage.body.turnIds.length, 0, 'group chat requires a mention for agent turns');
   const liveEvents = await connectSocket(roomId, ownerToken);
@@ -179,6 +191,7 @@ try {
     ['Session identity', 'Owner and invited members authenticate with their participant IDs.', 'Pass'],
     ['App account creation', 'A new person can register without a Cloudflare key and cannot read existing chats.', 'Pass'],
     ['Chat invite access', 'Codes admit people to one chat; new chats stay private until invited.', 'Pass'],
+    ['Chat ownership and rename', 'The chat creator is its owner, and only that person can rename the chat for every member.', 'Pass'],
     ['Solo and group agent routing', 'Solo chats call their owner agent automatically; group chats require a mention.', 'Pass'],
     ['Existing chat history', 'An imported Codex conversation is visible to invitees and retries do not duplicate messages.', 'Pass'],
     ['Permission queue regression', 'Disabled cross-owner requests do not block own-agent turns; opt-in restores pending mentions and preserves one active turn.', 'Pass'],
@@ -248,12 +261,12 @@ async function waitForWorker() {
   throw new Error(`Wrangler did not become ready: ${safeLogs()}`);
 }
 
-async function api(route, { token, admin, body } = {}) {
+async function api(route, { token, admin, body, method } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   if (admin) headers.authorization = `Bearer ${admin}`;
   const response = await fetch(new URL(route, baseUrl), {
-    method: body === undefined ? 'GET' : 'POST',
+    method: method || (body === undefined ? 'GET' : 'POST'),
     headers,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });

@@ -28,12 +28,13 @@ type SharedMessage = {
 };
 
 type PendingLocalMessage = { client_id: string; room_id: string; text: string; agent_ids: string; error: string | null; created_at: string };
-type SharedRoom = { id: string; name: string; createdAt?: string };
+type SharedRoom = { id: string; name: string; createdBy?: string; createdAt?: string; defaultAgentId?: string };
 type SharedMember = { id: string; name: string; role: 'owner' | 'member' };
 type SharedAgent = { id: string; ownerId: string; name: string; harness: 'codex' | 'hermes'; model: string };
 
 interface SurprisedFaceApi {
   settings(): Promise<SurprisedFaceSettings>;
+  availableHarnesses(): Promise<('codex' | 'hermes')[]>;
   updateSettings(input: Partial<SurprisedFaceSettings>): Promise<SurprisedFaceSettings>;
   bootstrap(input: unknown): Promise<unknown>;
   register(name: string): Promise<unknown>;
@@ -44,15 +45,14 @@ interface SurprisedFaceApi {
   createInvites(roomId: string): Promise<{ code: string; expiresAt: string }[]>;
   rooms(): Promise<SharedRoom[]>;
   createRoom(input: { name: string; defaultAgentId?: string }): Promise<SharedRoom>;
+  renameRoom(input: { roomId: string; name: string }): Promise<SharedRoom>;
   openRoom(roomId: string): Promise<SharedMessage[]>;
   roomMessages(roomId: string): Promise<SharedMessage[]>;
   pendingMessages(roomId: string): Promise<PendingLocalMessage[]>;
   sendMessage(input: { roomId: string; text: string; agentIds?: string[] }): Promise<unknown>;
   members(roomId: string): Promise<SharedMember[]>;
   agents(roomId: string): Promise<SharedAgent[]>;
-  saveAgent(input: unknown): Promise<SurprisedFaceSettings>;
   runPending(roomId: string): Promise<unknown>;
-  chooseFolder(): Promise<string | null>;
   sheepCached(): Promise<{ projects: Record<string, unknown>[]; conversations: Record<string, unknown>[] }>;
   sheepHealth(): Promise<unknown>;
   sheepProjects(): Promise<{ projects: Record<string, unknown>[] }>;

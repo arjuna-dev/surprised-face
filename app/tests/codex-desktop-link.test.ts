@@ -62,6 +62,32 @@ test('a message from the app is delivered to the open Codex thread and its reply
   }
 });
 
+test('desktop replies are copied as they appear before the turn finishes', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-stream-'));
+  const sessionFile = path.join(root, 'session.jsonl');
+  writeFileSync(sessionFile, `${record('user', 'Earlier')}\n`);
+  const socketPath = path.join(root, 'ipc.sock');
+  const chunks: string[] = [];
+  const server = await listen(socketPath, (message, socket) => {
+    if (message.method === 'initialize') {
+      writeFrame(socket, { type: 'response', requestId: message.requestId, resultType: 'success', result: { clientId: 'desktop-client' } });
+      return;
+    }
+    writeFrame(socket, { type: 'response', requestId: message.requestId, resultType: 'success', result: {} });
+    writeFileSync(sessionFile, `${readFileSync(sessionFile, 'utf8')}${record('user', 'Continue')}\n`);
+    setTimeout(() => writeFileSync(sessionFile, `${readFileSync(sessionFile, 'utf8')}${record('assistant', 'First thought')}\n`), 30);
+    setTimeout(() => writeFileSync(sessionFile, `${readFileSync(sessionFile, 'utf8')}${record('assistant', 'Final thought')}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete' } })}\n`), 100);
+  });
+  const link = new CodexDesktopLink({ socketPath, sessionFile, acceptTimeoutMs: 1000 });
+  try {
+    await link.startTurn({ threadId: 'thread-1', text: 'Continue', onDelta: (text) => chunks.push(text) });
+    assert.deepEqual(chunks, ['First thought', '\n\nFinal thought']);
+  } finally {
+    link.close();
+    server.close();
+  }
+});
+
 test('a desktop thread without an owner stays on the local Codex adapter', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'codex-link-'));
   const socketPath = path.join(root, 'ipc.sock');
@@ -84,9 +110,9 @@ test('a desktop thread without an owner stays on the local Codex adapter', async
 test('the desktop link answers discovery without claiming the thread', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'codex-link-'));
   const socketPath = path.join(root, 'ipc.sock');
-  let discovery: { type?: string; response?: { canHandle?: boolean } } | null = null;
+  const discoveries: { type?: string; response?: { canHandle?: boolean } }[] = [];
   const server = await listen(socketPath, (message, socket) => {
-    if (message.type === 'client-discovery-response') discovery = message;
+    if (message.type === 'client-discovery-response') discoveries.push(message);
     if (message.method === 'initialize') {
       writeFrame(socket, { type: 'response', requestId: message.requestId, resultType: 'success', method: 'initialize', result: { clientId: 'desktop-client' } });
       writeFrame(socket, { type: 'client-discovery-request', requestId: 'discover-1', request: { method: 'thread-owner-discovery', params: { conversationId: 'thread-1' } } });
@@ -96,8 +122,8 @@ test('the desktop link answers discovery without claiming the thread', async () 
   try {
     await link.connect();
     await new Promise((resolve) => setTimeout(resolve, 50));
-    assert.equal(discovery?.type, 'client-discovery-response');
-    assert.equal(discovery?.response?.canHandle, false);
+    assert.equal(discoveries[0]?.type, 'client-discovery-response');
+    assert.equal(discoveries[0]?.response?.canHandle, false);
   } finally {
     link.close();
     server.close();

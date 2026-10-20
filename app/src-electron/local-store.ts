@@ -234,7 +234,9 @@ export class LocalStore {
       }
       const messageId = stringValue(event.messageId);
       const messageSeq = numberValue(event.messageSeq);
-      if (event.type === 'message.created' && messageId && messageSeq !== null) {
+      if (event.type === 'room.renamed' && stringValue(event.name)) {
+        this.database.prepare('UPDATE rooms SET name=? WHERE id=?').run(stringValue(event.name), roomId);
+      } else if (event.type === 'message.created' && messageId && messageSeq !== null) {
         this.database.prepare(`
           INSERT INTO room_messages (room_id,message_seq,id,participant_id,participant_name,role,text,state,agent_id,agent_name,owner_id,harness,model,created_at,updated_at)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)

@@ -62,3 +62,54 @@ test('a shared Codex chat uses its desktop owner instead of acquiring a second w
   assert.deepEqual(chunks, ['Hello from the existing desktop session']);
   assert.deepEqual(finished, ['complete']);
 });
+
+test('a harness turn needs no configured working folder or instruction preamble', async () => {
+  const participant = { id: 'maya-codex', name: 'Codex', harness: 'codex', model: '', workingDirectory: '' };
+  const prompts: string[] = [];
+  let claimed = false;
+  const rooms = {
+    claimTurn: async () => {
+      if (claimed) return null;
+      claimed = true;
+      return { turnId: 'turn-1', agentId: participant.id, ownerId: 'maya', harness: 'codex', model: '', contextThroughSeq: 1, request: { text: 'Please help', requestedBy: 'maya' }, context: [{ messageSeq: 1, participantId: 'maya', role: 'user', text: 'Please help' }] };
+    },
+    members: async () => [], agents: async () => [],
+    appendAgentChunk: async () => {}, finishAgentTurn: async () => {},
+  };
+  const store = { agentSession: () => undefined, saveAgentSession: () => {} };
+  const settings = { get: async () => ({ connected: true, member: { id: 'maya', name: 'Maya', role: 'member' }, agents: [participant], allowRemoteAgentRequests: false }) };
+  const codex = Object.assign(new EventEmitter(), {
+    startThread: async () => ({ thread: { id: 'thread-1' } }),
+    startTurn: async ({ text }: { text: string }) => {
+      prompts.push(text);
+      queueMicrotask(() => codex.emit('event', { method: 'turn/completed', params: { threadId: 'thread-1' } }));
+    },
+  });
+  const runner = new AgentRunner(rooms as never, store as never, settings as never, codex as never, new EventEmitter() as never);
+  await runner.runPending('room-1');
+  assert.deepEqual(prompts, ['Please help']);
+});
+
+test('streamed model deltas are delivered promptly in bounded batches', async () => {
+  const participant = { id: 'maya-codex', name: 'Codex', harness: 'codex', model: '', workingDirectory: '' };
+  let claimed = false;
+  const chunks: { index: number; text: string }[] = [];
+  const rooms = {
+    claimTurn: async () => claimed ? null : (claimed = true, { turnId: 'turn-1', agentId: participant.id, ownerId: 'maya', harness: 'codex', model: '', contextThroughSeq: 1, request: { text: 'Write', requestedBy: 'maya' }, context: [{ messageSeq: 1, participantId: 'maya', role: 'user', text: 'Write' }] }),
+    appendAgentChunk: async (_room: string, _turn: string, index: number, text: string) => { chunks.push({ index, text }); },
+    finishAgentTurn: async () => {},
+  };
+  const settings = { get: async () => ({ connected: true, member: { id: 'maya', name: 'Maya', role: 'member' }, agents: [participant], allowRemoteAgentRequests: false }) };
+  const codex = Object.assign(new EventEmitter(), {
+    startThread: async () => ({ thread: { id: 'thread-1' } }),
+    startTurn: async () => {
+      codex.emit('event', { method: 'item/agentMessage/delta', params: { threadId: 'thread-1', delta: 'Hello' } });
+      codex.emit('event', { method: 'item/agentMessage/delta', params: { threadId: 'thread-1', delta: ' ' } });
+      codex.emit('event', { method: 'item/agentMessage/delta', params: { threadId: 'thread-1', delta: 'world' } });
+      codex.emit('event', { method: 'turn/completed', params: { threadId: 'thread-1' } });
+    },
+  });
+  const runner = new AgentRunner(rooms as never, { agentSession: () => undefined, saveAgentSession: () => {} } as never, settings as never, codex as never, new EventEmitter() as never);
+  await runner.runPending('room-1');
+  assert.deepEqual(chunks, [{ index: 0, text: 'Hello world' }]);
+});

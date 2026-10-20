@@ -30,8 +30,8 @@
         <button
           v-if="!settingsOpen && (selectedRoom || selectedNative || selectedProject)"
           class="icon-button"
-          :title="rightOpen ? 'Hide people and agents' : 'Show people and agents'"
-          :aria-label="rightOpen ? 'Hide people and agents' : 'Show people and agents'"
+          :title="rightOpen ? 'Hide people and harnesses' : 'Show people and harnesses'"
+          :aria-label="rightOpen ? 'Hide people and harnesses' : 'Show people and harnesses'"
           :aria-expanded="rightOpen"
           @click="rightOpen = !rightOpen"
         >
@@ -58,14 +58,23 @@
               {{ harnessLabel(harness) }}
             </option>
           </select>
-          <select v-model="agentFilter" aria-label="Filter by agent">
-            <option value="">All agents</option>
-            <option v-for="agent in agentOptions" :key="agent.value" :value="agent.value">
-              {{ agent.label }}
-            </option>
-          </select>
         </div>
         <div class="sidebar-scroll">
+          <div class="sidebar-section-head">
+            <span>Shared chats <span>{{ filteredRooms.length }}</span></span>
+          </div>
+          <div v-for="room in filteredRooms" :key="room.id" class="shared-chat-row">
+            <button
+              class="sidebar-row"
+              :class="{ selected: currentRoomId === room.id && !selectedNative && !settingsOpen }"
+              @click="selectRoom(room)"
+            >
+              <MessageSquare :size="15" /><span>{{ room.name }}</span>
+            </button>
+            <button v-if="room.createdBy === settings.member?.id" class="small-icon-button shared-chat-edit" :aria-label="`Rename ${room.name}`" :title="`Rename ${room.name}`" @click="openRename(room)"><Pencil :size="14" /></button>
+          </div>
+          <p v-if="!rooms.length" class="sidebar-note">No shared chats yet.</p>
+          <p v-else-if="!filteredRooms.length" class="sidebar-note">No matching shared chats.</p>
           <div class="sidebar-section-head">
             <button
               class="sidebar-section-toggle"
@@ -129,22 +138,6 @@
             </p>
             <p v-else-if="!projects.length" class="sidebar-note">No local projects found.</p>
           </template>
-
-          <div v-if="rooms.length" class="sidebar-section-head sidebar-section-head--spaced">
-            <span>Chats</span>
-          </div>
-          <button
-            v-for="room in filteredRooms"
-            :key="room.id"
-            class="sidebar-row"
-            :class="{ selected: currentRoomId === room.id && !selectedNative && !settingsOpen }"
-            @click="selectRoom(room)"
-          >
-            <MessageSquare :size="15" /><span>{{ room.name }}</span>
-          </button>
-          <p v-if="rooms.length && !filteredRooms.length" class="sidebar-note">
-            No matching chats.
-          </p>
 
           <div v-if="unfiledConversations.length" class="sidebar-section-head sidebar-section-head--spaced">Other local chats</div>
           <template v-if="unfiledConversations.length">
@@ -247,73 +240,16 @@
                   </div>
                 </section>
                 <section class="settings-section">
-                  <div class="section-title-row">
-                    <h3>Local agents</h3>
-                    <button class="small-icon-button" title="Add agent" @click="addAgent">
-                      <Plus :size="15" />
-                    </button>
-                  </div>
-                  <p class="section-help">
-                    Each agent uses the harness and working folder on this computer.
-                  </p>
-                  <div class="agent-picker" v-if="agentDrafts.length > 1">
-                    <button
-                      v-for="(agent, index) in agentDrafts"
-                      :key="agent.id || index"
-                      :class="{ active: selectedAgentDraft === index }"
-                      @click="selectedAgentDraft = index"
-                    >
-                      {{ agent.name || `Agent ${index + 1}` }}
-                    </button>
-                  </div>
-                  <template v-if="activeAgentDraft">
-                    <label
-                      >Agent name<input
-                        v-model="activeAgentDraft.name"
-                        placeholder="e.g. maya-agent"
-                    /></label>
-                    <label
-                      >Agent ID<input v-model="activeAgentDraft.id" placeholder="e.g. maya-agent"
-                    /></label>
-                    <label
-                      >Harness<select v-model="activeAgentDraft.harness">
-                        <option value="codex">Codex</option>
-                        <option value="hermes">Hermes</option>
-                      </select></label
-                    >
-                    <label
-                      >Model<input
-                        v-model="activeAgentDraft.model"
-                        placeholder="Use harness default"
-                    /></label>
-                    <div class="folder-field">
-                      <label
-                        >Working folder<input
-                          :value="activeAgentDraft.workingDirectory"
-                          readonly
-                          placeholder="Choose a project folder" /></label
-                      ><button class="outline-button" @click="chooseWorkingFolder">
-                        <FolderOpen :size="15" />Choose
-                      </button>
-                    </div>
-                    <button
-                      class="primary-button full-button"
-                      :disabled="savingAgent || !canSaveAgent"
-                      @click="saveAgent"
-                    >
-                      <LoaderCircle v-if="savingAgent" :size="15" class="spin" />Save agent
-                    </button>
-                  </template>
                   <label class="toggle-row"
                     ><span
-                      ><strong>Run agent mentions on this computer</strong
+                      ><strong>Run harness mentions on this computer</strong
                       ><small
-                        >Allows other people in your chats to start your local agents with a mention.</small
+                        >Allows other people in your chats to request your local harnesses with a mention.</small
                       ></span
                     ><input v-model="allowAgentRuns" type="checkbox"
                   /></label>
                   <p class="section-help">
-                    When off, mentions from other people wait for permission. You can still mention your own agents.
+                    When off, mentions from other people wait for permission. You can still mention your own harnesses.
                   </p>
                 </section>
                 <section class="settings-section">
@@ -364,7 +300,7 @@
               <p v-if="selectedProject" class="subheading">{{ projectName(selectedProject) }}</p>
             </div>
             <div class="room-actions">
-              <button class="primary-button chat-action" aria-label="Invite friend" :title="selectedNative ? 'Invite friend' : 'Send a message before inviting a friend'" :disabled="!selectedNative || nativeLoading || nativeSending || inviting || !nativeChatSupported || !selectedNative.path" @click="shareNativeConversation"><LoaderCircle v-if="inviting" :size="17" class="spin" /><UserPlus v-else :size="17" />Invite friend</button>
+              <button class="primary-button chat-action" aria-label="Invite friend" :title="selectedNative ? 'Invite friend' : 'Send a message before inviting a friend'" :disabled="!selectedNative || nativeLoading || nativeSending || inviting || !nativeChatSupported" @click="shareNativeConversation"><LoaderCircle v-if="inviting" :size="17" class="spin" /><UserPlus v-else :size="17" />Invite friend</button>
               <button class="outline-button chat-action" aria-label="Join a chat" @click="joinChat"><LogIn :size="17" />Join a chat</button>
             </div>
           </div>
@@ -380,7 +316,7 @@
                   <span
                     class="role-tag"
                     :class="message.role === 'assistant' ? 'agent-tag' : 'human-tag'"
-                    >{{ message.role }}</span
+                    >{{ message.role === 'assistant' ? harnessLabel(selectedNative?.harness || newChatHarness) : 'human' }}</span
                   ><time v-if="message.at">{{ formatTime(message.at) }}</time>
                 </div>
                 <pre>{{ message.content }}</pre>
@@ -397,7 +333,7 @@
             <div class="composer-footer">
               <div class="composer-controls">
                 <select :value="composerProjectPath" aria-label="Project" :disabled="nativeSending" @change="changeComposerProject(($event.target as HTMLSelectElement).value)"><option value="" disabled>Choose project</option><option v-for="project in composerProjects" :key="String(project.path)" :value="String(project.path)">{{ projectName(project) }}</option></select>
-                <select v-if="!selectedNative" v-model="newChatHarness" aria-label="Agent" :disabled="nativeSending"><option value="codex">Codex</option><option value="hermes">Hermes</option></select>
+                <select v-if="!selectedNative" v-model="newChatHarness" aria-label="Harness" :disabled="nativeSending || !availableHarnesses.length"><option v-for="harness in availableHarnesses" :key="harness" :value="harness">{{ harnessLabel(harness) }}</option></select>
                 <span v-else>{{ nativeSending ? 'Replying...' : harnessLabel(selectedNative.harness) }}</span>
               </div>
               <button class="send-button" type="submit" :disabled="!nativeDraft.trim() || !nativeCanSend" aria-label="Send message"><LoaderCircle v-if="nativeSending" :size="16" class="spin" /><Send v-else :size="16" /></button>
@@ -409,17 +345,10 @@
           <div class="room-heading">
             <div>
               <p class="eyebrow">CHAT</p>
-              <h1>{{ selectedRoom?.name || 'Choose a chat' }}</h1>
+              <div class="room-title-line"><h1>{{ selectedRoom?.name || 'Choose a chat' }}</h1><button v-if="selectedRoom?.createdBy === settings.member?.id" class="small-icon-button title-edit" :aria-label="`Rename ${selectedRoom.name}`" :title="`Rename ${selectedRoom.name}`" @click="openRename(selectedRoom)"><Pencil :size="16" /></button></div>
               <p v-if="selectedProject" class="subheading">{{ selectedProject.path }}</p>
             </div>
             <div v-if="selectedRoom" class="room-actions">
-              <span v-if="activeAgentName" class="active-agent"
-                ><span class="status-dot busy"></span>{{ activeAgentName }} is replying</span
-              >
-              <span v-else-if="queuedAgentNames.length" class="active-agent"
-                ><span class="status-dot queued"></span
-                >{{ queuedAgentNames.join(', ') }} queued</span
-              >
               <button class="primary-button chat-action" aria-label="Invite friend" :disabled="inviting" @click="createRoomInvite"><LoaderCircle v-if="inviting" :size="17" class="spin" /><UserPlus v-else :size="17" />Invite friend</button>
               <button class="outline-button chat-action" aria-label="Join a chat" @click="joinChat"><LogIn :size="17" />Join a chat</button>
             </div>
@@ -427,7 +356,7 @@
 
           <p v-if="selectedRoom && !settings.allowRemoteAgentRequests" class="native-status" role="status">
             <span>Mentions from other people are paused on this computer.</span>
-            <button class="outline-button" @click="settingsOpen = true">Manage agent mentions</button>
+            <button class="outline-button" @click="settingsOpen = true">Manage harness mentions</button>
           </p>
 
           <div ref="messageViewport" class="message-viewport">
@@ -439,7 +368,7 @@
             <div v-else-if="!messages.length" class="empty-state room-empty">
               <p class="eyebrow">{{ selectedRoom.name }}</p>
               <h2>Messages appear here.</h2>
-              <p>{{ members.length === 1 ? 'Write a message and your agent will answer.' : 'Write to the people in this chat. Mention an agent when you want it to act.' }}</p>
+              <p>{{ members.length === 1 ? 'Write a message and your harness will answer.' : 'Write to the people in this chat. Mention a harness when you want it to act.' }}</p>
             </div>
             <div v-else class="message-list">
               <article
@@ -461,7 +390,7 @@
                     <span
                       class="role-tag"
                       :class="message.role === 'assistant' ? 'agent-tag' : 'human-tag'"
-                      >{{ message.role === 'assistant' ? 'agent' : 'human' }}</span
+                      >{{ message.role === 'assistant' ? 'harness' : 'human' }}</span
                     >
                     <span v-if="message.state === 'pending'" class="pending-tag">sending</span>
                     <span v-if="message.harness" class="harness-tag"
@@ -475,7 +404,7 @@
                     <span></span><span></span><span></span>
                   </div>
                   <div v-if="message.state === 'failed'" class="message-error">
-                    The agent stopped before finishing.
+                    The harness stopped before finishing.
                   </div>
                 </div>
               </article>
@@ -485,14 +414,14 @@
           <form class="composer" @submit.prevent="sendDraft">
             <div class="mention-menu" v-if="mentionOptions.length">
               <button
-                v-for="agent in mentionOptions"
-                :key="agent.id"
+                v-for="harness in mentionOptions"
+                :key="harness.id"
                 type="button"
-                @click="insertMention(agent)"
+                @click="insertMention(harness)"
               >
-                <span class="mention-dot"></span><strong>@{{ agent.id }}</strong
+                <span class="mention-dot"></span><strong>@{{ mentionHandle(harness) }}</strong
                 ><small
-                  >{{ agent.name }} · {{ ownerName(agent.ownerId) }} · {{ agent.harness }}</small
+                  >{{ harnessLabel(harness.harness) }} · {{ ownerName(harness.ownerId) }}</small
                 >
               </button>
             </div>
@@ -500,9 +429,13 @@
               v-model="draft"
               aria-label="Message"
               rows="2"
-              :placeholder="members.length > 1 ? 'Message... Type @ to mention an agent' : 'Message...'"
+              :placeholder="members.length > 1 ? 'Message... Type @ to mention a harness' : 'Message...'"
               :disabled="!selectedRoom"
-              @keydown.enter.exact.prevent="sendDraft"
+              ref="sharedComposer"
+              @input="updateMentionCursor"
+              @click="updateMentionCursor"
+              @keyup="updateMentionCursor"
+              @keydown.enter.exact.prevent="handleComposerEnter"
             ></textarea>
             <div class="composer-footer">
               <div class="composer-controls"><select :value="composerProjectPath" aria-label="Project" @change="changeComposerProject(($event.target as HTMLSelectElement).value)"><option value="">Choose project</option><option v-for="project in composerProjects" :key="String(project.path)" :value="String(project.path)">{{ projectName(project) }}</option></select></div>
@@ -524,10 +457,10 @@
         v-if="(selectedRoom || selectedNative || selectedProject) && !settingsOpen && rightOpen"
       >
         <div class="right-panel-header">
-          <h2>People and agents</h2>
+          <h2>People and harnesses</h2>
           <button
             class="small-icon-button"
-            aria-label="Hide people and agents"
+            aria-label="Hide people and harnesses"
             @click="rightOpen = false"
           >
             <PanelRightClose :size="16" />
@@ -548,42 +481,38 @@
               initials(member.name)
             }}</span>
             <span class="participant-name"
-              >{{ member.name }}<small v-if="member.role === 'owner'">owner</small></span
+              >{{ member.name }}<small v-if="selectedRoom?.createdBy ? member.id === selectedRoom.createdBy : member.role === 'owner'">owner</small></span
             >
             <span v-if="member.id === settings.member?.id" class="you-label">you</span>
           </div>
         </div>
         <div class="right-section">
           <div class="right-heading">
-            <h2>Agents</h2>
-            <button class="small-icon-button" title="Configure agents" @click="settingsOpen = true">
-              <Settings2 :size="14" />
-            </button>
+            <h2>Harnesses</h2>
           </div>
           <div v-if="!selectedRoom" class="participant-row">
             <span class="participant-avatar agent-avatar" :style="hueStyle(selectedNative?.agentId || selectedNative?.harness || newChatHarness, 'agent')"><Bot :size="15" /></span>
-            <span class="participant-name">{{ selectedNative?.agent || harnessLabel(selectedNative?.harness || newChatHarness) }}<small>on this computer</small></span>
+            <span class="participant-name">{{ harnessLabel(selectedNative?.harness || newChatHarness) }}<small>on this computer</small></span>
+            <span class="agent-state" :class="nativeSending ? 'working' : 'idle'">{{ nativeSending ? 'working' : 'idle' }}</span>
           </div>
-          <div v-for="agent in !selectedRoom ? [] : agents" :key="agent.id" class="participant-row">
+          <div v-for="agent in !selectedRoom ? [] : visibleHarnesses" :key="agent.id" class="participant-row">
             <span class="participant-avatar agent-avatar" :style="hueStyle(agent.id, 'agent')"
               ><Bot :size="15"
             /></span>
             <span class="participant-name"
-              >{{ agent.name
+              >{{ harnessLabel(agent.harness)
               }}<small
-                >{{ ownerName(agent.ownerId) }} · {{ agent.harness
+                >{{ ownerName(agent.ownerId)
                 }}<template v-if="agent.model"> · {{ agent.model }}</template></small
               ></span
             >
-            <span v-if="agentStates[agent.id]" class="agent-state" :class="agentStates[agent.id]">{{
-              agentStates[agent.id] === 'working' ? 'working' : 'queued'
-            }}</span>
+            <span class="agent-state" :class="harnessState(agent.id)">{{ harnessState(agent.id) }}</span>
           </div>
-          <p v-if="selectedRoom && !agents.length" class="sidebar-note">Add a local agent in Settings.</p>
+          <p v-if="selectedRoom && !visibleHarnesses.length" class="sidebar-note">No harnesses are available in this chat.</p>
         </div>
         <div v-if="!selectedNative && selectedRoom" class="right-section room-rule">
           <p>
-            {{ members.length === 1 ? 'Your agent answers ordinary messages.' : 'Tag an agent with @' + exampleAgent + ' to ask it to act.' }}
+            {{ members.length === 1 ? 'Your harness answers ordinary messages.' : 'Tag a harness with @ to ask it to act.' }}
           </p>
         </div>
       </aside>
@@ -616,6 +545,17 @@
         <div class="dialog-actions">
           <button type="button" class="outline-button" @click="joinOpen = false">Cancel</button>
           <button type="submit" class="primary-button" :disabled="joining || !joinDraft.trim() || (!settings.connected && !joinName.trim())">{{ joining ? 'Joining...' : 'Join chat' }}</button>
+        </div>
+      </form>
+    </ChatDialog>
+
+    <ChatDialog v-if="renameRoomId" title="Rename shared chat" return-focus=".room-heading .title-edit" @close="renameRoomId = ''">
+      <form class="join-form" aria-label="Rename shared chat" @submit.prevent="saveRename">
+        <label>Chat title<input v-model="renameDraft" aria-label="Chat title" maxlength="80" autofocus required /></label>
+        <p v-if="renameError" class="dialog-error" role="alert">{{ renameError }}</p>
+        <div class="dialog-actions">
+          <button type="button" class="outline-button" @click="renameRoomId = ''">Cancel</button>
+          <button type="submit" class="primary-button" :disabled="renaming || !renameDraft.trim()">{{ renaming ? 'Saving...' : 'Save title' }}</button>
         </div>
       </form>
     </ChatDialog>
@@ -656,6 +596,7 @@ import {
   MessageSquare,
   PanelRightClose,
   PanelRightOpen,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -668,6 +609,7 @@ import ChatDialog from '../components/ChatDialog.vue';
 import { filterLocalConversations } from '../lib/catalog-filters';
 import { projectPathForConversation } from '../lib/project-chats';
 import { displayTranscriptMessages } from '../lib/native-transcript';
+import { insertMentionAtCursor, mentionAtCursor } from '../lib/mentions';
 
 type LocalConversation = {
   id: string;
@@ -717,7 +659,6 @@ const visibleProjectCount = ref(80);
 const visibleConversationCount = ref(80);
 const catalogQuery = ref('');
 const harnessFilter = ref('');
-const agentFilter = ref('');
 const settingsSaved = ref(false);
 const settingsSaving = ref(false);
 const settingsSaveError = ref('');
@@ -727,7 +668,6 @@ const rooms = ref<SharedRoom[]>([]);
 const members = ref<SharedMember[]>([]);
 const agents = ref<SharedAgent[]>([]);
 const messages = ref<SharedMessage[]>([]);
-const roomAgentIds = ref<Record<string, string[]>>({});
 const roomHarnesses = ref<Record<string, string[]>>({});
 const pendingOutbox = ref<PendingLocalMessage[]>([]);
 const currentRoomId = ref('');
@@ -738,6 +678,7 @@ const projects = ref<LocalProject[]>([]);
 const conversations = ref<LocalConversation[]>([]);
 const selectedNative = ref<LocalConversation | null>(null);
 const newChatHarness = ref<'codex' | 'hermes'>('codex');
+const availableHarnesses = ref<('codex' | 'hermes')[]>([]);
 const nativeTranscript = ref<unknown>(null);
 const nativeDraft = ref('');
 const nativeSending = ref(false);
@@ -748,8 +689,10 @@ const nativeMessages = computed<NativeMessage[]>(() => {
   return displayTranscriptMessages(nativeTranscript.value);
 });
 const nativeDisplayMessages = computed(() => [...nativeMessages.value, ...nativeAddedMessages.value]);
-const nativeChatSupported = computed(() => !selectedNative.value || selectedNative.value.harness === 'codex' || selectedNative.value.harness === 'hermes');
-const nativeCanSend = computed(() => nativeChatSupported.value && !nativeSending.value && Boolean(selectedNative.value?.path || selectedProject.value?.path));
+const nativeChatSupported = computed(() => selectedNative.value
+  ? availableHarnesses.value.includes(selectedNative.value.harness as 'codex' | 'hermes')
+  : availableHarnesses.value.includes(newChatHarness.value));
+const nativeCanSend = computed(() => nativeChatSupported.value && !nativeSending.value);
 const composerProjectPath = computed(() => selectedNative.value
   ? projectPathForConversation(selectedNative.value.path, projects.value) || selectedNative.value.path || ''
   : string(selectedProject.value?.path));
@@ -778,31 +721,17 @@ const joinDraft = ref('');
 const joinName = ref('');
 const joinError = ref('');
 const joining = ref(false);
+const renameRoomId = ref('');
+const renameDraft = ref('');
+const renameError = ref('');
+const renaming = ref(false);
 const connecting = ref(false);
-const savingAgent = ref(false);
 const sending = ref(false);
 const draft = ref('');
-const selectedAgentDraft = ref(0);
-const agentDrafts = ref<
-  {
-    id: string;
-    name: string;
-    harness: 'codex' | 'hermes';
-    model: string;
-    workingDirectory: string;
-  }[]
->([]);
-const agentStates = ref<Record<string, AgentState>>({});
+const sharedComposer = ref<HTMLTextAreaElement | null>(null);
+const mentionCursor = ref(0);
+const agentStates = ref<Record<string, Record<string, AgentState>>>({});
 const connectedRoomIds = ref(new Set<string>());
-const activeAgentName = computed(() => {
-  const id = Object.entries(agentStates.value).find(([, state]) => state === 'working')?.[0];
-  return id ? agents.value.find((agent) => agent.id === id)?.name || 'Agent' : '';
-});
-const queuedAgentNames = computed(() =>
-  Object.entries(agentStates.value)
-    .filter(([, state]) => state === 'queued')
-    .map(([id]) => agents.value.find((agent) => agent.id === id)?.name || id),
-);
 const permissionRequest = ref<PermissionRequest | null>(null);
 const notice = ref('');
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -848,17 +777,16 @@ const displayMessages = computed<SharedMessage[]>(() => {
 const harnessOptions = computed(() =>
   [...new Set(conversations.value.map((item) => item.harness).filter(Boolean))].sort(),
 );
-const agentOptions = computed(() => {
-  const choices = new Map<string, string>();
-  for (const agent of agents.value) choices.set(agent.id, agent.name);
-  for (const conversation of conversations.value) {
-    if (conversation.agentId)
-      choices.set(conversation.agentId, conversation.agent || conversation.agentId);
-    else if (conversation.agent) choices.set(conversation.agent, conversation.agent);
+const visibleHarnesses = computed(() => {
+  const chosen = new Map<string, SharedAgent>();
+  for (const agent of agents.value) {
+    const key = `${agent.ownerId}:${agent.harness}`;
+    const previous = chosen.get(key);
+    if (!previous || agent.id === selectedRoom.value?.defaultAgentId ||
+      (previous.id !== selectedRoom.value?.defaultAgentId && messages.value.some((message) => message.agentId === agent.id)))
+      chosen.set(key, agent);
   }
-  return [...choices]
-    .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  return [...chosen.values()];
 });
 const filteredProjects = computed(() =>
   projects.value.filter((project) => {
@@ -874,15 +802,6 @@ const filteredProjects = computed(() =>
       )
     )
       return false;
-    if (
-      agentFilter.value &&
-      !conversations.value.some(
-        (item) =>
-          belongsToProject(item, project) &&
-          (item.agent === agentFilter.value || item.agentId === agentFilter.value),
-      )
-    )
-      return false;
     return true;
   }),
 );
@@ -892,7 +811,6 @@ const filteredRooms = computed(() =>
     (room) =>
       (!catalogQuery.value.trim() ||
         room.name.toLowerCase().includes(catalogQuery.value.trim().toLowerCase())) &&
-      (!agentFilter.value || roomAgentIds.value[room.id]?.includes(agentFilter.value)) &&
       (!harnessFilter.value || roomHarnesses.value[room.id]?.includes(harnessFilter.value)),
   ),
 );
@@ -900,14 +818,13 @@ const filteredConversations = computed(() =>
   filterLocalConversations(conversations.value, {
     query: catalogQuery.value,
     harness: harnessFilter.value,
-    agent: agentFilter.value,
+    agent: '',
     projectPath: '',
   }),
 );
 const unfiledConversations = computed(() => filteredConversations.value.filter((item) =>
   !projects.value.some((project) => belongsToProject(item, project)),
 ));
-const activeAgentDraft = computed(() => agentDrafts.value[selectedAgentDraft.value]);
 const canJoin = computed(() =>
   Boolean(
     settingsDraft.value.backendUrl.trim() &&
@@ -915,26 +832,17 @@ const canJoin = computed(() =>
     inviteCode.value.trim(),
   ),
 );
-const canSaveAgent = computed(() =>
-  Boolean(
-    activeAgentDraft.value?.id.trim() &&
-    activeAgentDraft.value?.name.trim() &&
-    activeAgentDraft.value?.workingDirectory.trim(),
-  ),
-);
+const activeMention = computed(() => mentionAtCursor(draft.value, mentionCursor.value));
 const mentionOptions = computed(() => {
-  if (!selectedRoom.value) return [];
-  const match = /(?:^|\s)@([a-z0-9-]*)$/i.exec(draft.value);
-  if (!match) return [];
-  const search = (match[1] || '').toLowerCase();
-  return agents.value
+  if (!selectedRoom.value || !activeMention.value) return [];
+  const search = activeMention.value.search;
+  return visibleHarnesses.value
     .filter(
       (agent) =>
-        agent.id.toLowerCase().startsWith(search) || agent.name.toLowerCase().startsWith(search),
+        mentionHandle(agent).startsWith(search) || agent.name.toLowerCase().startsWith(search),
     )
     .slice(0, 8);
 });
-const exampleAgent = computed(() => agents.value[0]?.id || 'agent-name');
 const themeOptions = [
   { value: 'cobalt-red', label: 'Cobalt + red' },
   { value: 'mint-charcoal', label: 'Mint + charcoal' },
@@ -948,11 +856,11 @@ watch([() => settingsDraft.value.theme, () => settingsDraft.value.displayName, a
   settingsSaveTimer = setTimeout(() => void saveGeneralSettings(), 250);
 });
 watch(settingsOpen, (open) => { if (open) void checkCodex(false, false); });
-watch([catalogQuery, harnessFilter, agentFilter, selectedProject], () => {
+watch([catalogQuery, harnessFilter, selectedProject], () => {
   visibleProjectCount.value = 80;
   visibleConversationCount.value = 80;
 });
-watch([catalogQuery, harnessFilter, agentFilter], () => {
+watch([catalogQuery, harnessFilter], () => {
   if (catalogQuery.value.trim()) projectsExpanded.value = true;
 });
 watch(messages, () => void scrollToBottom(), { deep: true });
@@ -966,10 +874,9 @@ onMounted(async () => {
       theme: settings.value.theme,
     };
     allowAgentRuns.value = settings.value.allowRemoteAgentRequests;
+    availableHarnesses.value = await api.availableHarnesses();
+    if (!availableHarnesses.value.includes(newChatHarness.value) && availableHarnesses.value[0]) newChatHarness.value = availableHarnesses.value[0];
     settingsReady = true;
-    agentDrafts.value = settings.value.agents.length
-      ? settings.value.agents.map((agent) => ({ ...agent }))
-      : [blankAgent(settings.value.displayName)];
     try {
       const saved = await api.sheepCached();
       if (saved.projects.length || saved.conversations.length) applyCatalog(saved);
@@ -1013,16 +920,6 @@ async function loadWorkspace(): Promise<void> {
     const roomRows = await api.rooms();
     rooms.value = roomRows;
     const snapshots = await Promise.all(roomRows.map((room) => api.roomMessages(room.id)));
-    roomAgentIds.value = Object.fromEntries(
-      roomRows.map((room, index) => [
-        room.id,
-        [
-          ...new Set(
-            (snapshots[index] || []).map((item) => item.agentId).filter((id): id is string => !!id),
-          ),
-        ],
-      ]),
-    );
     roomHarnesses.value = Object.fromEntries(
       roomRows.map((room, index) => [
         room.id,
@@ -1090,9 +987,6 @@ async function selectRoom(room: SharedRoom): Promise<void> {
     agents.value = roomAgents;
     if (readVersion === roomReadVersion) {
       messages.value = rows;
-      roomAgentIds.value[room.id] = [
-        ...new Set(rows.map((item) => item.agentId).filter((id): id is string => !!id)),
-      ];
       roomHarnesses.value[room.id] = [
         ...new Set(rows.map((item) => item.harness).filter((name): name is string => !!name)),
       ];
@@ -1107,7 +1001,7 @@ async function selectRoom(room: SharedRoom): Promise<void> {
 
 function newRoom(project: LocalProject | null = selectedProject.value): void {
   if (nativeSending.value) return;
-  if (selectedNative.value?.harness === 'codex' || selectedNative.value?.harness === 'hermes') newChatHarness.value = selectedNative.value.harness;
+  if (selectedNative.value && availableHarnesses.value.includes(selectedNative.value.harness as 'codex' | 'hermes')) newChatHarness.value = selectedNative.value.harness as 'codex' | 'hermes';
   selectedProject.value = project;
   settingsOpen.value = false;
   selectedNative.value = null;
@@ -1190,15 +1084,15 @@ function handleNativeChatEvent(value: unknown): void {
   } else if (event?.type === 'completed') nativeSending.value = false;
   else if (event?.type === 'failed') {
     nativeSending.value = false;
-    nativeError.value = string(event.message) || 'The agent could not finish.';
+    nativeError.value = string(event.message) || 'The harness could not finish.';
   }
 }
 
 async function shareNativeConversation(): Promise<void> {
   const conversation = selectedNative.value;
   if (!conversation) return;
-  if (!nativeChatSupported.value || !conversation.path) {
-    nativeError.value = 'This chat needs a Codex or Hermes session with a working folder before inviting.';
+  if (!nativeChatSupported.value) {
+    nativeError.value = 'Choose a Codex or Hermes chat before inviting.';
     return;
   }
   beginInvite(conversation.title || 'Chat');
@@ -1211,7 +1105,7 @@ async function shareNativeConversation(): Promise<void> {
     }
     const result = await api.nativeShare({
       harness: conversation.harness as 'codex' | 'hermes', sessionId: conversation.id,
-      cwd: conversation.path, title: conversation.title || 'Chat',
+      cwd: conversation.path || '', title: conversation.title || 'Chat',
       ...(conversation.agent ? { agentName: conversation.agent } : {}),
     });
     rooms.value = [...rooms.value.filter((room) => room.id !== result.room.id), result.room];
@@ -1247,10 +1141,36 @@ async function scrollNativeToBottom(): Promise<void> {
 }
 
 function insertMention(agent: SharedAgent): void {
-  draft.value = draft.value.replace(
-    /(?:^|\s)@([a-z0-9-]*)$/i,
-    (match) => `${match.startsWith(' ') ? ' ' : ''}@${agent.id} `,
-  );
+  const inserted = insertMentionAtCursor(draft.value, mentionCursor.value, mentionHandle(agent));
+  draft.value = inserted.text;
+  mentionCursor.value = inserted.cursor;
+  void nextTick(() => {
+    sharedComposer.value?.focus();
+    sharedComposer.value?.setSelectionRange(inserted.cursor, inserted.cursor);
+  });
+}
+
+function updateMentionCursor(event: Event): void {
+  mentionCursor.value = (event.target as HTMLTextAreaElement).selectionStart;
+}
+
+function handleComposerEnter(): void {
+  if (mentionOptions.value[0]) insertMention(mentionOptions.value[0]);
+  else void sendDraft();
+}
+
+function mentionHandle(agent: SharedAgent): string {
+  const sameHarness = visibleHarnesses.value.filter((item) => item.harness === agent.harness);
+  if (sameHarness.length === 1) return agent.harness;
+  const owner = ownerName(agent.ownerId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const candidate = `${owner}-${agent.harness}`;
+  return sameHarness.filter((item) => ownerName(item.ownerId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') === owner).length === 1
+    ? candidate : agent.id;
+}
+
+function harnessState(id: string): 'idle' | AgentState {
+  if (messages.value.some((message) => message.agentId === id && message.state === 'streaming')) return 'working';
+  return agentStates.value[currentRoomId.value]?.[id] || 'idle';
 }
 
 async function sendDraft(): Promise<void> {
@@ -1260,11 +1180,17 @@ async function sendDraft(): Promise<void> {
   const mentions = [...text.matchAll(/(?:^|\s)@([a-z0-9][a-z0-9-]*)/gi)].map((match) =>
     (match[1] || '').toLowerCase(),
   );
-  const agentIds = [
-    ...new Set(
-      mentions.filter((id) => agents.value.some((agent) => agent.id.toLowerCase() === id)),
-    ),
-  ];
+  const agentIds = [...new Set(mentions.flatMap((handle) => {
+    const agent = visibleHarnesses.value.find((item) => mentionHandle(item) === handle || item.id.toLowerCase() === handle);
+    return agent ? [agent.id] : [];
+  }))];
+  if (!agentIds.length && members.value.length === 1) {
+    const ownHarnesses = visibleHarnesses.value.filter((item) => item.ownerId === settings.value.member?.id);
+    const preferred = ownHarnesses.find((item) => item.id === selectedRoom.value?.defaultAgentId)
+      || ownHarnesses.find((item) => item.harness === newChatHarness.value)
+      || ownHarnesses[0];
+    if (preferred) agentIds.push(preferred.id);
+  }
   sending.value = true;
   draft.value = '';
   try {
@@ -1291,10 +1217,17 @@ function handleRoomEvent(value: unknown): void {
   const roomId = string(payload?.roomId);
   const event = object(payload?.event);
   if (!event || !roomId) return;
+  if (event.type === 'room.renamed' && typeof event.name === 'string') {
+    rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, name: event.name as string } : room);
+  }
   const agentId = string(event.agentId) || '';
-  if (event.type === 'turn.queued' && agentId) agentStates.value[agentId] = 'queued';
-  if (event.type === 'turn.started' && agentId) agentStates.value[agentId] = 'working';
-  if (event.type === 'turn.finished' && agentId) delete agentStates.value[agentId];
+  if (agentId && ['turn.queued', 'turn.started', 'turn.finished'].includes(string(event.type))) {
+    const current = { ...(agentStates.value[roomId] || {}) };
+    if (event.type === 'turn.queued') current[agentId] = 'queued';
+    if (event.type === 'turn.started') current[agentId] = 'working';
+    if (event.type === 'turn.finished') delete current[agentId];
+    agentStates.value = { ...agentStates.value, [roomId]: current };
+  }
   if (roomId === currentRoomId.value && (event.type === 'member.joined' || event.type === 'agent.updated')) {
     void Promise.all([api.members(roomId), api.agents(roomId)])
       .then(([roomMembers, roomAgents]) => {
@@ -1304,6 +1237,28 @@ function handleRoomEvent(value: unknown): void {
       }).catch(showError);
   }
   if (roomId === currentRoomId.value) refreshRoomMessages(roomId);
+}
+
+function openRename(room: SharedRoom): void {
+  if (room.createdBy !== settings.value.member?.id) return;
+  renameRoomId.value = room.id;
+  renameDraft.value = room.name;
+  renameError.value = '';
+}
+
+async function saveRename(): Promise<void> {
+  const room = rooms.value.find((item) => item.id === renameRoomId.value);
+  if (!room || room.createdBy !== settings.value.member?.id || renaming.value) return;
+  const name = renameDraft.value.trim().replace(/\s+/g, ' ');
+  if (!name || name.length > 80) { renameError.value = 'Enter a chat title up to 80 characters.'; return; }
+  renaming.value = true;
+  renameError.value = '';
+  try {
+    const updated = await api.renameRoom({ roomId: room.id, name });
+    rooms.value = rooms.value.map((item) => item.id === room.id ? { ...item, name: updated.name } : item);
+    renameRoomId.value = '';
+  } catch (error) { renameError.value = messageOf(error); }
+  finally { renaming.value = false; }
 }
 
 function refreshRoomMessages(roomId: string): void {
@@ -1319,9 +1274,6 @@ function refreshRoomMessages(roomId: string): void {
         )
           return;
         messages.value = rows;
-        roomAgentIds.value[roomId] = [
-          ...new Set(rows.map((item) => item.agentId).filter((id): id is string => !!id)),
-        ];
         roomHarnesses.value[roomId] = [
           ...new Set(rows.map((item) => item.harness).filter((name): name is string => !!name)),
         ];
@@ -1347,7 +1299,7 @@ function handleAgentActivity(value: unknown): void {
   if (activity?.event && object(activity.event)?.type === 'tool') {
     const tool = object(activity.event);
     if (tool?.status === 'completed' || tool?.status === 'failed')
-      showNotice(`${string(tool.title) || 'Agent tool'} ${string(tool.status)}.`);
+      showNotice(`${string(tool.title) || 'Harness tool'} ${string(tool.status)}.`);
   }
 }
 
@@ -1534,46 +1486,6 @@ async function saveGeneralSettings(): Promise<void> {
   }
 }
 
-function blankAgent(displayName = '') {
-  const stem = (displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'my').replace(
-    /^-|-$/g,
-    '',
-  );
-  return {
-    id: `${stem}-agent`,
-    name: `${displayName || 'My'} agent`,
-    harness: 'codex' as const,
-    model: '',
-    workingDirectory: '',
-  };
-}
-
-function addAgent(): void {
-  agentDrafts.value.push(blankAgent(settings.value.displayName));
-  selectedAgentDraft.value = agentDrafts.value.length - 1;
-}
-
-async function saveAgent(): Promise<void> {
-  if (!activeAgentDraft.value || !canSaveAgent.value) return;
-  savingAgent.value = true;
-  try {
-    settings.value = await api.saveAgent({ ...activeAgentDraft.value });
-    agentDrafts.value = settings.value.agents.map((agent) => ({ ...agent }));
-    if (selectedRoom.value) agents.value = await api.agents(selectedRoom.value.id);
-    showNotice('Agent saved.');
-  } catch (error) {
-    connectionError.value = messageOf(error);
-  } finally {
-    savingAgent.value = false;
-  }
-}
-
-async function chooseWorkingFolder(): Promise<void> {
-  if (!activeAgentDraft.value) return;
-  const folder = await api.chooseFolder();
-  if (folder) activeAgentDraft.value.workingDirectory = folder;
-}
-
 async function readCodexAccount(refresh: boolean): Promise<void> {
   const response = object(await api.codexAccount(refresh));
   if (!response) throw new Error('Could not read the Codex account. Try checking status again.');
@@ -1738,12 +1650,10 @@ function harnessInitial(harness: string): string {
   );
 }
 function authorName(message: SharedMessage): string {
-  if (message.role === 'assistant')
-    return (
-      message.agentName ||
-      agents.value.find((agent) => agent.id === message.agentId)?.name ||
-      'Agent'
-    );
+  if (message.role === 'assistant') {
+    const harness = message.harness || agents.value.find((agent) => agent.id === message.agentId)?.harness;
+    return harness ? harnessLabel(harness) : 'Harness';
+  }
   return (
     message.participantName ||
     members.value.find((member) => member.id === message.participantId)?.name ||
@@ -2011,6 +1921,19 @@ button:disabled {
 .sidebar-section-head--spaced {
   margin-top: 10px;
 }
+.shared-chat-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.shared-chat-row .sidebar-row { min-width: 0; padding-right: 42px; }
+.shared-chat-edit {
+  position: absolute;
+  right: 7px;
+  opacity: 0;
+}
+.shared-chat-row:hover .shared-chat-edit,
+.shared-chat-row:focus-within .shared-chat-edit { opacity: 1; }
 .sidebar-scroll {
   overflow: auto;
   min-height: 0;
@@ -2117,6 +2040,11 @@ button:disabled {
   letter-spacing: -0.03em;
   font-weight: 650;
 }
+.room-title-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.room-title-line h1 { min-width: 0; }
+.room-title-line .title-edit { flex: none; opacity: 0; }
+.room-heading:hover .title-edit,
+.room-title-line:focus-within .title-edit { opacity: 1; }
 .eyebrow {
   margin: 0 0 4px;
   color: var(--muted);
