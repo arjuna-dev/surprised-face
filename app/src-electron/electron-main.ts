@@ -181,6 +181,7 @@ function registerHandlers(): void {
     return settingsStore.clearConnection();
   });
   safeIpc('app:create-invites', async (_event, roomId) => roomService.createInvites(String(roomId), 1));
+  safeIpc('app:hordes', (_event, input) => roomService.hordeRequest(input as Parameters<RoomService['hordeRequest']>[0]));
   safeIpc('app:rooms', async () => roomService.rooms());
   safeIpc('app:create-room', async (_event, input) =>
     roomService.createRoom(

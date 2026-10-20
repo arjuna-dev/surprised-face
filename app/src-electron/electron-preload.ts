@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('surprisedFace', {
   joinRoom: (code: string) => ipcRenderer.invoke('app:join-room', code),
   logout: () => ipcRenderer.invoke('app:logout'),
   createInvites: (roomId: string) => ipcRenderer.invoke('app:create-invites', roomId),
+  hordeRequest: (input: unknown) => ipcRenderer.invoke('app:hordes', input),
   rooms: () => ipcRenderer.invoke('app:rooms'),
   createRoom: (input: unknown) => ipcRenderer.invoke('app:create-room', input),
   renameRoom: (input: unknown) => ipcRenderer.invoke('app:rename-room', input),

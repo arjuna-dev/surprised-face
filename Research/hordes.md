@@ -87,3 +87,67 @@ The public account does **not** specify the low-level scheduler, task queue, age
 
 - [OpenAI: On the Navier-Stokes Millennium Prize Problem](https://openai.com/index/navier-stokes-solution/)
 - [OpenAI: A practical guide to building agents](https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf)
+
+## First application release, October 20, 2026
+
+The Hordes tab opens a shared project offering as cards. An account can create a project, join an existing project, dedicate a budget commitment and discuss the work. Project updates use revisions so one person cannot silently overwrite another person's edits. Deletion moves a project to the Warchief's Trash; restoration retains its discussion, skills, roles and commitments.
+
+Source code stays in GitHub and local working copies. The existing Cloudflare SQLite database stores project definitions, memberships, budget commitments and discussion messages. A repository link does not grant GitHub access. Project descriptions and skills are discoverable to signed-in people; discussion and individual commitments are visible to project collaborators. The listing shows aggregate commitments by unit.
+
+Budget commitments support tokens, USD and GPU hours separately. No unit conversion, payment, token transfer, automatic model call or verified spending meter is implemented. The project's orchestration setting and parallel work limit describe the agreed workflow; they do not launch work. Skills persist a name, explicit instructions and a tools list. They are project material for contributors to review, not automatic grants to tools or local files.
+
+| Role | Current rights |
+| --- | --- |
+| Horde Warchief | Create, edit, change roles, delete and restore. The creator remains Warchief. |
+| Warlord | Edit project details, repository, orchestration and skills; contribute and discuss. |
+| Warrior | Read, contribute their own budget and discuss. Joining grants this role. |
+| Scout | Read the project and its discussion. |
+
+Roles are enforced in the shared service, independently of hidden UI controls. Horde roles do not alter existing chat membership or the Run harness mentions on this computer setting.
+
+## Default strategy
+
+Plan, build, verify is the initial default:
+
+1. A human defines the goal, constraints and acceptance evidence.
+2. A coordinator breaks it into bounded tasks with explicit inputs, dependencies and expected artifacts.
+3. Contributors select independent work that fits their own capacity and tools.
+4. A separate reviewer checks results with tests, source checks, simulations or reproducible certificates.
+5. A human accepts integrated results and decides the next cycle.
+
+The release also offers world sectors, creative production, search and verify, and systems engineering as predefined strategies. A custom strategy editor and executable task scheduler are later work. Any future scheduler needs contributor authorization, reserved budgets, task attempts, renewable leases with fencing epochs, idempotent submissions, independent acceptance and a local stop control. A lost heartbeat does not prove a paid run stopped, so automatic retries must not silently double-spend a contribution.
+
+## Projects to pitch
+
+These are proposed projects, not claims that a full world, film or vehicle can be delivered with a known token budget. The matching in this table is our design recommendation. Tokens fund planning, code, analysis and evaluation. Render time, simulation time, storage, bandwidth, licensed inputs and specialist work need separate budgets.
+
+| Project | Concrete first milestone | Architecture and validation |
+| --- | --- | --- |
+| Earth Commons | One walkable 1 km² district, ten landmarks and a shared multiplayer visit | Spatial tasks with fixed coordinates, common asset contracts, seam and streaming checks. Scale to districts before claiming a planet. |
+| The Living Archive | One evidence-linked street in historic Alexandria, Tenochtitlan or Edo | Research teams and environment teams, reviewed sources, explicit uncertainty and spatial assembly. |
+| The Last City | A 30-minute cooperative island combining Dwarf Fortress-like simulation, Factorio-like logistics and Zelda-like exploration in an original game | Subsystem teams, stable engine APIs, deterministic simulation tests and human playtests. |
+| A Billion Worlds | Three distinct planets, one ship and an exploration progression | Independent planet teams conform to shared world, art, quest and performance contracts. |
+| Frankenstein: The Arctic Testimony | A 90-second rescue scene, leading to a 25-minute Gothic film framed by Walton finding the creature | Approve screenplay, synthetic actor references and visual bible; parallel shots; continuity, sound and editorial review. |
+| Kenshin: A New Lens | A rights-cleared visual test for a new interpretation of the Kyoto arc | Sequence teams, consistent synthetic actors and choreography; human director and continuity gates. Existing live-action films already cover this franchise. |
+| Harry Potter and the Methods of Rationality | A licensed pilot treatment and short visual test about investigating magic scientifically | Season architecture, episode teams, character and canon checks, central editing. |
+| All the Young Dudes | A rights-cleared limited-series treatment and one short scene | Writers room, episode production teams, centrally reviewed character arcs and continuity. This is a fanfiction adaptation prospect, not an authorized production. |
+| The Incal: A Cinematic Atlas | A licensed comic adaptation concept trailer and one reusable vertical-city block | Parallel environment and sequence teams sharing an approved design bible. |
+| Ramsey Frontier | Reproduce a known 42-vertex R(5,5) construction and independently check all 5-vertex subsets; then define a bounded new search | Independent graph and SAT experiments, deterministic verifiers, immutable candidates and expert review. No promised mathematical breakthrough. |
+| Open City Car | A complete requirements baseline and simulated vehicle packaging, chassis and energy model | Interface-controlled subsystem engineering, independent simulation review and qualified human approval before physical builds. |
+| Pocket Orbital Lab | A non-operational research rocket digital twin and telemetry viewer with synthetic data | Subsystem simulation and uncertainty sweeps; human specialist review. No construction or launch execution. |
+| The Coral Cathedral | One immense streaming underwater environment tested on an agreed reference machine | Asset-family teams and spatial partitions, instancing, LOD checks, GPU profiling and visual review. |
+| Open Accessibility Corps | Reviewed accessibility fixes for five consenting open-source repositories | Independent repository workers, reproducible browser tests, separate patch reviewers and maintainer acceptance. |
+
+For the first public demonstration, Earth Commons offers the clearest collaborative visual payoff. The Last City can show functional code integration. Frankenstein offers an immediately understandable media result with a manageable first sequence. Ramsey Frontier demonstrates independent search with objective verification.
+
+## Additional primary sources checked October 20, 2026
+
+- [OpenStreetMap copyright and license](https://www.openstreetmap.org/copyright): usable map data requires attribution and ODbL compliance. Open data does not imply free unlimited hosted map services.
+- [Godot MultiMesh documentation](https://docs.godotengine.org/en/stable/tutorials/performance/using_multimesh.html): instancing and spatially divided batches are relevant to large environments. Asset count alone does not guarantee interactive performance.
+- [Carnegie Mellon presentation on R(5,5), March 2026](https://www.cs.rit.edu/~spr/COURSES/CCOMP/srg_r55.pdf): a concrete graph construction and SAT search target. Recheck the frontier before a research campaign.
+- [Frankenstein source text](https://www.gutenberg.org/ebooks/84): Project Gutenberg lists its text as public domain in the USA. Release territories and modern adaptation designs require separate consideration.
+- [Netflix on Keishi Otomo and existing Kenshin live-action films](https://about.netflix.com/en/news/10dance-streams-2025).
+- [Authorized HPMOR mirror](https://hpmor.com/): confirms the work and its completed serial form. An authorized text mirror does not establish film adaptation permission.
+- [All the Young Dudes original work page](https://archiveofourown.org/works/10057010): identified as an adaptation prospect; the research browser could not retrieve the page, so no popularity ranking or adaptation permission is claimed.
+- [Towards a Science of Scaling Agent Systems, latest revision](https://arxiv.org/abs/2512.08296): the revision reports 260 configurations, rather than the earlier 180. Architectural benefits depend on task structure.
+- [Anthropic multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) and [Cursor scaling experiments](https://cursor.com/blog/scaling-agents): bounded delegated work and explicit verification are useful precedents; their results do not establish a universal topology for heterogeneous community machines.

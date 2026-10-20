@@ -1,3 +1,4 @@
+import { HordeStore } from './hordes';
 import { DurableObject } from 'cloudflare:workers';
 
 interface Env {
@@ -67,6 +68,12 @@ export default {
       const protocolToken = request.headers.get('sec-websocket-protocol')?.split(',').map((value) => value.trim()).find((value) => value.startsWith('bearer.'))?.slice('bearer.'.length);
       const identity = await authenticate(request, env, protocolToken);
       if (!identity) return response({ error: 'Create your account or join a chat first.' }, 401, env);
+
+      if (/^\/v1\/hordes(?:\/|$)/.test(url.pathname)) {
+        const body = ['POST', 'PUT', 'PATCH'].includes(request.method) ? JSON.stringify(await readJson(request)) : undefined;
+        const result = await directory(env).fetch(`https://directory${url.pathname.slice(3)}${url.search}`, { method: request.method, headers: { 'x-actor-id': identity.id, 'content-type': 'application/json' }, ...(body ? { body } : {}) });
+        return response(await result.json(), result.status, env);
+      }
 
       if (url.pathname === '/v1/me' && request.method === 'GET') return response(identity, 200, env);
 
@@ -203,6 +210,7 @@ export default {
 };
 
 export class WorkspaceDirectory extends DurableObject<Env> {
+  private hordes: HordeStore;
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.storage.sql.exec(`
@@ -212,6 +220,7 @@ export class WorkspaceDirectory extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS room_members (room_id TEXT NOT NULL, member_id TEXT NOT NULL, PRIMARY KEY(room_id, member_id));
       CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, name TEXT NOT NULL, harness TEXT NOT NULL, model TEXT NOT NULL, updated_at TEXT NOT NULL);
     `);
+    this.hordes = new HordeStore(ctx.storage.sql);
     const inviteColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(invites)').toArray();
     if (!inviteColumns.some((column) => column.name === 'room_id')) ctx.storage.sql.exec('ALTER TABLE invites ADD COLUMN room_id TEXT');
     const roomColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(rooms)').toArray();
@@ -220,6 +229,7 @@ export class WorkspaceDirectory extends DurableObject<Env> {
 
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (/^\/hordes(?:\/|$)/.test(url.pathname)) return this.hordes.fetch(request);
     if (request.method === 'POST' && url.pathname === '/bootstrap') return this.bootstrap(await readJson(request));
     if (request.method === 'POST' && url.pathname === '/register') return this.register(await readJson(request));
     if (request.method === 'POST' && url.pathname === '/invites') return this.createInvites(await readJson(request));
@@ -636,7 +646,7 @@ export class ChatRoom extends DurableObject<Env> {
 function directory(env: Env) { return env.DIRECTORY.get(env.DIRECTORY.idFromName('workspace')); }
 function response(value: unknown, status: number, env: Env) { return new Response(JSON.stringify(value), { status, headers: { ...jsonHeaders, ...corsHeaders(env) } }); }
 function json(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status, headers: jsonHeaders }); }
-function corsHeaders(env: Env): HeadersInit { return { 'access-control-allow-origin': env.APP_ORIGIN || '*', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '86400' }; }
+function corsHeaders(env: Env): HeadersInit { return { 'access-control-allow-origin': env.APP_ORIGIN || '*', 'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '86400' }; }
 function now() { return new Date().toISOString(); }
 function cleanName(input: unknown): string { const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : ''; if (!name || name.length > 64) throw new HttpError('Enter a name up to 64 characters.', 400); return name; }
 function cleanRoomName(input: unknown): string { const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : ''; if (!name || name.length > 80) throw new HttpError('Enter a chat name up to 80 characters.', 400); return name; }

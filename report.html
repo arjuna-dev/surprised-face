@@ -51,7 +51,7 @@
       <section>
         <h2>Harness turns</h2>
         <ul>
-          <li><a href="app/src-electron/harness-participants.ts">Harness registration</a> creates stable internal participant IDs for installed Codex and Hermes adapters. Saved IDs remain claimable for older shared chats. The interface shows one harness per owner and marks it idle, queued, or working.</li>
+          <li><a href="app/src-electron/harness-participants.ts">Harness registration</a> creates stable internal participant IDs for installed Codex and Hermes adapters. Saved IDs remain claimable for older shared chats. The interface names each harness with its owner, such as Aman's Codex, in replies, mention suggestions, and the harness list, and marks it idle, queued, or working.</li>
           <li>When a queued turn starts, <a href="app/src-electron/agent-runner.ts">the runner</a> sends the unseen completed shared messages to the native adapter. A single new message goes through as written. Multiple messages keep their source participant labels. The runner adds no generated identity or shared-chat instruction preamble.</li>
           <li>Codex app-server and Hermes ACP emit reply text as it arrives. The runner batches small deltas for 80 milliseconds before appending ordered chunks to the room. The chat displays these chunks inside one reserved reply.</li>
           <li>For a Codex session already owned by Codex Desktop, <a href="app/src-electron/codex-desktop-link.ts">the desktop link</a> submits the turn to that owner and copies saved assistant text into the room as the session file grows. This path can only display text after Desktop has saved it. :o does not write the native session file.</li>
@@ -65,6 +65,16 @@
           <li>The native Codex and Hermes session journals remain owned by those tools. Shared messages that arrived while a harness was idle are included on its next requested turn through the adapter.</li>
           <li>Sheep reads local projects, chats, and selected native history. The catalog shows its saved copy first and refreshes discovery in the background.</li>
         </ul>
+      </section>
+      <section>
+        <h2>Hordes</h2>
+        <ol>
+          <li>The top-bar Hordes tab opens a project offering. <a href="app/src/components/HordesPage.vue">Project cards</a> link to goals, GitHub repositories, collaborators, skills, orchestration and budget commitments. Project ideas are labeled proposals and can prefill a new project.</li>
+          <li>The local bridge calls the authenticated <a href="app/cloudflare/src/hordes.ts">Hordes service</a>. Its SQLite tables store project definitions, member roles, independent budget units and discussion messages. Source code stays in Git and local working copies.</li>
+          <li>The creator is Horde Warchief. Warlords can edit, Warriors can contribute and discuss, and Scouts can read. The service checks permissions. Edits use revisions; messages deduplicate retries; deletion is recoverable from Trash.</li>
+          <li>Budgets are commitments, not payments or metered spending. Five predefined strategies describe work; automatic execution and a custom strategy editor remain future work. Project skills store instructions and tool names without granting tool access.</li>
+        </ol>
+        <p><a href="Research/hordes.md">Project concepts, permissions and implementation scope</a></p>
       </section>
       <section>
         <h2>Tests</h2>

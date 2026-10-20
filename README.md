@@ -121,6 +121,15 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 
 ## Hordes
 
+The top bar has Chat and Hordes tabs. Hordes opens the shared project offering as cards, with a separate gallery of fourteen concrete project proposals.
+
+- Signed-in people can create projects and join as Warriors. Warchiefs control roles, deletion and restore; Warlords edit; Scouts read.
+- Projects support a GitHub repository link, goals, five predefined orchestration strategies and skills containing instructions and tools.
+- Discussions, memberships, project definitions and budget commitments live in the shared database. Code stays in Git and its local copies.
+- Contributors can record their own token, USD or GPU-hour commitments. These do not charge, transfer usage or start model runs. Automatic execution, metering and custom strategy builders are not yet implemented.
+- Project CRUD, revisions, permissions, discussion retry handling and restore are checked with `cd app/cloudflare && npm run test:local`. UI evidence is generated with `cd app && SURPRISED_FACE_TEST_BROWSER=chrome npm run test:ui`.
+
+
 - Contributors bring their own API keys, local models, token budgets, or compute. Credentials remain local.
 - Harnesses and skills are usually free or low cost. Paid tokens and available compute are the constrained resources.
 - Split missions into bounded tasks and task rooms. Use atomic claims, leases, budget limits, explicit handoffs, and independent review.

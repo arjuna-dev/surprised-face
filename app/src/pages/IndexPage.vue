@@ -20,6 +20,10 @@
           >/ {{ selectedProject ? projectName(selectedProject) : 'surprised-face' }}</span
         >
       </button>
+      <nav class="mode-tabs" role="tablist" aria-label="App sections">
+        <button id="chat-tab" role="tab" aria-controls="chat-workspace" :aria-selected="activeMode === 'chat'" :tabindex="activeMode === 'chat' ? 0 : -1" @click="activeMode='chat'" @keydown.right.prevent="activeMode='hordes'; focusMode('hordes')">Chat</button>
+        <button id="hordes-tab" role="tab" aria-controls="hordes-workspace" :aria-selected="activeMode === 'hordes'" :tabindex="activeMode === 'hordes' ? 0 : -1" @click="activeMode='hordes'" @keydown.left.prevent="activeMode='chat'; focusMode('chat')">Hordes</button>
+      </nav>
       <div class="topbar-actions">
         <span
           class="connection-state"
@@ -28,7 +32,7 @@
           <span class="status-dot"></span>{{ settings.connected ? 'Connected' : 'Local' }}
         </span>
         <button
-          v-if="!settingsOpen && (selectedRoom || selectedNative || selectedProject)"
+          v-if="activeMode === 'chat' && !settingsOpen && (selectedRoom || selectedNative || selectedProject)"
           class="icon-button"
           :title="rightOpen ? 'Hide people and harnesses' : 'Show people and harnesses'"
           :aria-label="rightOpen ? 'Hide people and harnesses' : 'Show people and harnesses'"
@@ -40,7 +44,8 @@
       </div>
     </header>
 
-    <div class="workspace">
+    <HordesPage v-if="hordesVisited" v-show="activeMode === 'hordes'" id="hordes-workspace" role="tabpanel" aria-labelledby="hordes-tab" :connected="settings.connected" :member-id="settings.member?.id || ''" @connected="refreshHordeIdentity" />
+    <div v-show="activeMode === 'chat'" id="chat-workspace" class="workspace" role="tabpanel" aria-labelledby="chat-tab">
       <aside v-if="leftOpen" class="left-sidebar">
         <div class="sidebar-search">
           <Search :size="15" />
@@ -421,7 +426,7 @@
               >
                 <span class="mention-dot"></span><strong>@{{ mentionHandle(harness) }}</strong
                 ><small
-                  >{{ harnessLabel(harness.harness) }} · {{ ownerName(harness.ownerId) }}</small
+                  >{{ ownedHarnessName(harness.harness, harness.ownerId, harness.name) }}</small
                 >
               </button>
             </div>
@@ -500,7 +505,7 @@
               ><Bot :size="15"
             /></span>
             <span class="participant-name"
-              >{{ harnessLabel(agent.harness)
+              >{{ ownedHarnessName(agent.harness, agent.ownerId, agent.name)
               }}<small
                 >{{ ownerName(agent.ownerId)
                 }}<template v-if="agent.model"> · {{ agent.model }}</template></small
@@ -606,6 +611,7 @@ import {
   X,
 } from 'lucide-vue-next';
 import ChatDialog from '../components/ChatDialog.vue';
+import HordesPage from '../components/HordesPage.vue';
 import { filterLocalConversations } from '../lib/catalog-filters';
 import { projectPathForConversation } from '../lib/project-chats';
 import { displayTranscriptMessages } from '../lib/native-transcript';
@@ -635,7 +641,12 @@ type PermissionRequest = {
   options?: { optionId: string; name: string }[];
 };
 
+function focusMode(mode: string): void { void nextTick(() => document.getElementById(`${mode}-tab`)?.focus()); }
+const activeMode = ref<'chat' | 'hordes'>('chat');
+const hordesVisited = ref(false);
+watch(activeMode, mode => { if (mode === 'hordes') hordesVisited.value = true; });
 const api = window.surprisedFace;
+async function refreshHordeIdentity(): Promise<void> { settings.value = await api.settings(); await loadWorkspace(); }
 const settings = ref<SurprisedFaceSettings>({
   backendUrl: '',
   displayName: '',
@@ -1651,14 +1662,20 @@ function harnessInitial(harness: string): string {
 }
 function authorName(message: SharedMessage): string {
   if (message.role === 'assistant') {
-    const harness = message.harness || agents.value.find((agent) => agent.id === message.agentId)?.harness;
-    return harness ? harnessLabel(harness) : 'Harness';
+    const agent = agents.value.find((item) => item.id === message.agentId);
+    const harness = message.harness || agent?.harness || '';
+    return ownedHarnessName(harness, message.ownerId || agent?.ownerId || '', message.agentName || agent?.name || '');
   }
   return (
     message.participantName ||
     members.value.find((member) => member.id === message.participantId)?.name ||
     (message.participantId === settings.value.member?.id ? settings.value.displayName : 'Member')
   );
+}
+function ownedHarnessName(harness: string, ownerId: string, fallbackName = ''): string {
+  const owner = members.value.find((member) => member.id === ownerId)?.name;
+  if (owner) return `${owner}'s ${harnessLabel(harness)}`;
+  return fallbackName || (harness ? harnessLabel(harness) : 'Harness');
 }
 function ownerName(ownerId: string): string {
   return members.value.find((member) => member.id === ownerId)?.name || 'owner';
@@ -1815,6 +1832,10 @@ button:disabled {
   font-size: 14px;
   letter-spacing: -0.2px;
 }
+.mode-tabs { display:flex; align-self:stretch; gap:24px; }
+.mode-tabs button { border:0; border-bottom:3px solid transparent; background:none; color:var(--muted); padding:0 8px; font-weight:550; }
+.mode-tabs button[aria-selected='true'] { border-bottom-color:var(--text); color:var(--text); }
+.mode-tabs button:focus-visible { outline:2px solid var(--blue); outline-offset:-5px; }
 .topbar-current {
   display: flex;
   align-items: center;

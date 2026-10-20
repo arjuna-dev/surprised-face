@@ -33,6 +33,7 @@ type SharedMember = { id: string; name: string; role: 'owner' | 'member' };
 type SharedAgent = { id: string; ownerId: string; name: string; harness: 'codex' | 'hermes'; model: string };
 
 interface SurprisedFaceApi {
+  hordeRequest(input: { action: string; projectId?: string; data?: unknown; deleted?: boolean }): Promise<unknown>;
   settings(): Promise<SurprisedFaceSettings>;
   availableHarnesses(): Promise<('codex' | 'hermes')[]>;
   updateSettings(input: Partial<SurprisedFaceSettings>): Promise<SurprisedFaceSettings>;

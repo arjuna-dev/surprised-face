@@ -79,6 +79,17 @@ export class RoomService extends EventEmitter {
     return result.body;
   }
 
+  async hordeRequest(input: { action: string; projectId?: string; data?: unknown; deleted?: boolean }): Promise<unknown> {
+    const methods: Record<string, string> = { list: 'GET', read: 'GET', create: 'POST', update: 'PATCH', delete: 'DELETE', join: 'POST', restore: 'POST', budget: 'PUT', members: 'PUT', messages: 'POST' };
+    const method = methods[input.action];
+    if (!method) throw new Error('Unknown horde action.');
+    const collection = ['list', 'create'].includes(input.action);
+    if (!collection && !/^[a-zA-Z0-9_-]+$/.test(input.projectId || '')) throw new Error('Choose a horde project.');
+    const suffix = ['join', 'restore', 'budget', 'members', 'messages'].includes(input.action) ? `/${input.action}` : '';
+    const route = `/v1/hordes${collection ? '' : `/${input.projectId}`}${suffix}${input.action === 'list' && input.deleted ? '?deleted=1' : ''}`;
+    return (await this.api(route, { method, ...(['POST', 'PUT', 'PATCH'].includes(method) ? { body: input.data || {} } : {}) })).body;
+  }
+
   async rooms(): Promise<ApiRoom[]> {
     const result = await this.api<{ rooms: ApiRoom[] }>('/v1/rooms');
     const rooms = (result.body.rooms || []).map((room) => {

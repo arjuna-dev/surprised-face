@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boolean; twoHarnesses?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean; hermesUnavailable?: boolean } = {}) {
+async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boolean; twoHarnesses?: boolean; ownerAttribution?: boolean; failCreate?: boolean; connected?: boolean; failCopy?: boolean; emptyInvite?: boolean; signedOut?: boolean; failSettings?: boolean; slowSettings?: boolean; failAccount?: boolean; failLogout?: boolean; slowInvite?: boolean; failInvite?: boolean; slowCatalog?: boolean; failCatalog?: boolean; hermesUnavailable?: boolean } = {}) {
   await page.addInitScript((options) => {
     const events: Record<string, ((value: unknown) => void)[]> = {};
     const state = {
@@ -9,7 +9,13 @@ async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boo
       account: options.signedOut ? null : { type: 'chatgpt', email: 'maya@example.test', planType: 'plus' },
       settings: { backendUrl: 'https://fixture.invalid', displayName: 'Maya', member: { id: 'maya', name: 'Maya', role: options.foreignOwned ? 'owner' : 'member' }, theme: 'mint-charcoal', agents: [], allowRemoteAgentRequests: false, connected: options.connected !== false },
       rooms: options.room ? [{ id: 'chat-1', name: 'Design review', createdBy: options.foreignOwned ? 'mukesh' : 'maya' }] : [],
-      sharedMessages: [] as Record<string, unknown>[], sharedAgents: options.room ? [
+      sharedMessages: options.ownerAttribution ? [
+        { id: 'aman-reply', roomId: 'chat-1', messageSeq: 1, participantId: 'aman-codex', participantName: 'Aman agent', role: 'assistant', text: 'Hi Alejandro!', state: 'complete', agentId: 'aman-codex', agentName: 'Aman agent', ownerId: 'aman', harness: 'codex', createdAt: '2026-10-20T19:42:00Z' },
+        { id: 'mukesh-reply', roomId: 'chat-1', messageSeq: 2, participantId: 'mukesh-codex', participantName: 'mukesh Codex', role: 'assistant', text: 'It really is!', state: 'complete', agentId: 'mukesh-codex', agentName: 'mukesh Codex', ownerId: 'mukesh', harness: 'codex', createdAt: '2026-10-20T19:43:00Z' },
+      ] as Record<string, unknown>[] : [] as Record<string, unknown>[], sharedAgents: options.ownerAttribution ? [
+        { id: 'aman-codex', name: 'Aman agent', ownerId: 'aman', harness: 'codex', model: '' },
+        { id: 'mukesh-codex', name: 'mukesh Codex', ownerId: 'mukesh', harness: 'codex', model: '' },
+      ] as Record<string, unknown>[] : options.room ? [
         { id: 'maya-codex', name: 'Codex', ownerId: 'maya', harness: 'codex', model: '' },
         ...(options.twoHarnesses ? [{ id: 'maya-hermes', name: 'Hermes', ownerId: 'maya', harness: 'hermes', model: '' }] : []),
       ] as Record<string, unknown>[] : [] as Record<string, unknown>[],
@@ -74,7 +80,9 @@ async function fixture(page: Page, options: { room?: boolean; foreignOwned?: boo
         }, 50);
         return { ok: true };
       },
-      members: async () => options.foreignOwned
+      members: async () => options.ownerAttribution
+        ? [{ id: 'maya', name: 'Maya', role: 'member' }, { id: 'aman', name: 'Aman', role: 'owner' }, { id: 'mukesh', name: 'Mukesh', role: 'member' }]
+        : options.foreignOwned
         ? [{ id: 'maya', name: 'Maya', role: 'owner' }, { id: 'mukesh', name: 'Mukesh', role: 'member' }]
         : [{ id: 'maya', name: 'Maya', role: 'member' }], agents: async () => state.sharedAgents, runPending: async () => ({}),
       nativeLink: async () => null,
@@ -588,6 +596,20 @@ test('shared chats lead the sidebar and the actual chat creator is labeled owner
   await expect(page.getByRole('button', { name: 'Rename Design review' })).toHaveCount(0);
 });
 
+test('shared replies and harness list identify the owner of each Codex harness', async ({ page }) => {
+  await fixture(page, { room: true, ownerAttribution: true });
+  await page.getByRole('button', { name: 'Design review', exact: true }).click();
+  await expect(page.locator('.chat-message').filter({ hasText: 'Hi Alejandro!' }).locator('.message-meta strong')).toHaveText("Aman's Codex");
+  await expect(page.locator('.chat-message').filter({ hasText: 'It really is!' }).locator('.message-meta strong')).toHaveText("Mukesh's Codex");
+  const harnesses = page.locator('.right-section').filter({ has: page.getByRole('heading', { name: 'Harnesses' }) });
+  await expect(harnesses).toContainText("Aman's Codex");
+  await expect(harnesses).toContainText("Mukesh's Codex");
+  await page.getByRole('textbox', { name: 'Message' }).fill('@');
+  await expect(page.locator('.mention-menu')).toContainText("Aman's Codex");
+  await expect(page.locator('.mention-menu')).toContainText("Mukesh's Codex");
+  await page.screenshot({ path: '../output/playwright/harness-owner-attribution.png' });
+});
+
 test('a chat owner renames the shared chat from the sidebar or header', async ({ page }) => {
   await fixture(page, { room: true });
   await page.getByRole('button', { name: 'Rename Design review' }).first().click();
@@ -607,4 +629,97 @@ test('a chat owner renames the shared chat from the sidebar or header', async ({
     { roomId: 'chat-1', name: 'Planning together' },
     { roomId: 'chat-1', name: 'Shared plan' },
   ]);
+});
+
+test('Hordes manages projects, skills, budgets, discussion and recoverable deletion', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    const projects: Record<string, unknown>[] = [];
+    let detail: Record<string, unknown>;
+    window.surprisedFace.hordeRequest = async ({ action, data, deleted }) => {
+      const input = (data || {}) as Record<string, unknown>;
+      if (action === 'list') return { projects: projects.filter(p => Boolean(p.deletedAt) === Boolean(deleted)) };
+      if (action === 'create') {
+        const project = { ...input, id: 'horde-1', revision: 1, myRole: 'warchief', createdBy: 'maya', memberCount: 1, totals: { tokens: 0, usd: 0, gpu_hours: 0 }, deletedAt: null };
+        projects.push(project); detail = { project, members: [{ id: 'maya', name: 'Maya', role: 'warchief' }], budgets: [], messages: [] };
+      }
+      const project = detail.project as Record<string, unknown>;
+      if (action === 'update') Object.assign(project, input, { revision: Number(project.revision) + 1 });
+      if (action === 'budget') { detail.budgets = [{ memberId: 'maya', name: 'Maya', ...input }]; (project.totals as Record<string, unknown>)[String(input.unit)] = input.amount; }
+      if (action === 'messages') (detail.messages as unknown[]).push({ id: 'm1', name: 'Maya', text: input.text, createdAt: new Date().toISOString() });
+      if (action === 'delete') project.deletedAt = new Date().toISOString();
+      if (action === 'restore') project.deletedAt = null;
+      return structuredClone(detail);
+    };
+  });
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Horde projects', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByLabel('Project name', { exact: true }).fill('Earth Commons');
+  await page.getByLabel('Project goal', { exact: true }).fill('A walkable planet built district by district.');
+  await page.getByLabel('GitHub repository', { exact: true }).fill('https://github.com/example/earth');
+  await page.getByRole('button', { name: 'Add skill', exact: true }).click();
+  await page.getByLabel('Skill name', { exact: true }).fill('Tile builder');
+  await page.getByLabel('Skill instructions', { exact: true }).fill('Validate boundary seams.');
+  await page.getByLabel('Tools', { exact: true }).fill('Blender, Godot');
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Earth Commons', exact: true })).toBeVisible();
+  await expect(page.getByText('Tile builder', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Set my budget', exact: true }).click();
+  await page.getByLabel('Budget amount', { exact: true }).fill('250000');
+  await page.getByRole('button', { name: 'Save commitment', exact: true }).click();
+  await expect(page.getByText('250,000 tokens', { exact: true }).first()).toBeVisible();
+  await page.getByLabel('Project message', { exact: true }).fill('I can build the first district.');
+  await page.getByRole('button', { name: 'Post message', exact: true }).click();
+  await expect(page.getByText('I can build the first district.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit project', exact: true }).click();
+  await page.getByLabel('Project name', { exact: true }).fill('Earth Together');
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Earth Together', exact: true })).toBeVisible();
+  await page.screenshot({ path: '../output/playwright/hordes-project.png' });
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  await page.getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await page.getByRole('button', { name: 'Trash', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore Earth Together', exact: true }).click();
+  await page.getByRole('button', { name: 'Projects', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open Earth Together', exact: true })).toBeVisible();
+  await page.screenshot({ path: '../output/playwright/hordes-cards.png' });
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open Earth Together', exact: true })).toBeVisible();
+});
+
+test('Hordes protects read-only UI and offers concrete project ideas', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    const project = { id: 'earth', name: 'Earth Commons', summary: 'Build one district.', category: 'Worlds', repositoryUrl: '', strategy: { id: 'spatial', parallelism: 3 }, skills: [], myRole: 'scout', memberCount: 2, totals: { tokens: 0, usd: 0, gpu_hours: 0 } };
+    window.surprisedFace.hordeRequest = async ({action}) => action === 'list' ? { projects: [project] } : { project, members: [{ id:'maya', name:'Maya', role:'scout' }], budgets: [], messages: [] };
+  });
+  await page.getByRole('tab', {name:'Hordes',exact:true}).click();
+  await page.getByRole('button', {name:'Open Earth Commons',exact:true}).click();
+  await expect(page.getByRole('button', {name:'Edit project',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button', {name:'Delete project',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button', {name:'Set my budget',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox', {name:'Project message',exact:true})).toHaveCount(0);
+  await page.getByRole('button', {name:'All projects',exact:true}).click();
+  await page.getByRole('button', {name:/^Project ideas/}).click();
+  await expect(page.getByRole('heading', {name:'Ramsey Frontier',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading', {name:'Frankenstein: The Arctic Testimony',exact:true})).toBeVisible();
+  await page.setViewportSize({width:1000,height:680});
+  await page.screenshot({path:'../output/playwright/hordes-ideas.png'});
+  expect(await page.locator('.hordes').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
+test('a failed Hordes save preserves the project draft for retry', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => { window.surprisedFace.hordeRequest = async ({action}) => { if(action === 'list') return {projects:[]}; throw new Error('Connection lost. Please retry.'); }; });
+  await page.getByRole('tab', {name:'Hordes',exact:true}).click();
+  await page.getByRole('button', {name:'Create project',exact:true}).click();
+  await page.getByLabel('Project name',{exact:true}).fill('A Billion Worlds');
+  await page.getByLabel('Project goal',{exact:true}).fill('Build three distinct planets.');
+  await page.getByRole('button', {name:'Save project',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Connection lost');
+  await expect(page.getByLabel('Project name',{exact:true})).toHaveValue('A Billion Worlds');
+  await expect(page.getByRole('button',{name:'Save project',exact:true})).toBeEnabled();
 });

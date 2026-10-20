@@ -32,6 +32,8 @@ try {
   worker.stderr.setEncoding('utf8').on('data', (chunk) => { output.stderr += chunk; });
 
   await waitForWorker();
+  const preflight = await fetch(`${baseUrl}/v1/hordes`, { method: 'OPTIONS' });
+  for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) assert.ok(preflight.headers.get('access-control-allow-methods').includes(method), `preflight permits ${method}`);
   const health = await api('/health');
   assert.equal(health.body.ok, true, 'local Worker serves health checks');
 
@@ -63,6 +65,38 @@ try {
   assert.equal((await api('/v1/join', { body: { code: inviteResult.body.invites[0].code, name: 'Again' } })).status, 403, 'an invite cannot be used twice');
   const jo = { member: joResult.body.member, token: joResult.body.token };
   const lee = { member: leeResult.body.member, token: leeResult.body.token };
+
+  const hordeInput = { name: 'Earth Commons', summary: 'A walkable planet.', category: 'Worlds', repositoryUrl: 'https://github.com/example/earth', strategy: { parallelism: 4 }, skills: [{ name: 'Tile builder', instructions: 'Validate seams.', tools: ['Blender'] }] };
+  const hc = await api('/v1/hordes', { token: ownerToken, body: hordeInput });
+  assert.equal(hc.status, 201, 'horde creation uses shared database');
+  const hp = `/v1/hordes/${hc.body.project.id}`;
+  assert.equal((await api('/v1/hordes', { token: jo.token })).body.projects[0].name, 'Earth Commons');
+  assert.equal((await api(hp, { token: jo.token, method: 'PATCH', body: { ...hordeInput, revision: 1 } })).status, 403);
+  await api(`${hp}/join`, { token: jo.token, body: {} });
+  await api(`${hp}/budget`, { token: jo.token, method: 'PUT', body: { amount: 100000, unit: 'tokens' } });
+  assert.equal((await api(`${hp}/budget`, { token: jo.token, method: 'PUT', body: { amount: -1, unit: 'tokens' } })).status, 400);
+  assert.equal((await api(`${hp}/budget`, { token: lee.token, method: 'PUT', body: { memberId: jo.member.id, amount: 2, unit: 'usd' } })).status, 403);
+  await api(`${hp}/members`, { token: ownerToken, method: 'PUT', body: { memberId: jo.member.id, role: 'warlord' } });
+  const hu = await api(hp, { token: jo.token, method: 'PATCH', body: { ...hordeInput, revision: 1, name: 'Earth Together' } });
+  assert.equal(hu.body.project.name, 'Earth Together');
+  assert.equal(hu.body.project.skills[0].tools[0], 'Blender');
+  assert.equal((await api(hp, { token: ownerToken, method: 'PATCH', body: { ...hordeInput, revision: 1 } })).status, 409);
+  assert.equal((await api(hp, { token: jo.token, method: 'DELETE' })).status, 403);
+  assert.equal((await api(`${hp}/members`, { token: jo.token, method: 'PUT', body: { memberId: jo.member.id, role: 'warchief' } })).status, 403);
+  await api(`${hp}/messages`, { token: jo.token, body: { clientId: 'hello', text: 'First tile ready.' } });
+  await api(`${hp}/messages`, { token: jo.token, body: { clientId: 'hello', text: 'First tile ready.' } });
+  const hr = await api(hp, { token: ownerToken });
+  assert.equal(hr.body.messages.length, 1);
+  assert.ok(Number.isSafeInteger(hr.body.messages[0].messageSeq), 'discussion has a stable database order');
+  assert.equal(hr.body.budgets[0].amount, 100000);
+  await api(`${hp}/members`, { token: ownerToken, method: 'PUT', body: { memberId: jo.member.id, role: 'scout' } });
+  assert.equal((await api(`${hp}/messages`, { token: jo.token, body: { clientId: 'scout', text: 'No write' } })).status, 403);
+  assert.equal((await api('/v1/hordes', { token: ownerToken, body: { ...hordeInput, repositoryUrl: 'javascript:alert(1)' } })).status, 400);
+  await api(hp, { token: ownerToken, method: 'DELETE' });
+  assert.equal((await api(hp, { token: jo.token })).status, 404);
+  assert.equal((await api('/v1/hordes?deleted=1', { token: ownerToken })).body.projects.length, 1);
+  await api(`${hp}/restore`, { token: ownerToken, body: {} });
+  assert.equal((await api(hp, { token: ownerToken })).body.messages.length, 1);
 
   const joRooms = await api('/v1/rooms', { token: jo.token });
   assert.deepEqual(joRooms.body.rooms.map((room) => room.id), [roomId], 'a code grants access to its chat');
@@ -188,6 +222,7 @@ try {
   assert.ok(laterMessage.body.messageSeq > firstTurn.body.turn.context.at(-1).messageSeq, 'messages sent while streaming receive later message positions');
 
   const checks = [
+    ['Hordes', 'Real database: project CRUD, roles, revision conflicts, skills, budgets, discussion, deletion and restore.', 'Pass'],
     ['Session identity', 'Owner and invited members authenticate with their participant IDs.', 'Pass'],
     ['App account creation', 'A new person can register without a Cloudflare key and cannot read existing chats.', 'Pass'],
     ['Chat invite access', 'Codes admit people to one chat; new chats stay private until invited.', 'Pass'],
