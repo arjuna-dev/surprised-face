@@ -62,6 +62,29 @@ test('a message from the app is delivered to the open Codex thread and its reply
   }
 });
 
+test('shared context is saved to the desktop chat without waiting for a model reply', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-append-'));
+  const sessionFile = path.join(root, 'session.jsonl');
+  writeFileSync(sessionFile, `${record('user', 'Hello from Codex')}\n`);
+  const socketPath = path.join(root, 'ipc.sock');
+  const server = await listen(socketPath, (message, socket) => {
+    if (message.method === 'initialize') {
+      writeFrame(socket, { type: 'response', requestId: message.requestId, resultType: 'success', result: { clientId: 'desktop-client' } });
+      return;
+    }
+    writeFrame(socket, { type: 'response', requestId: message.requestId, resultType: 'success', result: {} });
+    writeFileSync(sessionFile, `${readFileSync(sessionFile, 'utf8')}${record('user', 'Maya:\nHello')}\n`);
+  });
+  const link = new CodexDesktopLink({ socketPath, sessionFile, acceptTimeoutMs: 500 });
+  try {
+    await link.appendPlainText({ threadId: 'thread-1', text: 'Maya:\nHello', cwd: '/work/game' });
+    assert.equal(messagesFromCodexSession(readFileSync(sessionFile, 'utf8')).messages.some((item) => item.role === 'assistant'), false);
+  } finally {
+    link.close();
+    server.close();
+  }
+});
+
 test('desktop replies are copied as they appear before the turn finishes', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'codex-stream-'));
   const sessionFile = path.join(root, 'session.jsonl');
