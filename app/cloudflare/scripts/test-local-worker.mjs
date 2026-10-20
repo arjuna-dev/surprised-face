@@ -16,6 +16,8 @@ const wranglerPath = path.join(cloudflareRoot, 'node_modules/wrangler/bin/wrangl
 const sessionSecret = randomBytes(32).toString('hex');
 const adminSecret = randomBytes(32).toString('hex');
 const googleClientId = 'local-test-client.apps.googleusercontent.com';
+const googleClientSecret = randomBytes(32).toString('base64url');
+const googleCodes = new Map();
 const googleKeys = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const googleKeyId = randomBytes(8).toString('hex');
 const googleJwk = { ...googleKeys.publicKey.export({ format: 'jwk' }), kid: googleKeyId, use: 'sig', alg: 'RS256' };
@@ -24,6 +26,29 @@ const jwksServer = createHttpServer((_request, response) => {
   response.end(JSON.stringify({ keys: [googleJwk] }));
 });
 const jwksPort = await listenServer(jwksServer);
+const tokenServer = createHttpServer(async (request, response) => {
+  let text = '';
+  for await (const chunk of request) text += chunk.toString();
+  const form = new URLSearchParams(text);
+  const pending = googleCodes.get(form.get('code'));
+  const valid = request.method === 'POST'
+    && form.get('client_id') === googleClientId
+    && form.get('client_secret') === googleClientSecret
+    && form.get('grant_type') === 'authorization_code'
+    && pending
+    && !pending.used
+    && form.get('code_verifier') === pending.codeVerifier
+    && form.get('redirect_uri') === pending.redirectUri;
+  if (!valid) {
+    response.writeHead(400, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ error: 'invalid_grant', error_description: 'The test authorization code or PKCE exchange is invalid.' }));
+    return;
+  }
+  pending.used = true;
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({ id_token: pending.idToken }));
+});
+const tokenPort = await listenServer(tokenServer);
 const stateDir = await mkdtemp(path.join(path.resolve('/tmp'), 'surprised-face-worker-test-'));
 const port = await reservePort();
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -37,7 +62,8 @@ try {
     wranglerPath, 'dev', '--local', '--ip', '127.0.0.1', '--port', String(port),
     '--persist-to', stateDir, '--show-interactive-dev-session=false',
     '--var', `SESSION_SECRET:${sessionSecret}`, '--var', `ADMIN_SECRET:${adminSecret}`,
-    '--var', `GOOGLE_CLIENT_ID:${googleClientId}`, '--var', `GOOGLE_JWKS_URL:http://127.0.0.1:${jwksPort}/certs`,
+    '--var', `GOOGLE_CLIENT_ID:${googleClientId}`, '--var', `GOOGLE_CLIENT_SECRET:${googleClientSecret}`,
+    '--var', `GOOGLE_JWKS_URL:http://127.0.0.1:${jwksPort}/certs`, '--var', `GOOGLE_TOKEN_URL:http://127.0.0.1:${tokenPort}/token`,
   ], { cwd: cloudflareRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   worker.stdout.setEncoding('utf8').on('data', (chunk) => { output.stdout += chunk; });
   worker.stderr.setEncoding('utf8').on('data', (chunk) => { output.stderr += chunk; });
@@ -53,18 +79,13 @@ try {
   const owner = boot.body.member;
   const legacyOwnerToken = makeLegacyToken(owner);
   assert.equal((await api('/v1/me', { token: legacyOwnerToken })).status, 401, 'legacy sessions cannot access chat data before Google linking');
-  const badChallenge = (await api('/v1/auth/google/challenge', { body: {} })).body;
-  const badAudience = await api('/v1/auth/google/complete', {
-    body: { idToken: makeGoogleToken('google-sub-maya', 'Maya', badChallenge.nonce, 'other-client.apps.googleusercontent.com'), challenge: badChallenge.challenge },
-  });
+  const badAudienceCompletion = await googleAuthorization('google-sub-maya', 'Maya', 'other-client.apps.googleusercontent.com');
+  const badAudience = await api('/v1/auth/google/complete', { body: badAudienceCompletion });
   assert.equal(badAudience.status, 401, 'the Worker rejects an ID token minted for a different OAuth client');
   const ownerLogin = await googleLogin('google-sub-maya', 'Maya', legacyOwnerToken);
   assert.equal(ownerLogin.member.id, owner.id, 'a verified Google sign-in links the existing member only with its valid legacy session');
-  const conflictChallenge = (await api('/v1/auth/google/challenge', { body: {} })).body;
-  const conflictingLink = await api('/v1/auth/google/complete', {
-    token: legacyOwnerToken,
-    body: { idToken: makeGoogleToken('google-sub-other', 'Maya', conflictChallenge.nonce), challenge: conflictChallenge.challenge },
-  });
+  const conflictCompletion = await googleAuthorization('google-sub-other', 'Maya');
+  const conflictingLink = await api('/v1/auth/google/complete', { token: legacyOwnerToken, body: conflictCompletion });
   assert.equal(conflictingLink.status, 409, 'an existing account cannot be linked to a second Google identity');
   const ownerToken = ownerLogin.token;
   const unauthenticatedProjects = await api('/v1/rooms');
@@ -74,8 +95,11 @@ try {
   const niaLogin = await googleLogin('google-sub-nia', 'Nia');
   assert.deepEqual((await api('/v1/rooms', { token: niaLogin.token })).body.rooms, [], 'a new Google account has no access to existing chats');
   assert.equal((await googleLogin('google-sub-nia', 'Nia')).member.id, niaLogin.member.id, 'signing in again returns the existing Google-linked account');
-  const replay = await api('/v1/auth/google/complete', { body: ownerLogin.completion });
-  assert.equal(replay.status, 409, 'the same OIDC nonce cannot be replayed to mint another session');
+  const repeatedNonce = await googleAuthorization('google-sub-maya', 'Maya', googleClientId, ownerLogin.completion.challenge);
+  const nonceReplay = await api('/v1/auth/google/complete', { body: repeatedNonce });
+  assert.equal(nonceReplay.status, 409, 'a signed challenge nonce cannot be reused with a second Google authorization code');
+  const codeReplay = await api('/v1/auth/google/complete', { body: ownerLogin.completion });
+  assert.equal(codeReplay.status, 400, 'a consumed Google authorization code cannot be replayed');
   const identity = await api('/v1/me', { token: ownerToken });
   assert.equal(identity.body.id, owner.id, 'session identity exposes the member ID');
 
@@ -309,8 +333,10 @@ try {
 
   const checks = [
     ['Hordes', 'Real database: project CRUD, roles, revision conflicts, skills, budgets, discussion, deletion and restore.', 'Pass'],
-    ['Google sign-in', 'A generated Google ID token with a trusted test RSA key creates or reuses an account; an existing member links only with its valid legacy session.', 'Pass'],
-    ['OAuth token verification', 'Wrong audiences and conflicting account links are rejected; one-time OIDC nonces cannot be replayed.', 'Pass'],
+    ['Google sign-in', 'A Google authorization code is exchanged by the Worker with its server-side client secret; the verified ID token creates or reuses an account and an existing member links only with its valid legacy session.', 'Pass'],
+    ['OAuth code replay protection', 'The local Google token endpoint rejects a second exchange of a consumed authorization code.', 'Pass'],
+    ['OAuth token verification', 'Wrong audiences and conflicting account links are rejected after server-side code exchange; one-time OIDC nonces remain bound to their sign-in challenge.', 'Pass'],
+
     ['Opaque session lifecycle', 'The Worker stores a hash of the app session, denies old sessions, and revokes a session at sign-out.', 'Pass'],
     ['Authentication required', 'Name-only registration and invite-based account creation are disabled; chat data requires a verified account session.', 'Pass'],
     ['Daily chat limit', 'Concurrent local reservations and shared room creation stop at 100 per account per UTC day; request retries do not double count.', 'Pass'],
@@ -341,6 +367,7 @@ try {
     await Promise.race([once(worker, 'close'), delay(2_000)]);
   }
   await rm(stateDir, { recursive: true, force: true });
+  await new Promise((resolve) => tokenServer.close(resolve));
   await new Promise((resolve) => jwksServer.close(resolve));
 }
 
@@ -418,12 +445,26 @@ async function listenServer(server) {
 }
 
 async function googleLogin(sub, name, legacyToken) {
-  const challenge = (await api('/v1/auth/google/challenge', { body: {} })).body;
-  const completion = { idToken: makeGoogleToken(sub, name, challenge.nonce), challenge: challenge.challenge };
+  const completion = await googleAuthorization(sub, name);
   const result = await api('/v1/auth/google/complete', { token: legacyToken, body: completion });
   assert.equal(result.status, 200, `Google sign-in should complete for ${name}: ${JSON.stringify(result.body)}`);
   assert.equal('email' in result.body.member, false, 'the sign-in response does not expose an email address');
   return { ...result.body, completion };
+}
+
+async function googleAuthorization(sub, name, audience = googleClientId, challengeValue) {
+  const challenge = challengeValue ? { challenge: challengeValue } : (await api('/v1/auth/google/challenge', { body: {} })).body;
+  const claims = JSON.parse(Buffer.from(challenge.challenge.split('.')[0], 'base64url').toString('utf8'));
+  const authorizationCode = randomUUID();
+  const codeVerifier = randomBytes(32).toString('base64url');
+  const redirectUri = 'http://127.0.0.1:49152';
+  googleCodes.set(authorizationCode, {
+    codeVerifier,
+    redirectUri,
+    idToken: makeGoogleToken(sub, name, claims.nonce, audience),
+    used: false,
+  });
+  return { authorizationCode, codeVerifier, redirectUri, challenge: challenge.challenge };
 }
 
 function makeGoogleToken(sub, name, nonce, audience = googleClientId) {

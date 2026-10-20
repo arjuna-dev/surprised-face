@@ -2,7 +2,6 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const OAUTH_TIMEOUT_MS = 5 * 60_000;
 
 export function createPkcePair(): { verifier: string; challenge: string } {
@@ -73,28 +72,18 @@ export async function signInWithGoogle(input: {
     });
     await input.openExternal(authorizationUrl.toString());
     const { code } = await callback.result;
-    const form = new URLSearchParams({
-      client_id: input.clientId,
-      code,
-      code_verifier: verifier,
-      grant_type: 'authorization_code',
-      redirect_uri: callback.redirectUri,
-    });
-    const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-      body: form,
-    });
-    const tokenBody = await readResponse<{ id_token?: string }>(tokenResponse);
-    if (!tokenBody.id_token) throw new Error('Google did not return a sign-in token. Please try again.');
-
     const completeResponse = await fetch(new URL('/v1/auth/google/complete', backend), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         ...(input.currentToken ? { authorization: `Bearer ${input.currentToken}` } : {}),
       },
-      body: JSON.stringify({ idToken: tokenBody.id_token, challenge: challengeBody.challenge }),
+      body: JSON.stringify({
+        authorizationCode: code,
+        codeVerifier: verifier,
+        redirectUri: callback.redirectUri,
+        challenge: challengeBody.challenge,
+      }),
     });
     return await readResponse(completeResponse);
   } finally {
@@ -105,7 +94,9 @@ export async function signInWithGoogle(input: {
 async function readResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (!response.ok) {
-    const message = typeof body.error === 'string' ? body.error : 'Sign-in failed. Please try again.';
+    const code = typeof body.error === 'string' ? body.error : '';
+    const description = typeof body.error_description === 'string' ? body.error_description.trim().slice(0, 240) : '';
+    const message = [code, description].filter(Boolean).join(': ') || 'Sign-in failed. Please try again.';
     throw new Error(message);
   }
   return body as T;

@@ -22,7 +22,7 @@ const checks = [
     name: 'Google sign-in request',
     test: 'Google authorization uses a system-browser code flow with PKCE and minimal scopes',
     input: 'A desktop OAuth client, loopback URI, random verifier/state, and a server-issued nonce.',
-    result: 'Authorization uses openid/profile, S256 PKCE, state, and nonce without a client secret.',
+    result: 'Authorization uses openid/profile, S256 PKCE, state, and nonce. The app carries no Google client secret.',
   },
   {
     name: 'Google callback validation',
@@ -32,9 +32,9 @@ const checks = [
   },
   {
     name: 'Google browser redirect',
-    test: 'Google sign-in completes the loopback redirect and exchanges the code with PKCE',
-    input: 'Simulate Google returning an authorization code to the temporary localhost callback, then exchange it with PKCE.',
-    result: 'The callback is scrubbed from browser history, no-store security headers are returned, and only the verified code flow reaches the Worker.',
+    test: 'Google sign-in sends the code and PKCE verifier only to the HTTPS Worker',
+    input: 'Simulate Google returning an authorization code to the temporary localhost callback, then send the code, verifier, redirect URI, and signed challenge to the Worker.',
+    result: 'The callback is scrubbed from browser history, and the Google authorization code is exchanged only by the Worker using its server-side secret.',
   },
   {
     name: 'Waiting for the owner',

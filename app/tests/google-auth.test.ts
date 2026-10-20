@@ -35,7 +35,7 @@ void test('OAuth callback accepts only a matching state and a non-empty authoriz
   assert.throws(() => readOAuthCallback(new URL('http://127.0.0.1/?error=access_denied&state=good'), 'good'), /cancel/i);
 });
 
-void test('Google sign-in completes the loopback redirect and exchanges the code with PKCE', async () => {
+void test('Google sign-in sends the code and PKCE verifier only to the HTTPS Worker', async () => {
   const originalFetch = globalThis.fetch;
   const requests: { url: string; init: RequestInit | undefined }[] = [];
   const mockFetch: typeof fetch = async (input, init) => {
@@ -44,8 +44,6 @@ void test('Google sign-in completes the loopback redirect and exchanges the code
     requests.push({ url, init });
     if (url.endsWith('/v1/auth/google/challenge'))
       return new Response(JSON.stringify({ nonce: 'server-nonce', challenge: 'signed-challenge' }), { status: 200 });
-    if (url === 'https://oauth2.googleapis.com/token')
-      return new Response(JSON.stringify({ id_token: 'signed-google-id-token' }), { status: 200 });
     if (url.endsWith('/v1/auth/google/complete'))
       return new Response(JSON.stringify({ member: { id: 'member-1', name: 'Maya', role: 'member' }, token: 'opaque-session' }), { status: 200 });
     throw new Error(`Unexpected request to ${url}`);
@@ -72,23 +70,54 @@ void test('Google sign-in completes the loopback redirect and exchanges the code
       },
     });
     assert.deepEqual(result, { member: { id: 'member-1', name: 'Maya', role: 'member' }, token: 'opaque-session' });
-    assert.equal(requests.length, 3);
-    const tokenRequest = requests.find((request) => request.url === 'https://oauth2.googleapis.com/token');
-    assert.ok(tokenRequest?.init?.body instanceof URLSearchParams);
-    const tokenForm = tokenRequest?.init?.body;
-    assert.equal(tokenForm.get('code'), 'google-auth-code');
-    assert.equal(tokenForm.get('code_verifier')?.length, 43);
-    assert.equal(tokenForm.has('client_secret'), false);
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every((request) => new URL(request.url).hostname !== 'oauth2.googleapis.com'));
     const completeRequest = requests.find((request) => request.url.endsWith('/v1/auth/google/complete'));
     assert.equal(new Headers(completeRequest?.init?.headers).get('authorization'), 'Bearer legacy-app-session');
     assert.ok(typeof completeRequest?.init?.body === 'string');
-    assert.deepEqual(JSON.parse(completeRequest.init.body), { idToken: 'signed-google-id-token', challenge: 'signed-challenge' });
+    const completion = JSON.parse(completeRequest.init.body);
+    assert.equal(completion.authorizationCode, 'google-auth-code');
+    assert.match(completion.codeVerifier, /^[A-Za-z0-9_-]{43,128}$/);
+    assert.match(completion.redirectUri, /^http:\/\/127\.0\.0\.1:\d+$/);
+    assert.equal(completion.challenge, 'signed-challenge');
+    assert.equal('idToken' in completion, false);
+    assert.equal('clientSecret' in completion, false);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-void test('Google sign-in refuses to send an identity token to a non-HTTPS backend', async () => {
+void test('Google Worker errors include the token exchange description', async () => {
+  const originalFetch = globalThis.fetch;
+  const mockFetch: typeof fetch = async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (new URL(url).hostname === '127.0.0.1') return originalFetch(input, init);
+    if (url.endsWith('/v1/auth/google/challenge'))
+      return new Response(JSON.stringify({ nonce: 'server-nonce', challenge: 'signed-challenge' }), { status: 200 });
+    if (url.endsWith('/v1/auth/google/complete'))
+      return new Response(JSON.stringify({ error: 'google_token_exchange_failed', error_description: 'Google OAuth client is not configured.' }), { status: 400 });
+    throw new Error(`Unexpected request to ${url}`);
+  };
+  globalThis.fetch = mockFetch;
+  try {
+    await assert.rejects(signInWithGoogle({
+      backendUrl: 'https://rooms.example',
+      clientId: 'desktop-client.apps.googleusercontent.com',
+      openExternal: async (authorizationUrl) => {
+        const authorization = new URL(authorizationUrl);
+        const redirectUri = authorization.searchParams.get('redirect_uri');
+        assert.ok(redirectUri);
+        const callback = new URL(redirectUri);
+        callback.search = new URLSearchParams({ code: 'google-auth-code', state: authorization.searchParams.get('state') || '' }).toString();
+        assert.equal((await originalFetch(callback)).status, 200);
+      },
+    }), /google_token_exchange_failed: Google OAuth client is not configured\./);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+void test('Google sign-in refuses to send an authorization code to a non-HTTPS backend', async () => {
   let openedBrowser = false;
   await assert.rejects(signInWithGoogle({
     backendUrl: 'http://example.invalid',

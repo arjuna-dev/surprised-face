@@ -41,8 +41,8 @@
       <section>
         <h2>Sign-in and privacy</h2>
         <ul>
-          <li>At startup, <a href="app/src/pages/IndexPage.vue">the interface</a> checks the saved app session before asking Electron for local project or chat data. Google sign-in opens the system browser. <a href="app/src-electron/google-auth.ts">The Electron main process</a> validates the loopback callback state and PKCE exchange, then sends the ID token to the Worker.</li>
-          <li><a href="app/cloudflare/src/index.ts">The Worker</a> verifies Google's ID-token signature, issuer, client audience, expiry, and one-time nonce. It stores the Google subject and display name, issues a random app session, and stores only the session token hash. Existing account linking requires a valid prior session; it does not match email or name.</li>
+          <li>At startup, <a href="app/src/pages/IndexPage.vue">the interface</a> checks the saved app session before asking Electron for local project or chat data. Google sign-in opens the system browser. <a href="app/src-electron/google-auth.ts">Electron</a> validates the loopback callback state and sends the short-lived authorization code, PKCE verifier, redirect URI, and signed challenge to the Worker over HTTPS.</li>
+          <li><a href="app/cloudflare/src/index.ts">The Worker</a> exchanges the code using the Google client secret stored in Cloudflare, then verifies the ID-token signature, issuer, client audience, expiry, and one-time nonce. It stores the Google subject and display name, issues a random app session, and stores only the session token hash. The Google client secret and ID token do not enter the desktop app. Existing account linking requires a valid prior session; it does not match email or name.</li>
           <li>The app requests `openid profile`; project names and chat history are not part of the Google sign-in request. Electron stores the app session with `safeStorage`. Sign-out revokes that session in the Worker.</li>
         </ul>
       </section>

@@ -7,6 +7,8 @@ interface Env {
   SESSION_SECRET: string;
   ADMIN_SECRET: string;
   GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_TOKEN_URL?: string;
   GOOGLE_JWKS_URL?: string;
   APP_ORIGIN?: string;
 }
@@ -42,7 +44,7 @@ export default {
       if (url.pathname === '/health' && request.method === 'GET') return response({ ok: true, service: 'surprised-face-rooms' }, 200, env);
 
       if (url.pathname === '/v1/auth/google/challenge' && request.method === 'POST') {
-        if (!env.GOOGLE_CLIENT_ID) return response({ error: 'Google sign-in is not configured yet.' }, 503, env);
+        if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return response({ error: 'Google sign-in is not configured yet.' }, 503, env);
         const nonce = randomToken(32);
         const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
         const challenge = await signChallenge({ nonce, exp: expiresAt }, env.SESSION_SECRET);
@@ -50,10 +52,11 @@ export default {
       }
 
       if (url.pathname === '/v1/auth/google/complete' && request.method === 'POST') {
-        if (!env.GOOGLE_CLIENT_ID) return response({ error: 'Google sign-in is not configured yet.' }, 503, env);
-        const input = await readJson<{ idToken?: string; challenge?: string }>(request);
+        if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return response({ error: 'Google sign-in is not configured yet.' }, 503, env);
+        const input = await readJson<{ authorizationCode?: string; codeVerifier?: string; redirectUri?: string; challenge?: string }>(request);
         const challenge = await verifyChallenge(input.challenge || '', env.SESSION_SECRET);
-        const googleIdentity = await verifyGoogleIdToken(input.idToken || '', challenge.nonce, env.GOOGLE_CLIENT_ID, env.GOOGLE_JWKS_URL);
+        const idToken = await exchangeGoogleAuthorizationCode(input, env);
+        const googleIdentity = await verifyGoogleIdToken(idToken, challenge.nonce, env.GOOGLE_CLIENT_ID, env.GOOGLE_JWKS_URL);
         const legacyToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
         const legacyIdentity = legacyToken ? await verifyLegacySession(legacyToken, env.SESSION_SECRET) : null;
         const token = randomToken(32);
@@ -247,7 +250,8 @@ export default {
       return response({ error: 'Not found.' }, 404, env);
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 400;
-      return response({ error: error instanceof Error ? error.message : 'Request failed.' }, status, env);
+      const body = { error: error instanceof Error ? error.message : 'Request failed.', ...(error instanceof HttpError ? error.details : {}) };
+      return response(body, status, env);
     }
   },
 };
@@ -928,6 +932,67 @@ async function verifyChallenge(value: string, secret: string): Promise<{ nonce: 
   return { nonce: claims.nonce, exp: claims.exp };
 }
 
+async function exchangeGoogleAuthorizationCode(
+  input: { authorizationCode?: string; codeVerifier?: string; redirectUri?: string },
+  env: Env,
+): Promise<string> {
+  const code = input.authorizationCode || '';
+  const verifier = input.codeVerifier || '';
+  const redirectUri = input.redirectUri || '';
+  if (!code || code.length > 4096 || /[\u0000-\u001f\u007f]/.test(code))
+    throw new HttpError('Google did not return a valid sign-in code. Please try again.', 400);
+  if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier))
+    throw new HttpError('Google sign-in could not verify the authorization code. Please try again.', 400);
+
+  let callback: URL;
+  try { callback = new URL(redirectUri); } catch { throw new HttpError('Google sign-in callback is invalid.', 400); }
+  const callbackPort = Number(callback.port);
+  if (callback.protocol !== 'http:' || callback.hostname !== '127.0.0.1' || !Number.isInteger(callbackPort) || callbackPort < 1 || callbackPort > 65535 || callback.pathname !== '/' || callback.search || callback.hash || callback.username || callback.password)
+    throw new HttpError('Google sign-in callback is invalid.', 400);
+
+  let tokenEndpoint: URL;
+  try { tokenEndpoint = new URL(env.GOOGLE_TOKEN_URL || 'https://oauth2.googleapis.com/token'); }
+  catch { throw new HttpError('Google sign-in is not configured correctly.', 503); }
+  const googleEndpoint = tokenEndpoint.protocol === 'https:' && tokenEndpoint.hostname === 'oauth2.googleapis.com' && tokenEndpoint.pathname === '/token';
+  const localTestEndpoint = env.GOOGLE_TOKEN_URL && tokenEndpoint.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(tokenEndpoint.hostname) && tokenEndpoint.pathname === '/token';
+  if ((!googleEndpoint && !localTestEndpoint) || tokenEndpoint.username || tokenEndpoint.password || tokenEndpoint.search || tokenEndpoint.hash)
+    throw new HttpError('Google sign-in is not configured correctly.', 503);
+
+  const form = new URLSearchParams({
+    client_id: env.GOOGLE_CLIENT_ID,
+    client_secret: env.GOOGLE_CLIENT_SECRET,
+    code,
+    code_verifier: verifier,
+    grant_type: 'authorization_code',
+    redirect_uri: callback.toString().replace(/\/$/, ''),
+  });
+  let tokenResponse: Response;
+  try {
+    tokenResponse = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+      body: form,
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new HttpError('Could not contact Google to complete sign-in. Please try again.', 503);
+  }
+  const body = await tokenResponse.json().catch(() => ({})) as Record<string, unknown>;
+  if (!tokenResponse.ok) {
+    const errorCode = typeof body.error === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.error)
+      ? body.error
+      : 'Google token exchange failed.';
+    const errorDescription = typeof body.error_description === 'string'
+      ? body.error_description.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 240)
+      : '';
+    const details = errorDescription ? { error_description: errorDescription } : undefined;
+    throw new HttpError(errorCode, tokenResponse.status === 400 ? 400 : 502, details);
+  }
+  if (typeof body.id_token !== 'string' || !body.id_token || body.id_token.length > 16_384)
+    throw new HttpError('Google did not return a valid sign-in token. Please try again.', 502);
+  return body.id_token;
+}
+
 type GoogleJwk = JsonWebKey & { kid?: string; use?: string; alg?: string };
 let googleJwksCache: { url: string; keys: GoogleJwk[]; expiresAt: number } | null = null;
 async function verifyGoogleIdToken(token: string, expectedNonce: string, clientId: string, configuredJwksUrl?: string): Promise<{ sub: string; name: string }> {
@@ -1005,4 +1070,6 @@ async function verifyLegacySession(token: string, secret: string): Promise<Ident
   } catch { return null; }
 }
 function requireAdmin(request: Request, env: Env) { if (!env.ADMIN_SECRET || request.headers.get('authorization') !== `Bearer ${env.ADMIN_SECRET}`) throw new HttpError('Admin access denied.', 403); }
-class HttpError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+class HttpError extends Error {
+  constructor(message: string, readonly status: number, readonly details?: Record<string, unknown>) { super(message); }
+}
