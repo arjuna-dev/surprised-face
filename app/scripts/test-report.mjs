@@ -19,6 +19,42 @@ for (const match of output.matchAll(/^(ok|not ok) \d+ - (.+)$/gm)) results.set(m
 
 const checks = [
   {
+    name: 'Waiting for the owner',
+    test: 'a mention waiting on someone else names that person',
+    input: 'Mukesh tags Aman\'s Codex and the turn is waiting for permission.',
+    result: 'Mukesh sees waiting for Aman. Aman sees waiting for you.',
+  },
+  {
+    name: 'One row for a shared chat',
+    test: 'a local chat linked to a shared room is not listed again',
+    input: 'Codex session a is already linked to a shared room. Sessions b and c are not.',
+    result: 'The local list keeps b and c.',
+  },
+  {
+    name: 'Reply label',
+    test: 'a shared reply is labeled with its owner and harness',
+    input: 'An assistant message belongs to mukesh and Codex.',
+    result: 'The label is mukesh · Codex. A human message keeps the person name.',
+  },
+  {
+    name: 'Harness context append',
+    test: 'new shared messages are appended once to the linked harness session',
+    input: 'A linked Codex session has not seen Maya and Noah, then Maya sends one more message.',
+    result: 'The session receives the first two lines, then only the newer line. Nothing is written back to the room.',
+  },
+  {
+    name: 'Mention stays a turn',
+    test: 'a mention that queued a turn is left for that turn',
+    input: 'A chat line is followed by a mention that already queued a turn.',
+    result: 'The chat line is appended and the mention is left for the harness turn.',
+  },
+  {
+    name: 'Context without a reply',
+    test: 'shared context is saved to the desktop chat without waiting for a model reply',
+    input: 'Codex desktop stores the shared line and does not write an assistant message.',
+    result: 'The append finishes with only the shared line in the session.',
+  },
+  {
     name: 'Harness availability',
     test: 'unavailable harnesses are not advertised for turns',
     input: 'Codex is installed and Hermes is absent.',

@@ -506,7 +506,8 @@
                 }}<template v-if="agent.model"> · {{ agent.model }}</template></small
               ></span
             >
-            <span class="agent-state" :class="harnessState(agent.id)">{{ harnessState(agent.id) }}</span>
+            <button v-if="harnessState(agent.id) === 'waiting' && agent.ownerId === settings.member?.id" type="button" class="agent-state waiting" @click="showMentionPrompt(agent)">{{ harnessStateLabel(agent) }}</button>
+            <span v-else class="agent-state" :class="harnessState(agent.id)">{{ harnessStateLabel(agent) }}</span>
           </div>
           <p v-if="selectedRoom && !visibleHarnesses.length" class="sidebar-note">No harnesses are available in this chat.</p>
         </div>
@@ -547,6 +548,17 @@
           <button type="submit" class="primary-button" :disabled="joining || !joinDraft.trim() || (!settings.connected && !joinName.trim())">{{ joining ? 'Joining...' : 'Join chat' }}</button>
         </div>
       </form>
+    </ChatDialog>
+
+    <ChatDialog v-if="visibleMentionPrompt" title="Allow this mention" return-focus=".right-section h2" @close="visibleMentionPrompt = null">
+      <div class="invite-content">
+        <p>{{ mentionRequesterName }} wants to use your {{ harnessLabel(visibleMentionPrompt.harness) }}.</p>
+        <div class="dialog-actions">
+          <button type="button" class="outline-button" @click="answerMention('decline')">Decline</button>
+          <button type="button" class="outline-button" @click="answerMention('once')">Allow once</button>
+          <button type="button" class="primary-button" @click="answerMention('always')">Allow always</button>
+        </div>
+      </div>
     </ChatDialog>
 
     <ChatDialog v-if="renameRoomId" title="Rename shared chat" return-focus=".room-heading .title-edit" @close="renameRoomId = ''">
@@ -606,9 +618,10 @@ import {
   X,
 } from 'lucide-vue-next';
 import ChatDialog from '../components/ChatDialog.vue';
-import { filterLocalConversations } from '../lib/catalog-filters';
+import { filterLocalConversations, withoutSharedSessions } from '../lib/catalog-filters';
 import { projectPathForConversation } from '../lib/project-chats';
 import { displayTranscriptMessages } from '../lib/native-transcript';
+import { harnessStatusLabel, sharedReplyLabel } from '../lib/reply-label';
 import { insertMentionAtCursor, mentionAtCursor } from '../lib/mentions';
 
 type LocalConversation = {
@@ -624,7 +637,8 @@ type LocalConversation = {
 };
 type LocalProject = Record<string, unknown>;
 type NativeMessage = { role: string; content: string; at?: string };
-type AgentState = 'queued' | 'working';
+type AgentState = 'queued' | 'working' | 'waiting';
+type MentionPrompt = { roomId: string; turnId: string; agentId: string; harness: string; requestedBy: string };
 type PermissionRequest = {
   harness: 'codex' | 'hermes';
   id: number | string;
@@ -676,6 +690,7 @@ let roomReadVersion = 0;
 const selectedProject = ref<LocalProject | null>(null);
 const projects = ref<LocalProject[]>([]);
 const conversations = ref<LocalConversation[]>([]);
+const linkedSessionKeys = ref<string[]>([]);
 const selectedNative = ref<LocalConversation | null>(null);
 const newChatHarness = ref<'codex' | 'hermes'>('codex');
 const availableHarnesses = ref<('codex' | 'hermes')[]>([]);
@@ -731,6 +746,8 @@ const draft = ref('');
 const sharedComposer = ref<HTMLTextAreaElement | null>(null);
 const mentionCursor = ref(0);
 const agentStates = ref<Record<string, Record<string, AgentState>>>({});
+const mentionPrompts = ref<MentionPrompt[]>([]);
+const visibleMentionPrompt = ref<MentionPrompt | null>(null);
 const connectedRoomIds = ref(new Set<string>());
 const permissionRequest = ref<PermissionRequest | null>(null);
 const notice = ref('');
@@ -822,9 +839,9 @@ const filteredConversations = computed(() =>
     projectPath: '',
   }),
 );
-const unfiledConversations = computed(() => filteredConversations.value.filter((item) =>
+const unfiledConversations = computed(() => withoutSharedSessions(filteredConversations.value.filter((item) =>
   !projects.value.some((project) => belongsToProject(item, project)),
-));
+), linkedSessionKeys.value));
 const canJoin = computed(() =>
   Boolean(
     settingsDraft.value.backendUrl.trim() &&
@@ -884,6 +901,7 @@ onMounted(async () => {
       // A missing local cache is recoverable through live discovery.
     }
     void refreshCatalog();
+    void loadLinkedSessions();
     catalogTimer = window.setInterval(() => {
       void refreshCatalog();
     }, 60_000);
@@ -940,6 +958,15 @@ async function loadWorkspace(): Promise<void> {
   }
 }
 
+async function loadLinkedSessions(): Promise<void> {
+  try {
+    const links = await api.nativeLinks();
+    linkedSessionKeys.value = links.map((link) => `${link.harness}:${link.sessionId}`);
+  } catch {
+    // The local list stays visible if the link lookup fails.
+  }
+}
+
 function applyCatalog(result: { projects: Record<string, unknown>[]; conversations: Record<string, unknown>[]; conversationSourceError?: string }): void {
   projects.value = result.projects || [];
   const activeProject = selectedProject.value;
@@ -957,6 +984,7 @@ async function refreshCatalog(): Promise<void> {
   try {
     const result = await api.sheepRefresh();
     applyCatalog(result);
+    await loadLinkedSessions();
   } catch (error) {
     catalogError.value = messageOf(error)
       .replace(/Sheep/g, 'Local catalog')
@@ -1108,6 +1136,7 @@ async function shareNativeConversation(): Promise<void> {
       cwd: conversation.path || '', title: conversation.title || 'Chat',
       ...(conversation.agent ? { agentName: conversation.agent } : {}),
     });
+    linkedSessionKeys.value = [...new Set([...linkedSessionKeys.value, conversationKey(conversation)])];
     rooms.value = [...rooms.value.filter((room) => room.id !== result.room.id), result.room];
     await selectRoom(result.room);
     setInviteCode(result.invite?.code);
@@ -1173,6 +1202,10 @@ function harnessState(id: string): 'idle' | AgentState {
   return agentStates.value[currentRoomId.value]?.[id] || 'idle';
 }
 
+function harnessStateLabel(agent: SharedAgent): string {
+  return harnessStatusLabel(harnessState(agent.id), ownerName(agent.ownerId), agent.ownerId === settings.value.member?.id);
+}
+
 async function sendDraft(): Promise<void> {
   if (!selectedRoom.value || !draft.value.trim() || sending.value) return;
   const roomId = selectedRoom.value.id;
@@ -1221,12 +1254,34 @@ function handleRoomEvent(value: unknown): void {
     rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, name: event.name as string } : room);
   }
   const agentId = string(event.agentId) || '';
-  if (agentId && ['turn.queued', 'turn.started', 'turn.finished'].includes(string(event.type))) {
+  if (agentId && ['turn.queued', 'turn.started', 'turn.finished', 'turn.permission_needed', 'turn.permission_decided'].includes(string(event.type))) {
     const current = { ...(agentStates.value[roomId] || {}) };
-    if (event.type === 'turn.queued') current[agentId] = 'queued';
+    if (event.type === 'turn.queued') {
+      const ownerId = string(event.ownerId);
+      const requestedBy = string(event.requestedBy);
+      const waitingOnOwner = Boolean(ownerId && requestedBy && ownerId !== requestedBy && ownerId !== settings.value.member?.id);
+      current[agentId] = waitingOnOwner ? 'waiting' : 'queued';
+    }
     if (event.type === 'turn.started') current[agentId] = 'working';
-    if (event.type === 'turn.finished') delete current[agentId];
+    if (event.type === 'turn.finished' || event.type === 'turn.permission_decided') delete current[agentId];
+    if (event.type === 'turn.permission_needed') current[agentId] = 'waiting';
     agentStates.value = { ...agentStates.value, [roomId]: current };
+  }
+  if (event.type === 'turn.permission_needed' && string(event.ownerId) === settings.value.member?.id && string(event.turnId)) {
+    const prompt = {
+      roomId,
+      turnId: string(event.turnId) || '',
+      agentId,
+      harness: string(event.harness) || 'codex',
+      requestedBy: string(event.requestedBy) || '',
+    };
+    if (!mentionPrompts.value.some((item) => item.turnId === prompt.turnId)) mentionPrompts.value = [...mentionPrompts.value, prompt];
+    if (roomId === currentRoomId.value) visibleMentionPrompt.value = prompt;
+  }
+  if (event.type === 'turn.permission_decided' || event.type === 'turn.started') {
+    const turnId = string(event.turnId) || '';
+    mentionPrompts.value = mentionPrompts.value.filter((item) => item.turnId !== turnId);
+    if (visibleMentionPrompt.value?.turnId === turnId) visibleMentionPrompt.value = null;
   }
   if (roomId === currentRoomId.value && (event.type === 'member.joined' || event.type === 'agent.updated')) {
     void Promise.all([api.members(roomId), api.agents(roomId)])
@@ -1626,7 +1681,10 @@ function belongsToProject(conversation: LocalConversation, project: LocalProject
   return projectPathForConversation(conversation.path, projects.value) === string(project.path);
 }
 function projectConversations(project: LocalProject): LocalConversation[] {
-  return filteredConversations.value.filter((conversation) => belongsToProject(conversation, project));
+  return withoutSharedSessions(
+    filteredConversations.value.filter((conversation) => belongsToProject(conversation, project)),
+    linkedSessionKeys.value,
+  );
 }
 function projectName(project: LocalProject): string {
   return (
@@ -1649,16 +1707,46 @@ function harnessInitial(harness: string): string {
     )[harness] || harness.slice(0, 1).toUpperCase()
   );
 }
+const mentionRequesterName = computed(() => {
+  const id = visibleMentionPrompt.value?.requestedBy;
+  return members.value.find((member) => member.id === id)?.name || 'Someone';
+});
+
+function showMentionPrompt(agent: SharedAgent): void {
+  const prompt = mentionPrompts.value.find((item) => item.roomId === currentRoomId.value && item.agentId === agent.id);
+  if (prompt) visibleMentionPrompt.value = prompt;
+}
+
+async function answerMention(decision: 'once' | 'always' | 'decline'): Promise<void> {
+  const prompt = visibleMentionPrompt.value;
+  if (!prompt) return;
+  visibleMentionPrompt.value = null;
+  mentionPrompts.value = mentionPrompts.value.filter((item) => item.turnId !== prompt.turnId);
+  try {
+    await api.decideMention({ roomId: prompt.roomId, turnId: prompt.turnId, decision });
+  } catch (error) {
+    showError(error);
+  }
+}
+
 function authorName(message: SharedMessage): string {
   if (message.role === 'assistant') {
-    const harness = message.harness || agents.value.find((agent) => agent.id === message.agentId)?.harness;
-    return harness ? harnessLabel(harness) : 'Harness';
+    const agent = agents.value.find((item) => item.id === message.agentId);
+    const harness = message.harness || agent?.harness;
+    const ownerId = message.ownerId || agent?.ownerId || '';
+    return sharedReplyLabel({
+      role: 'assistant',
+      harnessLabel: harness ? harnessLabel(harness) : 'Harness',
+      ownerName: ownerId ? ownerName(ownerId) : '',
+    });
   }
-  return (
-    message.participantName ||
-    members.value.find((member) => member.id === message.participantId)?.name ||
-    (message.participantId === settings.value.member?.id ? settings.value.displayName : 'Member')
-  );
+  return sharedReplyLabel({
+    role: 'user',
+    participantName:
+      message.participantName ||
+      members.value.find((member) => member.id === message.participantId)?.name ||
+      (message.participantId === settings.value.member?.id ? settings.value.displayName : 'Member'),
+  });
 }
 function ownerName(ownerId: string): string {
   return members.value.find((member) => member.id === ownerId)?.name || 'owner';
@@ -2356,8 +2444,16 @@ button:disabled {
 .agent-state.working {
   color: var(--red);
 }
-.agent-state.queued {
+.agent-state.queued,
+.agent-state.waiting {
   color: #d69743;
+}
+button.agent-state {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 .room-rule p {
   margin: 0;

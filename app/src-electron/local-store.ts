@@ -316,6 +316,28 @@ export class LocalStore {
       | undefined;
   }
 
+  agentSessionsForRoom(roomId: string): { agent_id: string; harness: string; native_session_id: string; working_directory: string; model: string; context_through_seq: number }[] {
+    return this.database.prepare('SELECT agent_id,harness,native_session_id,working_directory,model,context_through_seq FROM agent_sessions WHERE room_id=?').all(roomId) as
+      { agent_id: string; harness: string; native_session_id: string; working_directory: string; model: string; context_through_seq: number }[];
+  }
+
+  turnRequestMessageIds(roomId: string): string[] {
+    const rows = this.database.prepare("SELECT data FROM room_events WHERE room_id=? AND type='turn.queued'").all(roomId) as { data: string }[];
+    const ids: string[] = [];
+    for (const row of rows) {
+      try {
+        const data = JSON.parse(row.data) as { requestMessageId?: unknown };
+        if (typeof data.requestMessageId === 'string' && data.requestMessageId) ids.push(data.requestMessageId);
+      } catch { /* a damaged event does not hide later messages */ }
+    }
+    return ids;
+  }
+
+  nativeRoomLinks(): { harness: string; sessionId: string; roomId: string }[] {
+    const rows = this.database.prepare('SELECT harness, session_id, room_id FROM native_room_links').all() as { harness: string; session_id: string; room_id: string }[];
+    return rows.map((row) => ({ harness: row.harness, sessionId: row.session_id, roomId: row.room_id }));
+  }
+
   nativeRoomLink(harness: string, sessionId: string): { roomId: string; agentId: string } | null {
     const row = this.database.prepare('SELECT room_id, agent_id FROM native_room_links WHERE harness=? AND session_id=?').get(harness, sessionId) as { room_id: string; agent_id: string } | undefined;
     return row ? { roomId: row.room_id, agentId: row.agent_id } : null;

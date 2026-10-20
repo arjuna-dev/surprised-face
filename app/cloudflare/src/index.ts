@@ -188,7 +188,7 @@ export default {
           headers.set('x-surprised-face-actor-name', identity.name);
           return stub.fetch(new Request(`https://room/${roomId}/messages`, { method: 'POST', headers, body: JSON.stringify({ ...input, agents }) }));
         }
-        if (operation === 'turns/claim' || /^turns\/[^/]+\/(?:chunk|finish)$/.test(operation)) {
+        if (operation === 'turns/claim' || /^turns\/[^/]+\/(?:chunk|finish|permission)$/.test(operation)) {
           return stub.fetch(new Request(`https://room/${roomId}/${operation}`, { method: request.method, headers, body: request.method === 'GET' ? null : request.body }));
         }
         if (operation === 'events' && request.method === 'GET') return stub.fetch(new Request(`https://room/${roomId}/events${url.search}`, { headers }));
@@ -400,14 +400,19 @@ export class ChatRoom extends DurableObject<Env> {
     ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS events (event_seq INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS messages (message_seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL DEFAULT '', role TEXT NOT NULL, text TEXT NOT NULL, state TEXT NOT NULL, agent_id TEXT, owner_id TEXT, run_id TEXT, client_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(actor_id, client_id));
-      CREATE TABLE IF NOT EXISTS turns (queue_seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, request_message_id TEXT NOT NULL, agent_id TEXT NOT NULL, agent_name TEXT NOT NULL, harness TEXT NOT NULL, model TEXT NOT NULL, owner_id TEXT NOT NULL, requested_by TEXT NOT NULL, state TEXT NOT NULL, reply_id TEXT, context_through_seq INTEGER, next_chunk INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS turns (queue_seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, request_message_id TEXT NOT NULL, agent_id TEXT NOT NULL, agent_name TEXT NOT NULL, harness TEXT NOT NULL, model TEXT NOT NULL, owner_id TEXT NOT NULL, requested_by TEXT NOT NULL, state TEXT NOT NULL, reply_id TEXT, context_through_seq INTEGER, next_chunk INTEGER NOT NULL DEFAULT 0, permitted INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS agent_chunks (turn_id TEXT NOT NULL, chunk_index INTEGER NOT NULL, text TEXT NOT NULL, PRIMARY KEY(turn_id, chunk_index));
       CREATE TABLE IF NOT EXISTS imported_messages (source_id TEXT NOT NULL, source_index INTEGER NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY(source_id, source_index));
+      CREATE TABLE IF NOT EXISTS mention_grants (owner_id TEXT NOT NULL, requester_id TEXT NOT NULL, harness TEXT NOT NULL, decision TEXT NOT NULL, PRIMARY KEY(owner_id, requester_id, harness));
       CREATE INDEX IF NOT EXISTS turns_queue ON turns(state, created_at);
     `);
     const messageColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(messages)').toArray();
     if (!messageColumns.some((column) => column.name === 'actor_name')) {
       ctx.storage.sql.exec("ALTER TABLE messages ADD COLUMN actor_name TEXT NOT NULL DEFAULT ''");
+    }
+    const turnColumns = ctx.storage.sql.exec<{ name: string }>('PRAGMA table_info(turns)').toArray();
+    if (!turnColumns.some((column) => column.name === 'permitted')) {
+      ctx.storage.sql.exec('ALTER TABLE turns ADD COLUMN permitted INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -435,11 +440,14 @@ export class ChatRoom extends DurableObject<Env> {
       return json({ eventSeq: this.appendEvent('room.renamed', { name: input.name }).eventSeq });
     }
     if (url.pathname.endsWith('/claim') && request.method === 'POST') return this.claimTurn(actor, await readJson(request));
-    const match = /\/turns\/([^/]+)\/(chunk|finish)$/.exec(url.pathname);
+    const match = /\/turns\/([^/]+)\/(chunk|finish|permission)$/.exec(url.pathname);
     if (match && request.method === 'POST') {
       const turnId = match[1]!;
       const action = match[2]!;
-      return action === 'chunk' ? this.appendChunk(actor, turnId, await readJson(request)) : this.finishTurn(actor, turnId, await readJson(request));
+      const body = await readJson(request);
+      if (action === 'chunk') return this.appendChunk(actor, turnId, body);
+      if (action === 'permission') return this.decideMention(actor, turnId, body);
+      return this.finishTurn(actor, turnId, body);
     }
     return json({ error: 'Not found.' }, 404);
   }
@@ -533,17 +541,52 @@ export class ChatRoom extends DurableObject<Env> {
     const sql = this.ctx.storage.sql;
     // Keep declined cross-owner requests pending without blocking runnable turns.
     // Only the authenticated owner can pause or restore their own requests.
-    const waitingState = input.allowRemote ? 'queued' : 'awaiting_permission';
-    const previousState = input.allowRemote ? 'awaiting_permission' : 'queued';
-    const changed = sql.exec<{ id: string }>(
-      'UPDATE turns SET state=?, updated_at=? WHERE owner_id=? AND requested_by<>? AND state=? RETURNING id',
-      waitingState, now(), actor, actor, previousState,
+    const updatedAt = now();
+    const declined = sql.exec<{ id: string; agent_id: string; harness: string; requested_by: string }>(
+      `UPDATE turns SET state='declined', updated_at=?
+       WHERE owner_id=? AND requested_by<>? AND state IN ('queued','awaiting_permission')
+       AND EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='declined')
+       RETURNING id, agent_id, harness, requested_by`,
+      updatedAt, actor, actor,
     ).toArray();
-    if (changed.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: Boolean(input.allowRemote) });
+    for (const turn of declined) {
+      this.appendEvent('turn.permission_decided', { turnId: turn.id, agentId: turn.agent_id, harness: turn.harness, ownerId: actor, requestedBy: turn.requested_by, decision: 'decline' });
+    }
+    const allowRemote = input.allowRemote ? 1 : 0;
+    if (allowRemote) {
+      const restored = sql.exec<{ id: string }>(
+        `UPDATE turns SET state='queued', updated_at=?
+         WHERE owner_id=? AND requested_by<>? AND state='awaiting_permission'
+         AND NOT EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='declined')
+         RETURNING id`,
+        updatedAt, actor, actor,
+      ).toArray();
+      if (restored.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: true });
+    } else {
+      const parked = sql.exec<{ id: string; agent_id: string; agent_name: string; harness: string; requested_by: string }>(
+        `UPDATE turns SET state='awaiting_permission', updated_at=?
+         WHERE owner_id=? AND requested_by<>? AND state='queued'
+         AND permitted=0
+         AND NOT EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='always')
+         AND NOT EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='declined')
+         RETURNING id, agent_id, agent_name, harness, requested_by`,
+        updatedAt, actor, actor,
+      ).toArray();
+      if (parked.length) this.appendEvent('turn.availability', { ownerId: actor, allowRemote: false });
+      for (const turn of parked) this.announcePermission(actor, turn);
+    }
+    const waiting = sql.exec<{ id: string; agent_id: string; agent_name: string; harness: string; requested_by: string }>(
+      "SELECT id, agent_id, agent_name, harness, requested_by FROM turns WHERE state='awaiting_permission' AND owner_id=?",
+      actor,
+    ).toArray();
+    for (const turn of waiting) this.announcePermission(actor, turn);
     const active = sql.exec('SELECT id FROM turns WHERE state=\'active\' LIMIT 1').toArray()[0];
     if (active) return json({ turn: null, reason: 'another_agent_active' }, 409);
-    const turn = sql.exec<{ id: string; request_message_id: string; agent_id: string; agent_name: string; harness: string; model: string; owner_id: string; requested_by: string }>(
-      'SELECT id, request_message_id, agent_id, agent_name, harness, model, owner_id, requested_by FROM turns WHERE state=\'queued\' AND (owner_id<>? OR requested_by=? OR ?=1) ORDER BY queue_seq LIMIT 1',
+    const turn = sql.exec<{ id: string; request_message_id: string; agent_id: string; agent_name: string; harness: string; model: string; owner_id: string; requested_by: string; permitted: number }>(
+      `SELECT id, request_message_id, agent_id, agent_name, harness, model, owner_id, requested_by, permitted FROM turns
+       WHERE state='queued' AND (owner_id<>? OR requested_by=? OR ?=1 OR permitted=1
+         OR EXISTS (SELECT 1 FROM mention_grants WHERE owner_id=turns.owner_id AND requester_id=turns.requested_by AND harness=turns.harness AND decision='always'))
+       ORDER BY queue_seq LIMIT 1`,
       actor, actor, input.allowRemote ? 1 : 0,
     ).toArray()[0];
     if (!turn) {
@@ -559,7 +602,10 @@ export class ChatRoom extends DurableObject<Env> {
       if (!rechecked) this.appendEvent('turn.queued', { turnId: turn.id, agentId: turn.agent_id, agentName: turn.agent_name, ownerId: turn.owner_id, requestedBy: turn.requested_by, requestMessageId: turn.request_message_id, recheck: true });
       return json({ turn: null, reason: 'earlier_turn_waiting_for_owner' });
     }
-    if (turn.requested_by !== actor && !input.allowRemote) return json({ turn: null, reason: 'remote_requests_disabled' });
+    if (turn.requested_by !== actor && !input.allowRemote) {
+      const grant = sql.exec<{ decision: string }>('SELECT decision FROM mention_grants WHERE owner_id=? AND requester_id=? AND harness=?', turn.owner_id, turn.requested_by, turn.harness).toArray()[0];
+      if (grant?.decision !== 'always' && !turn.permitted) return json({ turn: null, reason: 'remote_requests_disabled' });
+    }
     if (!(input.agentIds || []).includes(turn.agent_id)) return json({ turn: null, reason: 'agent_not_configured_here' });
     const request = sql.exec<{ message_seq: number; text: string }>('SELECT message_seq, text FROM messages WHERE id=?', turn.request_message_id).toArray()[0];
     if (!request) return json({ error: 'Agent request message is missing.' }, 409);
@@ -578,6 +624,63 @@ export class ChatRoom extends DurableObject<Env> {
     ).toArray().map((message) => ({ id: message.id, messageSeq: message.message_seq, participantId: message.actor_id, participantName: message.actor_name, role: message.role, text: message.text, agentId: message.agent_id }));
     const result = { turnId: turn.id, request: { messageId: turn.request_message_id, text: request.text, requestedBy: turn.requested_by }, replyId, agentId: turn.agent_id, agentName: turn.agent_name, ownerId: actor, harness: turn.harness, model: turn.model, contextThroughSeq: frontier, context };
     return json({ turn: result });
+  }
+
+  private announcePermission(ownerId: string, turn: { id: string; agent_id: string; agent_name: string; harness: string; requested_by: string }): void {
+    const announced = this.ctx.storage.sql.exec(
+      "SELECT event_seq FROM events WHERE type='turn.permission_needed' AND json_extract(data,'$.turnId')=? LIMIT 1",
+      turn.id,
+    ).toArray()[0];
+    if (announced) return;
+    this.appendEvent('turn.permission_needed', {
+      turnId: turn.id, agentId: turn.agent_id, agentName: turn.agent_name, harness: turn.harness, ownerId, requestedBy: turn.requested_by,
+    });
+  }
+
+  private decideMention(actor: string, turnId: string, input: { decision?: string }): Response {
+    const decision = input.decision;
+    if (decision !== 'once' && decision !== 'always' && decision !== 'decline') return json({ error: 'Decision must be once, always, or decline.' }, 400);
+    const sql = this.ctx.storage.sql;
+    const turn = sql.exec<{ id: string; agent_id: string; agent_name: string; harness: string; owner_id: string; requested_by: string; state: string }>(
+      'SELECT id, agent_id, agent_name, harness, owner_id, requested_by, state FROM turns WHERE id=?', turnId,
+    ).toArray()[0];
+    if (!turn || turn.owner_id !== actor) return json({ error: 'This turn is not available to this agent owner.' }, 409);
+    if (turn.requested_by === actor) return json({ error: 'Your own mentions do not need permission.' }, 409);
+    const timestamp = now();
+    if (decision === 'decline') {
+      sql.exec(
+        'INSERT INTO mention_grants (owner_id, requester_id, harness, decision) VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, requester_id, harness) DO UPDATE SET decision=excluded.decision',
+        actor, turn.requested_by, turn.harness, 'declined',
+      );
+      const declined = sql.exec<{ id: string; agent_id: string }>(
+        "UPDATE turns SET state='declined', updated_at=? WHERE owner_id=? AND requested_by=? AND harness=? AND state='awaiting_permission' RETURNING id, agent_id",
+        timestamp, actor, turn.requested_by, turn.harness,
+      ).toArray();
+      if (!declined.length && turn.state !== 'awaiting_permission') return json({ error: 'This mention is not waiting for permission.' }, 409);
+      for (const item of declined) {
+        this.appendEvent('turn.permission_decided', { turnId: item.id, agentId: item.agent_id, harness: turn.harness, ownerId: actor, requestedBy: turn.requested_by, decision: 'decline' });
+      }
+      return json({ ok: true });
+    }
+    if (decision === 'always') {
+      sql.exec(
+        'INSERT INTO mention_grants (owner_id, requester_id, harness, decision) VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, requester_id, harness) DO UPDATE SET decision=excluded.decision',
+        actor, turn.requested_by, turn.harness, 'always',
+      );
+    }
+    const restored = sql.exec<{ id: string; agent_id: string; agent_name: string; request_message_id: string }>(
+      decision === 'once'
+        ? "UPDATE turns SET state='queued', permitted=1, updated_at=? WHERE id=? AND owner_id=? AND state='awaiting_permission' RETURNING id, agent_id, agent_name, request_message_id"
+        : "UPDATE turns SET state='queued', updated_at=? WHERE owner_id=? AND requested_by=? AND harness=? AND state='awaiting_permission' RETURNING id, agent_id, agent_name, request_message_id",
+      ...(decision === 'once'
+        ? [timestamp, turn.id, actor]
+        : [timestamp, actor, turn.requested_by, turn.harness]),
+    ).toArray();
+    if (!restored.length) return json({ error: 'This mention is not waiting for permission.' }, 409);
+    for (const item of restored) {
+      this.appendEvent('turn.queued', { turnId: item.id, agentId: item.agent_id, agentName: item.agent_name, ownerId: actor, requestedBy: turn.requested_by, requestMessageId: item.request_message_id });
+    }
+    return json({ ok: true });
   }
 
   private appendChunk(actor: string, turnId: string, input: { index?: number; text?: string }): Response {
@@ -603,14 +706,14 @@ export class ChatRoom extends DurableObject<Env> {
 
   private finishTurn(actor: string, turnId: string, input: { state?: string; error?: string }): Response {
     const sql = this.ctx.storage.sql;
-    const turn = sql.exec<{ reply_id: string; owner_id: string; state: string }>('SELECT reply_id, owner_id, state FROM turns WHERE id=?', turnId).toArray()[0];
+    const turn = sql.exec<{ reply_id: string; owner_id: string; state: string; agent_id: string; harness: string }>('SELECT reply_id, owner_id, state, agent_id, harness FROM turns WHERE id=?', turnId).toArray()[0];
     const state = ['complete', 'failed', 'stopped'].includes(input.state || '') ? input.state as string : 'complete';
     if (!turn || turn.owner_id !== actor) return json({ error: 'This turn is not available to this agent owner.' }, 409);
     if (turn.state !== 'active') return turn.state === state ? json({ ok: true, duplicate: true }) : json({ error: 'This turn is already finished.' }, 409);
     const timestamp = now();
     sql.exec('UPDATE turns SET state=?, updated_at=? WHERE id=?', state, timestamp, turnId);
     sql.exec('UPDATE messages SET state=?, updated_at=? WHERE id=?', state, timestamp, turn.reply_id);
-    const event = this.appendEvent('turn.finished', { turnId, messageId: turn.reply_id, state, error: typeof input.error === 'string' ? input.error.slice(0, 4000) : undefined, finishedAt: timestamp });
+    const event = this.appendEvent('turn.finished', { turnId, messageId: turn.reply_id, agentId: turn.agent_id, harness: turn.harness, state, error: typeof input.error === 'string' ? input.error.slice(0, 4000) : undefined, finishedAt: timestamp });
     return json({ ok: true, eventSeq: event.eventSeq });
   }
 

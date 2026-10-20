@@ -174,6 +174,39 @@ try {
   const permissionEvents = (await api(`/v1/rooms/${queueId}/events?after=0`, { token: ownerToken })).body.events;
   assert.ok(permissionEvents.some(event => event.type === 'turn.availability'), 'permission changes wake connected owners to retry eligible turns');
   assert.ok(permissionEvents.some(event => event.type === 'turn.queued' && event.recheck === true), 'already installed desktops are also woken through their existing queue event handler');
+  const finished = (await api(`/v1/rooms/${roomId}/events?after=0`, { token: jo.token })).body.events.find((event) => event.type === 'turn.finished' && event.turnId === firstTurn.body.turn.turnId);
+  assert.equal(finished?.agentId, 'jo-codex', 'a finished turn includes the harness id');
+  assert.equal(finished?.harness, 'codex', 'a finished turn includes the harness name');
+
+  const promptRoom = await api('/v1/rooms', { token: ownerToken, body: { name: 'Mention prompt' } });
+  const promptId = promptRoom.body.id;
+  const promptInvite = await api(`/v1/rooms/${promptId}/invites`, { token: ownerToken, body: { count: 1 } });
+  await api('/v1/rooms/join', { token: jo.token, body: { code: promptInvite.body.invites[0].code } });
+  const firstPrompt = await api(`/v1/rooms/${promptId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex first', agentIds: ['jo-codex'] } });
+  const parked = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(parked.body.reason, 'remote_requests_disabled', 'the first mention from another person waits');
+  const promptEvents = (await api(`/v1/rooms/${promptId}/events?after=0`, { token: jo.token })).body.events;
+  assert.ok(promptEvents.some((event) => event.type === 'turn.permission_needed' && event.turnId === firstPrompt.body.turnIds[0] && event.agentId === 'jo-codex' && event.harness === 'codex'), 'the owner is asked once for that mention');
+  assert.equal((await api(`/v1/rooms/${promptId}/turns/${firstPrompt.body.turnIds[0]}/permission`, { token: jo.token, body: { decision: 'once' } })).status, 200, 'allow once releases that mention');
+  const allowedOnce = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(allowedOnce.body.turn?.turnId, firstPrompt.body.turnIds[0], 'allow once runs that mention without the global switch');
+  await api(`/v1/rooms/${promptId}/turns/${allowedOnce.body.turn.turnId}/finish`, { token: jo.token, body: { state: 'complete' } });
+  const secondPrompt = await api(`/v1/rooms/${promptId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex second', agentIds: ['jo-codex'] } });
+  await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal((await api(`/v1/rooms/${promptId}/turns/${secondPrompt.body.turnIds[0]}/permission`, { token: jo.token, body: { decision: 'decline' } })).status, 200, 'decline records the refusal');
+  const ownAfterDecline = await api(`/v1/rooms/${promptId}/messages`, { token: jo.token, body: { clientId: randomUUID(), text: '@jo-codex mine', agentIds: ['jo-codex'] } });
+  const ownAfter = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(ownAfter.body.turn?.turnId, ownAfterDecline.body.turnIds[0], 'a declined mention does not block a later own mention');
+  await api(`/v1/rooms/${promptId}/turns/${ownAfter.body.turn.turnId}/finish`, { token: jo.token, body: { state: 'complete' } });
+  await api(`/v1/rooms/${promptId}/messages`, { token: ownerToken, body: { clientId: randomUUID(), text: '@jo-codex third', agentIds: ['jo-codex'] } });
+  const declinedClaim = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(declinedClaim.body.turn, null, 'a remembered decline does not run that person\'s later mention');
+  await api('/v1/rooms/join', { token: lee.token, body: { code: (await api(`/v1/rooms/${promptId}/invites`, { token: ownerToken, body: { count: 1 } })).body.invites[0].code } });
+  const fourthPrompt = await api(`/v1/rooms/${promptId}/messages`, { token: lee.token, body: { clientId: randomUUID(), text: '@jo-codex from lee', agentIds: ['jo-codex'] } });
+  await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal((await api(`/v1/rooms/${promptId}/turns/${fourthPrompt.body.turnIds[0]}/permission`, { token: jo.token, body: { decision: 'always' } })).status, 200, 'allow always remembers this person and harness');
+  const alwaysClaim = await api(`/v1/rooms/${promptId}/turns/claim`, { token: jo.token, body: { agentIds: ['jo-codex'], allowRemote: false } });
+  assert.equal(alwaysClaim.body.turn?.turnId, fourthPrompt.body.turnIds[0], 'an allowed person can call the harness again without another prompt');
 
   const duplicate = await api(`/v1/rooms/${roomId}/messages`, {
     token: ownerToken, body: { clientId: firstClientId, text: '@Jo Codex check this', agentIds: ['jo-codex'] },

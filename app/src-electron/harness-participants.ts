@@ -13,7 +13,7 @@ export function harnessParticipants(settings: ParticipantSettings, available: Ha
   const ownerKey = createHash('sha256').update(settings.member.id).digest('hex').slice(0, 16);
   const current = available.map((harness) => ({
     id: `harness-${ownerKey}-${harness}`,
-    name: harness === 'codex' ? 'Codex' : 'Hermes',
+    name: `${settings.member.name} · ${harness === 'codex' ? 'Codex' : 'Hermes'}`,
     harness,
     model: '',
     workingDirectory: '',
