@@ -1,5 +1,6 @@
 import type { HordeInput, HordeRole, BudgetUnit } from '../../src/lib/hordes';
-import { canEditHorde, hordeStrategies } from '../../src/lib/hordes';
+import { hordeIdeas } from '../../src/lib/horde-ideas';
+import { canEditHorde, hordeStrategies, hordeCoverKeys } from '../../src/lib/hordes';
 
 type Row = { id: string; data: string; creator: string; deleted_at: string | null };
 const reply = (body: unknown, status = 200) =>
@@ -17,6 +18,21 @@ const str = (value: unknown, max: number, label: string, required = false): stri
     fail(`${label} must contain ${required ? '1' : '0'} to ${max} characters.`);
   return text;
 };
+function coverImage(raw: unknown): string {
+  const value = str(raw, 170000, 'Cover image');
+  if (!value)
+    return hordeCoverKeys[crypto.getRandomValues(new Uint32Array(1))[0]! % hordeCoverKeys.length]!;
+  if ((hordeCoverKeys as readonly string[]).includes(value)) return value;
+  if (/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
+  try {
+    const url = new URL(value);
+    if (value.length <= 2000 && url.protocol === 'https:' && !url.username && !url.password)
+      return url.href;
+  } catch {
+    /* Report the allowed formats below. */
+  }
+  return fail('Choose a PNG, JPEG or WebP image, or an HTTPS image URL.');
+}
 function projectInput(raw: Record<string, unknown>): HordeInput {
   const repositoryUrl = str(raw.repositoryUrl, 300, 'GitHub repository');
   if (repositoryUrl && !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(repositoryUrl))
@@ -50,6 +66,7 @@ function projectInput(raw: Record<string, unknown>): HordeInput {
     summary: str(raw.summary, 6000, 'Project goal', true),
     category: str(raw.category, 50, 'Category') || 'Other',
     repositoryUrl,
+    coverImage: coverImage(raw.coverImage),
     strategy: { id, parallelism },
     skills,
   };
@@ -71,6 +88,107 @@ export class HordeStore {
       );
     }
   }
+  private seedProjects(): void {
+    const curator =
+      this.sql
+        .exec<{
+          id: string;
+        }>("SELECT id FROM members WHERE role='owner' ORDER BY created_at LIMIT 1")
+        .toArray()[0]?.id || 'surprised-face-curator';
+    const names = [
+      'Earth Commons',
+      'The Living Archive',
+      'The Last City',
+      'Frankenstein: Mary Shelley’s Novel on Film',
+      'The Five-Person Party Problem',
+      'The Coral Cathedral',
+      'Open Accessibility Corps',
+      'Super Mario Bros. in 2.5D',
+      'The Thousand-Voice Symphony',
+    ];
+    for (const [index, name] of names.entries()) {
+      const idea = hordeIdeas.find((item) => item.name === name)!;
+      const slug = idea.starterId || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '');
+      const id = `starter-${slug}`;
+      const at = '2026-10-21T00:00:00.000Z';
+      const summary = `${idea.pitch}\n\nFirst milestone: ${idea.first}\n\nWorking approach: ${idea.architecture}${idea.note ? `\n\n${idea.note}` : ''}`;
+      const contributionSkill = {
+        name: 'Contribution workflow',
+        instructions: `Start with the first milestone: ${idea.first}\nAgree on a bounded task in the project discussion, keep artifacts in the linked repository when one is added, and submit reproducible evidence for independent review.\nSpecialties: ${idea.skills}`,
+        tools: [] as string[],
+      };
+      const data = {
+        name: idea.name,
+        category: idea.category,
+        summary,
+        repositoryUrl: '',
+        coverImage: hordeCoverKeys[index % hordeCoverKeys.length],
+        strategy: { id: idea.strategy, parallelism: 3 },
+        skills: [contributionSkill],
+        revision: 1,
+        createdAt: at,
+        updatedAt: at,
+      };
+      const existing = this.sql.exec<Row>('SELECT * FROM horde_projects WHERE id=?', id).toArray()[0];
+      if (!existing) {
+        this.sql.exec(
+          'INSERT INTO horde_projects (id,creator,data) VALUES (?,?,?)',
+          id,
+          curator,
+          JSON.stringify(data),
+        );
+      } else {
+        const current = JSON.parse(existing.data) as typeof data;
+        // Refresh untouched starter copy while preserving any project edited by its community.
+        if (current.revision === 1 && current.updatedAt === at) {
+          const skills = [
+            ...current.skills.filter((skill) => skill.name !== 'Contribution workflow'),
+            { ...contributionSkill, tools: current.skills.find((skill) => skill.name === 'Contribution workflow')?.tools || [] },
+          ];
+          const changed =
+            current.name !== data.name ||
+            current.category !== data.category ||
+            current.summary !== data.summary ||
+            current.strategy.id !== data.strategy.id ||
+            JSON.stringify(current.skills) !== JSON.stringify(skills);
+          if (changed) {
+            this.sql.exec(
+              'UPDATE horde_projects SET data=? WHERE id=?',
+              JSON.stringify({
+                ...current,
+                name: data.name,
+                category: data.category,
+                summary: data.summary,
+                strategy: data.strategy,
+                skills,
+                revision: current.revision + 1,
+                updatedAt: new Date().toISOString(),
+              }),
+              id,
+            );
+          }
+        }
+      }
+      // A fresh public deployment may be visited before workspace bootstrap.
+      if (curator !== 'surprised-face-curator') {
+        this.sql.exec(
+          "UPDATE horde_projects SET creator=? WHERE id=? AND creator='surprised-face-curator'",
+          curator,
+          id,
+        );
+        const owner = this.sql
+          .exec<{ creator: string }>('SELECT creator FROM horde_projects WHERE id=?', id)
+          .toArray()[0]?.creator;
+        if (owner === curator)
+          this.sql.exec(
+            'INSERT OR IGNORE INTO horde_members VALUES (?,?,?)',
+            id,
+            curator,
+            'warchief',
+          );
+      }
+    }
+  }
   private role(id: string, actor: string): HordeRole | null {
     return (
       this.sql
@@ -86,7 +204,10 @@ export class HordeStore {
       .exec<{
         unit: BudgetUnit;
         amount: number;
-      }>('SELECT unit,SUM(amount) AS amount FROM horde_budgets WHERE project_id=? GROUP BY unit', row.id)
+      }>(
+        'SELECT unit,SUM(amount) AS amount FROM horde_budgets WHERE project_id=? GROUP BY unit',
+        row.id,
+      )
       .toArray())
       totals[budget.unit] = budget.amount;
     return {
@@ -133,7 +254,12 @@ export class HordeStore {
   private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const actor = request.headers.get('x-actor-id') || '';
-    if (!actor) return reply({ error: 'Sign in first.' }, 401);
+    const publicRead =
+      request.method === 'GET' &&
+      !url.searchParams.has('deleted') &&
+      /^\/hordes(?:\/[^/]+)?$/.test(url.pathname);
+    if (!actor && !publicRead) return reply({ error: 'Sign in first.' }, 401);
+    this.seedProjects();
     const parts = url.pathname.split('/').filter(Boolean);
     const id = parts[1] || '';
     const action = parts[2] || '';
@@ -185,7 +311,10 @@ export class HordeStore {
       const existing = JSON.parse(row.data);
       if (body.revision !== existing.revision)
         return reply({ error: 'This project changed. Refresh before saving your edits.' }, 409);
-      const value = projectInput(body);
+      const value = projectInput({
+        ...body,
+        coverImage: body.coverImage === undefined ? existing.coverImage : body.coverImage,
+      });
       row.data = JSON.stringify({
         ...existing,
         ...value,

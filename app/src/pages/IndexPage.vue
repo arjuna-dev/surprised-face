@@ -60,7 +60,7 @@
       </div>
     </header>
 
-    <HordesPage v-if="hordesVisited" v-show="activeMode === 'hordes'" id="hordes-workspace" role="tabpanel" aria-labelledby="hordes-tab" :connected="settings.connected" :member-id="settings.member?.id || ''" @sign-in="signInWithGoogle" />
+    <HordesPage v-if="hordesVisited" v-show="activeMode === 'hordes'" id="hordes-workspace" role="tabpanel" aria-labelledby="hordes-tab" :connected="settings.connected" :member-id="settings.member?.id || ''" :public-url="settings.backendUrl ? `${settings.backendUrl.replace(/\/$/, '')}/hordes/` : ''" @sign-in="signInWithGoogle" />
     <div v-show="activeMode === 'chat'" id="chat-workspace" class="workspace" role="tabpanel" aria-labelledby="chat-tab">
       <aside v-if="leftOpen" class="left-sidebar">
         <div class="sidebar-search">
@@ -3505,7 +3505,7 @@ button.agent-state {
   display: block;
 }
 .app-shell[data-theme='cobalt-red'] .brand-art {
-  background-image: url('../assets/brand/mint-charcoal-logo.png');
+  background-image: url('../assets/brand/cobalt-red-logo.png');
 }
 .app-shell[data-theme='mint-charcoal'] .brand-art {
   background-image: url('../assets/brand/mint-charcoal-logo.png');

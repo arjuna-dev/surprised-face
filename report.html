@@ -87,12 +87,12 @@
       <section>
         <h2>Hordes</h2>
         <ol>
-          <li>The top-bar Hordes tab opens a project offering. <a href="app/src/components/HordesPage.vue">Project cards</a> link to goals, GitHub repositories, collaborators, skills, orchestration and budget commitments. Project ideas are labeled proposals and can prefill a new project.</li>
-          <li>The local bridge calls the authenticated <a href="app/cloudflare/src/hordes.ts">Hordes service</a>. Its SQLite tables store project definitions, member roles, independent budget units and discussion messages. Source code stays in Git and local working copies.</li>
-          <li>The creator is Horde Warchief. Warlords can edit, Warriors can contribute and discuss, and Scouts can read. The service checks permissions. Edits use revisions; messages deduplicate retries; deletion is recoverable from Trash.</li>
+          <li>The top-bar Hordes tab opens the global public project directory in list view, with a compact card option. <a href="app/src/components/HordesPage.vue">Project entries</a> link to goals, GitHub repositories, collaborators, skills, orchestration and budget commitments. Entries show an illustration or custom cover and a description capped at 200 characters. The square hero uses full-strength artwork without a border; white backgrounds follow the text lines individually. Nine starter projects are persisted in the database; the directory has no Project Ideas or Trash tabs. Command+Left returns from project details to the project list.</li>
+          <li>The local bridge and a public browser page share one Vue directory component. Public list and detail reads use the <a href="app/cloudflare/src/hordes.ts">Hordes service</a>. Writes require authentication and project permissions. Its SQLite tables store project definitions, member roles, independent budget units and discussion messages. Source code stays in Git and local working copies.</li>
+          <li>The creator is Horde Warchief. Warlords can edit, Warriors can contribute and discuss, and Scouts can read. The service checks permissions. Edits use revisions; messages deduplicate retries; deletion removes a project from the directory. Public visitors cannot read discussions or individual commitments.</li>
           <li>Budgets are commitments, not payments or metered spending. Five predefined strategies describe work; automatic execution and a custom strategy editor remain future work. Project skills store instructions and tool names without granting tool access.</li>
         </ol>
-        <p><a href="Research/hordes.md">Project concepts, permissions and implementation scope</a></p>
+        <p><a href="https://surprised-face-rooms.camus-00.workers.dev/hordes/">Public directory</a> served by the same Worker as the API. Read-only public requests omit discussion, member identities and individual commitments. The shared Vue view supports direct project links and browser navigation. Desktop HTTP(S) links open through the system browser; the app keeps navigation to its own document and hash routes. Cobalt + red uses the matching red and blue brand artwork.</p><p><a href="Research/hordes.md">Project concepts, permissions and implementation scope</a></p>
       </section>
       <section>
         <h2>Tests</h2>

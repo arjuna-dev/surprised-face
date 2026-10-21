@@ -121,13 +121,13 @@ Person A :o UI <-> local bridge A <-> shared room <-> local bridge B <-> Person 
 
 ## Hordes
 
-The top bar has Chat and Hordes tabs. Hordes opens the shared project offering as cards, with a separate gallery of fourteen concrete project proposals.
+The top bar has Chat and Hordes tabs. Hordes opens a public directory of projects across the community. List view is the default; compact cards show an image, project name and a description capped at 200 characters. Click a project for its full details. Command+Left returns to the project list. There are no Project Ideas or Trash tabs.
 
-- Signed-in people can create projects and join as Warriors. Warchiefs control roles, deletion and restore; Warlords edit; Scouts read.
-- Projects support a GitHub repository link, goals, five predefined orchestration strategies and skills containing instructions and tools.
+- Anyone can browse the [public directory](https://surprised-face-rooms.camus-00.workers.dev/hordes/), including direct project URLs. Nine persisted starter projects provide real memberships, discussions and budget commitments. Signed-in people can create projects and join as Warriors. Warchiefs control roles, deletion and restore; Warlords edit; Scouts read.
+- Projects support a GitHub repository link, goals, five predefined orchestration strategies and skills containing instructions and tools. Owners and Warlords can upload PNG, JPEG or WebP covers, supply an HTTPS image URL, or use a built-in Horde illustration.
 - Discussions, memberships, project definitions and budget commitments live in the shared database. Code stays in Git and its local copies.
 - Contributors can record their own token, USD or GPU-hour commitments. These do not charge, transfer usage or start model runs. Automatic execution, metering and custom strategy builders are not yet implemented.
-- Project CRUD, revisions, permissions, discussion retry handling and restore are checked with `cd app/cloudflare && npm run test:local`. UI evidence is generated with `cd app && SURPRISED_FACE_TEST_BROWSER=chrome npm run test:ui`.
+- Public reads, page hosting, starter persistence, project CRUD, covers, revisions, permissions and discussion retry handling are checked with `cd app/cloudflare && npm run test:local`. UI evidence is generated with `cd app && SURPRISED_FACE_TEST_BROWSER=chrome npm run test:ui`.
 
 
 - Contributors bring their own API keys, local models, token budgets, or compute. Credentials remain local.

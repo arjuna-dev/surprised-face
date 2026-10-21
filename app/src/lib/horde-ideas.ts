@@ -1,5 +1,6 @@
 export type HordeIdea = {
   name: string;
+  starterId?: string;
   category: string;
   pitch: string;
   first: string;
@@ -14,13 +15,13 @@ export const hordeIdeas: HordeIdea[] = [
     name: 'Earth Commons',
     category: 'Worlds',
     pitch:
-      'A shared, walkable Earth where every district is built by a different group, with persistent places to meet and play.',
-    first: 'One 1 km² district, shared avatars, ten landmarks and seamless adjacent tiles.',
+      'Turn the whole Earth into a walkable 3D world. Visit places you know, discover places you may never see in person, and explore the planet together.',
+    first: 'A small walkable place with a recognizable street, a landmark, a patch of nature and one visit with a friend.',
     architecture:
-      'Spatial partitions, shared coordinates and asset contracts, seam checks, then multiplayer integration.',
+      'Connect regions using one coordinate system and shared art rules. Test navigation, boundaries and loading before expanding.',
     strategy: 'spatial',
     skills: 'OSM ingestion, Blender terrain, glTF optimization, Godot networking',
-    note: 'Distributed compute helps production. Source data, storage, streaming and moderation also limit scale.',
+    note: 'The goal is the entire Earth. The first place is a test slice, not the limit of the finished world.',
     source: 'https://www.openstreetmap.org/copyright',
   },
   {
@@ -38,12 +39,13 @@ export const hordeIdeas: HordeIdea[] = [
     name: 'The Last City',
     category: 'Games',
     pitch:
-      'An original multiplayer world combining Dwarf Fortress depth, Factorio logistics and Zelda-like exploration. Players rebuild a city whose economy and history persist.',
-    first: 'A cooperative island with a 30-minute building and exploration loop.',
+      'A co-op city-builder where you gather supplies, place homes and help residents rebuild a town one project at a time.',
+    first: 'A ten-minute town-building loop: collect one resource, place three buildings and complete one resident request.',
     architecture:
-      'Subsystem teams with fixed APIs, simulation tests, playtest feedback and integration milestones.',
+      'Start with one map, a few buildings and one clear resource loop. Add residents and systems after playtests.',
     strategy: 'plan-build-verify',
     skills: 'Godot gameplay, simulation invariants, headless multiplayer testing',
+    note: 'This starts with a familiar city-building loop instead of combining several large games at once.',
   },
   {
     name: 'A Billion Worlds',
@@ -56,18 +58,19 @@ export const hordeIdeas: HordeIdea[] = [
     skills: 'Procedural ecosystems, terrain generation, asset budgets, quest validation',
   },
   {
-    name: 'Frankenstein: The Arctic Testimony',
+    name: 'Frankenstein: Mary Shelley’s Novel on Film',
+    starterId: 'frankenstein-the-arctic-testimony',
     category: 'Film',
     pitch:
-      'A 25-minute photoreal Gothic film, framed by Walton finding the creature in the Arctic, with original synthetic actors and a consistent visual language.',
+      'Adapt Mary Shelley’s novel into a Gothic film: Victor creates life, abandons the creature and faces the consequences as their story reaches the Arctic.',
     first:
-      'A 90-second Arctic rescue sequence with four shots, original score and one consistent actor.',
+      'AI writers draft a short scene from Mary Shelley’s novel. A human editor chooses and revises the screenplay before production.',
     architecture:
-      'Story bible, character and set approvals, parallel shot production, continuity review and editorial assembly.',
+      'Approve the screenplay and character designs, produce one scene, then expand shot by shot with continuity and human editorial review.',
     strategy: 'production',
     skills: 'Screenplay breakdown, actor reference sheets, shot generation, dialogue, editing',
     source: 'https://www.gutenberg.org/ebooks/84',
-    note: 'Use Shelley’s source text and original designs; check source rights in release territories.',
+    note: 'This is a new screenplay adaptation of Mary Shelley’s original novel, not a retelling of a recent film. AI contributors can draft options; a human editor directs and approves the script.',
   },
   {
     name: 'Kenshin: A New Lens',
@@ -121,17 +124,18 @@ export const hordeIdeas: HordeIdea[] = [
     note: 'Requires adaptation rights before production.',
   },
   {
-    name: 'Ramsey Frontier',
+    name: 'The Five-Person Party Problem',
+    starterId: 'ramsey-frontier',
     category: 'Mathematics',
     pitch:
-      'Attack R(5,5) with independent graph construction and SAT search, keeping candidates and certificates reproducible.',
+      'How large must a party be to guarantee five mutual friends or five mutual strangers? Current proofs place the answer between 43 and 46 people.',
     first:
-      'Reproduce a known 42-vertex construction and independently verify every 5-vertex subset before any new search.',
+      'Recreate a published 42-person counterexample and independently check every group of five before beginning a new search.',
     architecture:
-      'Independent search branches, shared immutable candidates, deterministic checkers and expert mathematical review.',
+      'Separate graph search, SAT encoding and independent certificate checking. Keep candidates reproducible and ask graph theorists to review any claimed bound.',
     strategy: 'search',
     skills: 'Graph search, SAT encoding, certificate verification, Lean',
-    note: 'A research attempt with uncertain outcome. Verify the current frontier before each search campaign.',
+    note: 'This was chosen as a math project with checkable evidence, not because a solution is likely. The 42-person example tests the checker and establishes the known lower bound before harder research. Planning estimate for reproducing and checking that known example only: 3 to 5 contributors and 100,000 to 500,000 model tokens in total, plus separate compute and expert review. A new bound has no credible token or contributor estimate. No breakthrough is promised.',
     source: 'https://www.cs.rit.edu/~spr/COURSES/CCOMP/srg_r55.pdf',
   },
   {
@@ -162,12 +166,13 @@ export const hordeIdeas: HordeIdea[] = [
     name: 'The Coral Cathedral',
     category: '3D assets',
     pitch:
-      'An enormous explorable underwater environment made of millions of coherent, instanced assets, with schools of life and architectural spaces.',
-    first: 'One streaming environment with a 60-fps target on a specified reference machine.',
+      'Build a playable underwater world where you can swim through coral reefs, meet sea life, explore caves and discover a city reclaimed by coral.',
+    first: 'A short playable reef with swimming, fish, one cave and a small coral-covered ruin that runs smoothly on an agreed computer.',
     architecture:
-      'Asset families and spatial teams, deterministic naming, level-of-detail checks and performance gates.',
+      'Build one biome at a time with compatible art, then test how it looks and runs before adding more of the ocean.',
     strategy: 'spatial',
     skills: 'Blender geometry nodes, USD composition, LOD generation, profiling',
+    note: 'The goal is an explorable underwater world. Millions of assets are not a target; the world should grow only while it remains beautiful and playable.',
   },
   {
     name: 'Open Accessibility Corps',
@@ -180,5 +185,32 @@ export const hordeIdeas: HordeIdea[] = [
       'Independent repository teams with local reproduction, separate review and maintainer acceptance.',
     strategy: 'plan-build-verify',
     skills: 'Accessibility audits, browser tests, patch review, maintainer handoff',
+  },
+  {
+    name: 'Super Mario Bros. in 2.5D',
+    category: 'Games',
+    pitch:
+      'Rebuild the original NES Super Mario Bros. as a 2.5D side-scrolling game: keep the familiar left-to-right play, but stage the world in 3D.',
+    first:
+      'Make one short level with classic running, jumping, enemies and collectibles, viewed through a 3D side-scrolling camera.',
+    architecture:
+      'Prototype one movement model, camera and level. Playtest whether the 3D depth adds something while the platforming stays clear.',
+    strategy: 'plan-build-verify',
+    skills: 'Godot gameplay, platformer physics, 3D environment art, playtest design',
+    note: 'A public Mario project needs rights clearance. Without a license, use original characters, level designs and branding for a classic NES-inspired 2.5D platformer.',
+    source: 'https://en-americas-support.nintendo.com/app/answers/detail/a_id/50035/',
+  },
+  {
+    name: 'The Thousand-Voice Symphony',
+    category: 'Music',
+    pitch:
+      'Imagine a many-hour symphony woven from hundreds or thousands of voices, microtonal harmonies, and instruments and traditions from across centuries and cultures.',
+    first:
+      'Compose a five-minute opening movement with 24 independent parts, a shared theme, microtonal tuning and stems that can be heard separately.',
+    architecture:
+      'A lead composer sets the theme and tuning language. Instrument and style teams write compatible passages; editors shape transitions and the final mix.',
+    strategy: 'production',
+    skills: 'Orchestration, microtonal theory, notation, digital audio workstations, mixing',
+    note: 'Grow the scale in stages: first make a coherent, listenable ensemble across traditions and tunings, then expand its size and duration.',
   },
 ];

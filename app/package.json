@@ -17,6 +17,7 @@
     "dev": "quasar dev",
     "dev:electron": "quasar dev -m electron",
     "build": "quasar build",
+    "build:hordes": "vite build --config hordes-web/vite.config.ts",
     "build:electron": "quasar build -m electron",
     "postinstall": "quasar prepare"
   },

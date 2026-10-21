@@ -22,7 +22,7 @@ import { harnessParticipants } from './harness-participants';
 import { HarnessContextMirror } from './harness-context-mirror';
 import { HarnessSessionSync } from './harness-session-sync';
 import { SheepBridge } from './sheep-bridge';
-import { isSafeAppNavigation } from './navigation-policy';
+import { isSafeAppNavigation, createExternalWindowHandler, openExternalWebLink } from './navigation-policy';
 import { projectsForUi, projectsFromConversations, sortProjectsByRecent } from './local-projects';
 import { displayTranscriptMessages } from '../src/lib/native-transcript';
 import { configureAppProfile } from './app-data-path';
@@ -499,10 +499,17 @@ async function createWindow(): Promise<void> {
   });
   if (process.env.DEV && process.env.APP_URL) await mainWindow.loadURL(process.env.APP_URL);
   else await mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
-  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const reportBrowserError = (error: unknown) =>
+    sendToRenderer('app:error', `Could not open the browser. ${errorMessage(error)}`);
+  mainWindow.webContents.setWindowOpenHandler(createExternalWindowHandler(
+    (url) => shell.openExternal(url),
+    reportBrowserError,
+  ));
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!mainWindow || !isSafeAppNavigation(mainWindow.webContents.getURL(), url))
+    if (!mainWindow || !isSafeAppNavigation(mainWindow.webContents.getURL(), url)) {
       event.preventDefault();
+      void openExternalWebLink(url, (value) => shell.openExternal(value)).catch(reportBrowserError);
+    }
   });
   mainWindow.webContents.on('render-process-gone', (_event, details) =>
     sendToRenderer('app:error', `The interface stopped: ${details.reason}.`),

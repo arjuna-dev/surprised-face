@@ -1,137 +1,116 @@
 <template>
-  <main class="hordes" aria-label="Hordes">
+  <main ref="hordesRoot" class="hordes" aria-label="Hordes">
     <div class="horde-wrap">
       <div v-if="error" class="error" role="alert">
-        {{ error }} <button @click="refresh">Retry</button>
+        {{ error }} <button :disabled="loading" @click="retry">Retry</button>
       </div>
       <template v-if="!detail">
         <header class="horde-intro">
-          <div>
-            <p class="eyebrow">BUILD SOMETHING BIG, TOGETHER</p>
-            <h1>Horde projects</h1>
-            <p>Bring your ideas, your skills, and the compute you choose to contribute.</p>
-            <button class="primary" :disabled="!connected" @click="create()">
-              <Plus :size="16" /> Create project
-            </button>
-          </div>
-          <img :src="hordeArt" alt="A crowd of people and friendly robots gathered together" />
-        </header>
-        <div v-if="!connected" class="connect">
-          <p>Sign in with Google to discover shared projects and contribute.</p>
-          <button class="primary" @click="emit('signIn')">Continue with Google</button>
-        </div>
-        <nav class="section-tabs" aria-label="Hordes views">
-          <button :class="{ active: view === 'projects' }" @click="changeView('projects')">
-            Projects</button
-          ><button :class="{ active: view === 'ideas' }" @click="changeView('ideas')">
-            Project ideas <span>{{ hordeIdeas.length }}</span></button
-          ><button :class="{ active: view === 'trash' }" @click="changeView('trash')">Trash</button
-          ><button class="refresh" :disabled="loading" @click="refresh">
-            <RefreshCw :size="14" /> Refresh
-          </button>
-        </nav>
-        <template v-if="view !== 'ideas'">
-          <div class="listing-tools">
-            <h2>{{ view === 'trash' ? 'Your deleted projects' : 'Explore the projects' }}</h2>
-            <label class="search"
-              ><Search :size="15" /><input
-                v-model="query"
-                placeholder="Find a project"
-                aria-label="Find a horde project"
-            /></label>
-          </div>
-          <p v-if="loading" role="status">Loading projects...</p>
-          <div v-else class="project-grid">
-            <article v-for="project in filtered" :key="project.id" class="project-card">
-              <div class="card-top">
-                <span class="category">{{ project.category }}</span
-                ><span v-if="project.myRole" class="role">{{ roleName(project.myRole) }}</span>
-              </div>
-              <h2>
-                <button
-                  v-if="view !== 'trash'"
-                  :aria-label="`Open ${project.name}`"
-                  @click="open(project.id)"
-                >
-                  {{ project.name }}<ArrowUpRight :size="18" /></button
-                ><template v-else>{{ project.name }}</template>
-              </h2>
-              <p class="card-summary">{{ project.summary }}</p>
-              <p class="card-strategy">{{ strategyFor(project.strategy.id).name }}</p>
-              <div class="card-bottom">
-                <span
-                  ><Users :size="14" /> {{ project.memberCount }}
-                  {{ project.memberCount === 1 ? 'collaborator' : 'collaborators' }}</span
-                ><span>{{ totalText(project) }}</span>
-              </div>
-              <button
-                v-if="view === 'trash'"
-                class="secondary"
-                :disabled="busy"
-                :aria-label="`Restore ${project.name}`"
-                @click="restore(project.id)"
-              >
-                Restore project
-              </button>
-            </article>
-          </div>
-          <div v-if="!loading && !filtered.length" class="empty">
-            <h2>
-              {{
-                view === 'trash'
-                  ? 'No deleted projects'
-                  : query
-                    ? 'No matching projects'
-                    : 'The first horde starts here.'
-              }}
-            </h2>
-            <p>
-              {{
-                view === 'trash'
-                  ? 'Deleted projects remain recoverable by their Warchief.'
-                  : query
-                    ? 'Try a different search.'
-                    : 'Create a project, or find your next ambitious idea.'
-              }}
+          <img :src="hordeArt" alt="" class="hero-art" />
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="hero-highlight">HORDE PROJECTS</span></p>
+            <h1>
+              <span class="hero-highlight">Build something big,</span><br />
+              <span class="hero-highlight">together.</span>
+            </h1>
+            <p class="hero-description">
+              <span class="hero-highlight">
+                Find a project you want to be part of. Contribute with your agent. Help build
+                something big.
+              </span>
             </p>
-            <button
-              v-if="view === 'projects' && !query"
-              class="secondary"
-              @click="changeView('ideas')"
-            >
-              Explore project ideas
-            </button>
           </div>
-        </template>
-        <template v-else>
-          <div class="listing-tools">
-            <div>
-              <h2>Big ideas. A first step for each.</h2>
-              <p>Starting points for a horde. These are proposals, not active projects.</p>
+        </header>
+        <div class="listing-heading">
+          <div>
+            <h2>Projects</h2>
+            <p>
+              Open projects from across the :o community. Join one to make your own contribution.
+            </p>
+            <button class="create-project" @click="connected ? create() : emit('signIn')">
+              <Plus :size="14" /> Create project
+            </button>
+            <a
+              v-if="publicUrl"
+              class="public-link"
+              :href="publicUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >View public page <ArrowUpRight :size="12"
+            /></a>
+          </div>
+        </div>
+        <div class="listing-tools">
+          <label class="search"
+            ><Search :size="15" /><input
+              v-model="query"
+              placeholder="Find a project"
+              aria-label="Find a horde project"
+          /></label>
+          <div class="view-tools">
+            <button class="icon" aria-label="Refresh projects" :disabled="loading" @click="refresh">
+              <RefreshCw :size="15" />
+            </button>
+            <div class="view-switch" role="group" aria-label="Project layout">
+              <button
+                aria-label="List view"
+                :aria-pressed="layout === 'list'"
+                @click="setLayout('list')"
+              >
+                <List :size="16" />
+              </button>
+              <button
+                aria-label="Card view"
+                :aria-pressed="layout === 'cards'"
+                @click="setLayout('cards')"
+              >
+                <LayoutGrid :size="16" />
+              </button>
             </div>
           </div>
-          <div class="project-grid idea-grid">
-            <article v-for="idea in hordeIdeas" :key="idea.name" class="project-card idea-card">
-              <span class="category">{{ idea.category }}</span>
-              <h2>{{ idea.name }}</h2>
-              <p>{{ idea.pitch }}</p>
-              <h3>First milestone</h3>
-              <p>{{ idea.first }}</p>
-              <h3>How the horde works</h3>
-              <p>{{ idea.architecture }}</p>
-              <p class="muted">Skills: {{ idea.skills }}</p>
-              <p v-if="idea.note" class="idea-note">{{ idea.note }}</p>
-              <a v-if="idea.source" :href="idea.source" target="_blank" rel="noopener noreferrer"
-                >Source <ArrowUpRight :size="12" /></a
-              ><button class="secondary" :disabled="!connected" @click="create(idea)">
-                Start this project
-              </button>
-            </article>
-          </div>
-        </template>
+        </div>
+        <p v-if="loading && !projects.length" role="status">Loading projects...</p>
+        <div
+          v-else
+          :class="layout === 'list' ? 'project-list' : 'project-grid'"
+          :aria-busy="loading"
+        >
+          <button
+            v-for="project in filtered"
+            :key="project.id"
+            class="project-entry"
+            :aria-label="`Open ${project.name}`"
+            @click="open(project.id)"
+          >
+            <img
+              :src="projectCover(project)"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+              @error="coverFallback($event, project.id)"
+            />
+            <span class="entry-copy"
+              ><span class="entry-title">{{ project.name }}</span
+              ><span class="entry-summary">{{ hordeExcerpt(project.summary) }}</span></span
+            >
+            <ArrowUpRight class="entry-arrow" :size="17" />
+          </button>
+        </div>
+        <div v-if="!loading && !error && !filtered.length" class="empty">
+          <h2>{{ query ? 'No matching projects' : 'No projects available yet' }}</h2>
+          <p>{{ query ? 'Try a different search.' : 'Check back soon for community projects.' }}</p>
+        </div>
       </template>
       <template v-else>
         <button class="back" @click="back"><ArrowLeft :size="16" /> All projects</button>
+        <img
+          class="project-cover"
+          :src="projectCover(detail.project)"
+          alt=""
+          referrerpolicy="no-referrer"
+          @error="coverFallback($event, detail.project.id)"
+        />
         <header class="project-header">
           <div>
             <p class="eyebrow">
@@ -158,7 +137,12 @@
               @click="confirmDelete = true"
             >
               Delete project</button
-            ><button v-if="!detail.project.myRole" class="primary" :disabled="busy" @click="join">
+            ><button
+              v-if="!detail.project.myRole"
+              class="primary"
+              :disabled="busy"
+              @click="connected ? join() : emit('signIn')"
+            >
               Join this horde</button
             ><button
               class="icon"
@@ -339,13 +323,49 @@
     <ChatDialog
       v-if="editor"
       :title="editingId ? 'Edit horde project' : 'Create horde project'"
-      return-focus=".hordes .primary"
-      @close="!busy && (editor = false)"
+      return-focus=".hordes .create-project"
+      @close="!busy && !imageLoading && (editor = false)"
     >
       <form class="horde-form" @submit.prevent="save">
         <p class="muted">
-          Projects are listed to signed-in people. Discussion is visible to project collaborators.
+          Project names, goals, covers, skills and budget totals are public. Discussion is visible
+          to project collaborators.
         </p>
+        <div class="cover-editor">
+          <img
+            :src="projectCover({ id: editingId || draft.name, coverImage: draft.coverImage || '' })"
+            alt="Project cover preview"
+            referrerpolicy="no-referrer"
+            @error="coverFallback($event, editingId)"
+          />
+          <label
+            >Upload cover image<input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              :disabled="imageLoading"
+              @change="uploadCover"
+          /></label>
+          <small>PNG, JPEG or WebP, up to 10 MB.</small>
+          <label
+            >Cover image URL<input
+              v-model="coverUrl"
+              type="url"
+              placeholder="https://example.com/cover.webp"
+              @input="draft.coverImage = ($event.target as HTMLInputElement).value"
+          /></label>
+          <button
+            v-if="draft.coverImage"
+            type="button"
+            class="create-project"
+            @click="
+              draft.coverImage = '';
+              coverUrl = '';
+            "
+          >
+            Use a Horde illustration
+          </button>
+          <p v-if="imageLoading" role="status">Preparing cover...</p>
+        </div>
         <label>Project name<input v-model="draft.name" maxlength="100" required /></label
         ><label
           >Project goal<textarea v-model="draft.summary" maxlength="6000" rows="3" required />
@@ -416,9 +436,14 @@
         </fieldset>
         <p v-if="formError" class="error" role="alert">{{ formError }}</p>
         <div class="form-actions">
-          <button class="secondary" type="button" :disabled="busy" @click="editor = false">
+          <button
+            class="secondary"
+            type="button"
+            :disabled="busy || imageLoading"
+            @click="editor = false"
+          >
             Cancel</button
-          ><button class="primary" :disabled="busy">
+          ><button class="primary" :disabled="busy || imageLoading">
             {{ busy ? 'Saving...' : 'Save project' }}
           </button>
         </div>
@@ -454,13 +479,13 @@
       return-focus=".text-danger"
       @close="!busy && (confirmDelete = false)"
       ><p>
-        The project will leave the offering. You can restore it from Trash, including its discussion
-        and budgets.
+        The project will be removed from the public directory. Collaborators will no longer be able
+        to open it.
       </p>
       <p v-if="formError" class="error" role="alert">{{ formError }}</p>
       <div class="form-actions">
         <button class="secondary" :disabled="busy" @click="confirmDelete = false">Cancel</button
-        ><button class="danger" :disabled="busy" @click="remove">Move to trash</button>
+        ><button class="danger" :disabled="busy" @click="remove">Delete project</button>
       </div></ChatDialog
     >
   </main>
@@ -471,32 +496,56 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   ArrowLeft,
   ArrowUpRight,
-  FolderGit2,
   Github,
+  FolderGit2,
   Plus,
   RefreshCw,
   Search,
-  Users,
+  List,
+  LayoutGrid,
 } from 'lucide-vue-next';
 import ChatDialog from './ChatDialog.vue';
-import hordeArt from '../../../imagery/assets/horde-front-facing-chatgpt.png';
-import { hordeIdeas, type HordeIdea } from '../lib/horde-ideas';
+import hordeArt from '../assets/hordes/gathering.webp';
+import { projectCover, defaultHordeCover } from '../lib/horde-covers';
 import {
   budgetLabel,
   canEditHorde,
   hordeRoles,
   hordeStrategies,
+  hordeExcerpt,
   type BudgetUnit,
   type HordeDetail,
   type HordeInput,
   type HordeProject,
 } from '../lib/hordes';
-const props = defineProps<{ connected: boolean; memberId: string }>();
-const emit = defineEmits<{ signIn: [] }>();
-const api = window.surprisedFace;
+const props = defineProps<{
+  connected: boolean;
+  memberId: string;
+  transport?: {
+    hordeRequest: (input: {
+      action: string;
+      projectId?: string;
+      data?: unknown;
+    }) => Promise<unknown>;
+  };
+  initialProjectId?: string;
+  publicUrl?: string;
+}>();
+const emit = defineEmits<{ signIn: []; projectChange: [id: string | null] }>();
+const api = props.transport || window.surprisedFace;
+const hordesRoot = ref<HTMLElement | null>(null);
 const projects = ref<HordeProject[]>([]);
 const detail = ref<HordeDetail | null>(null);
-const view = ref<'projects' | 'ideas' | 'trash'>('projects');
+const layout = ref<'list' | 'cards'>(
+  localStorage.getItem('hordes-layout') === 'cards' ? 'cards' : 'list',
+);
+const failedProjectId = ref('');
+const imageLoading = ref(false);
+const coverUrl = ref('');
+function setLayout(value: 'list' | 'cards'): void {
+  layout.value = value;
+  localStorage.setItem('hordes-layout', value);
+}
 const query = ref('');
 const loading = ref(false);
 const busy = ref(false);
@@ -512,6 +561,7 @@ const emptyDraft = (): HordeInput => ({
   summary: '',
   category: 'Software',
   repositoryUrl: '',
+  coverImage: '',
   strategy: { id: 'plan-build-verify', parallelism: 3 },
   skills: [],
 });
@@ -527,6 +577,7 @@ const categories = [
   'Hardware',
   '3D assets',
   'Science',
+  'Music',
   'Other',
 ];
 const filtered = computed(() =>
@@ -539,11 +590,6 @@ const format = (amount: number) =>
 const roleName = (id: string | null) =>
   hordeRoles.find((r) => r.id === id)?.name || 'Open to contributors';
 const strategyFor = (id: string) => hordeStrategies.find((s) => s.id === id) || hordeStrategies[0];
-const totalText = (p: HordeProject) =>
-  units
-    .filter((u) => p.totals[u])
-    .map((u) => `${format(p.totals[u])} ${budgetLabel(u)}`)
-    .join(' · ') || 'Be the first to contribute';
 const errorText = (e: unknown) =>
   (e instanceof Error ? e.message : String(e)).replace(
     /^Error invoking remote method '[^']+': Error: /,
@@ -558,23 +604,25 @@ async function request<T>(
     action,
     ...(projectId ? { projectId } : {}),
     ...(data === undefined ? {} : { data: JSON.parse(JSON.stringify(data)) }),
-    deleted: view.value === 'trash',
   })) as T;
 }
 let listVersion = 0;
 let readVersion = 0;
 async function refresh(): Promise<void> {
   const version = ++listVersion;
-  if (!props.connected) return;
   loading.value = true;
   error.value = '';
+  failedProjectId.value = '';
   try {
     const result = await request<{ projects: HordeProject[] }>('list');
     if (version === listVersion) projects.value = result.projects;
   } catch (e) {
-    error.value = errorText(e);
+    if (version === listVersion)
+      error.value = /not found/i.test(errorText(e))
+        ? 'The project directory is unavailable on this server. Please try again shortly.'
+        : `Could not load the project directory. ${errorText(e)}`;
   } finally {
-    loading.value = false;
+    if (version === listVersion) loading.value = false;
   }
 }
 async function open(id: string): Promise<void> {
@@ -582,9 +630,16 @@ async function open(id: string): Promise<void> {
   error.value = '';
   try {
     const result = await request<HordeDetail>('read', undefined, id);
-    if (version === readVersion) detail.value = result;
+    if (version === readVersion) {
+      detail.value = result;
+      failedProjectId.value = '';
+      emit('projectChange', id);
+    }
   } catch (e) {
-    error.value = errorText(e);
+    if (version === readVersion) {
+      failedProjectId.value = id;
+      error.value = `Could not open this project. ${errorText(e)}`;
+    }
   }
 }
 async function reloadDetail(): Promise<void> {
@@ -593,30 +648,88 @@ async function reloadDetail(): Promise<void> {
 function back(): void {
   ++readVersion;
   detail.value = null;
+  emit('projectChange', null);
   void refresh();
 }
-function changeView(next: 'projects' | 'ideas' | 'trash'): void {
-  view.value = next;
-  query.value = '';
-  if (next !== 'ideas') void refresh();
+function navigateBackShortcut(event: KeyboardEvent): void {
+  if (
+    !event.metaKey ||
+    event.key !== 'ArrowLeft' ||
+    !detail.value ||
+    editor.value ||
+    budgetOpen.value ||
+    confirmDelete.value ||
+    busy.value ||
+    !hordesRoot.value?.getClientRects().length
+  )
+    return;
+  event.preventDefault();
+  event.stopPropagation();
+  back();
 }
-function create(idea?: HordeIdea): void {
+function retry(): void {
+  if (failedProjectId.value) void open(failedProjectId.value);
+  else if (detail.value) void reloadDetail();
+  else void refresh();
+}
+function create(): void {
   editingId.value = '';
   draft.value = emptyDraft();
-  if (idea)
-    Object.assign(draft.value, {
-      name: idea.name,
-      summary: `${idea.pitch}\n\nFirst milestone: ${idea.first}`,
-      category: idea.category,
-      strategy: { id: idea.strategy, parallelism: 3 },
-    });
+  coverUrl.value = '';
   formError.value = '';
   editor.value = true;
+}
+function coverFallback(event: Event, id: string): void {
+  const image = event.target as HTMLImageElement;
+  const fallback = defaultHordeCover(id);
+  if (image.getAttribute('src') !== fallback) image.src = fallback;
+}
+async function uploadCover(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  formError.value = '';
+  if (
+    !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) ||
+    file.size > 10 * 1024 * 1024
+  ) {
+    formError.value = 'Choose a PNG, JPEG or WebP image up to 10 MB.';
+    input.value = '';
+    return;
+  }
+  imageLoading.value = true;
+  let bitmap: ImageBitmap | undefined;
+  try {
+    bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, 900 / bitmap.width, 600 / bitmap.height);
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not prepare this image.');
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    let image = canvas.toDataURL('image/webp', 0.82);
+    for (const quality of [0.65, 0.45, 0.25]) {
+      if (image.length <= 160000) break;
+      image = canvas.toDataURL('image/webp', quality);
+    }
+    if (image.length > 160000)
+      throw new Error('This image is too detailed. Choose a smaller image.');
+    draft.value.coverImage = image;
+    coverUrl.value = '';
+  } catch (e) {
+    formError.value = `Could not use this cover. ${errorText(e)}`;
+  } finally {
+    bitmap?.close();
+    imageLoading.value = false;
+    input.value = '';
+  }
 }
 function edit(): void {
   if (!detail.value) return;
   editingId.value = detail.value.project.id;
   draft.value = JSON.parse(JSON.stringify(detail.value.project));
+  coverUrl.value = draft.value.coverImage?.startsWith('https://') ? draft.value.coverImage : '';
   formError.value = '';
   editor.value = true;
 }
@@ -628,7 +741,10 @@ async function mutate(action: string, data?: unknown, id?: string): Promise<bool
   try {
     const version = ++readVersion;
     const result = await request<HordeDetail>(action, data, id);
-    if (version === readVersion) detail.value = result;
+    if (version === readVersion) {
+      detail.value = result;
+      if (result?.project) emit('projectChange', result.project.id);
+    }
     return true;
   } catch (e) {
     formError.value = errorText(e);
@@ -639,6 +755,7 @@ async function mutate(action: string, data?: unknown, id?: string): Promise<bool
   }
 }
 async function save(): Promise<void> {
+  if (imageLoading.value) return;
   if (
     await mutate(editingId.value ? 'update' : 'create', draft.value, editingId.value || undefined)
   )
@@ -681,6 +798,7 @@ async function remove(): Promise<void> {
     await request('delete');
     confirmDelete.value = false;
     detail.value = null;
+    emit('projectChange', null);
     await refresh();
   } catch (e) {
     formError.value = errorText(e);
@@ -688,16 +806,10 @@ async function remove(): Promise<void> {
     busy.value = false;
   }
 }
-async function restore(id: string): Promise<void> {
-  if (await mutate('restore', {}, id)) {
-    detail.value = null;
-    await refresh();
-  }
-}
 const focusRefresh = () => {
   if (!editor.value && !budgetOpen.value && !busy.value) {
     if (detail.value) void reloadDetail();
-    else if (view.value !== 'ideas') void refresh();
+    else void refresh();
   }
 };
 watch(
@@ -706,11 +818,23 @@ watch(
     if (connected) void refresh();
   },
 );
+watch(
+  () => props.initialProjectId,
+  (id) => {
+    if (id && id !== detail.value?.project.id) void open(id);
+    else if (!id && detail.value) back();
+  },
+);
 onMounted(() => {
   void refresh();
+  if (props.initialProjectId) void open(props.initialProjectId);
   window.addEventListener('focus', focusRefresh);
+  window.addEventListener('keydown', navigateBackShortcut, true);
 });
-onUnmounted(() => window.removeEventListener('focus', focusRefresh));
+onUnmounted(() => {
+  window.removeEventListener('focus', focusRefresh);
+  window.removeEventListener('keydown', navigateBackShortcut, true);
+});
 </script>
 
 <style scoped>
@@ -727,22 +851,40 @@ onUnmounted(() => window.removeEventListener('focus', focusRefresh));
   padding: 32px 44px 64px;
 }
 .horde-intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 40px;
-  min-height: 230px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 28px;
+  position: relative;
+  isolation: isolate;
+  min-height: 255px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: 24px 28px;
+  background: var(--panel);
 }
-.horde-intro > div {
-  max-width: 620px;
-}
-.horde-intro img {
-  width: 300px;
-  height: 210px;
+.horde-intro .hero-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 8px;
+  object-position: center 47%;
+  opacity: 1;
+  z-index: -1;
+}
+.hero-copy {
+  max-width: 550px;
+  padding: 0;
+  background: transparent;
+}
+.hero-highlight {
+  background: #fff;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0.08em 0.2em;
+}
+.hero-copy p:last-child {
+  max-width: 450px;
+  font-size: 14px;
+  margin-bottom: 0;
 }
 .eyebrow {
   font-size: 11px;
@@ -835,139 +977,194 @@ a:focus-visible {
   border: 0;
   font-size: 12px;
 }
-.section-tabs {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-  margin-top: 24px;
+.listing-heading {
+  margin: 32px 0 20px;
 }
-.section-tabs button {
-  border: 0;
-  border-bottom: 2px solid transparent;
+.listing-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.listing-heading p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 10px;
+}
+.create-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: none;
-  padding: 14px 0;
+  border: 0;
+  padding: 2px 0;
+  font-size: 12px;
   color: var(--muted);
 }
-.section-tabs button.active {
+.public-link {
+  margin-left: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.create-project:hover {
   color: var(--text);
-  border-bottom-color: var(--blue);
-  font-weight: 600;
-}
-.section-tabs span {
-  font-size: 11px;
-  margin-left: 4px;
-}
-.section-tabs .refresh {
-  margin-left: auto;
-  display: flex;
-  gap: 7px;
-  align-items: center;
+  text-decoration: underline;
 }
 .listing-tools {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  margin: 30px 0 20px;
-}
-.listing-tools h2 {
-  margin: 0;
-}
-.listing-tools p {
-  color: var(--muted);
-  font-size: 13px;
+  gap: 16px;
+  padding-bottom: 16px;
 }
 .search {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-.search input {
-  width: 200px;
-  padding: 8px;
+  gap: 8px;
+  color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 5px;
+  padding: 9px 12px;
   background: var(--panel);
+  width: min(320px, 100%);
+  min-width: 0;
+}
+.search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.view-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.view-switch {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 3px;
+  background: var(--panel);
+}
+.view-switch button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 5px 7px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+}
+.view-switch button[aria-pressed='true'] {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+.project-entry {
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 120ms;
+}
+.project-entry:hover {
+  border-color: var(--muted);
+}
+.entry-copy {
+  display: block;
+  min-width: 0;
+}
+.entry-title {
+  display: block;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.entry-summary {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.entry-arrow {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.project-list {
+  display: grid;
+  gap: 8px;
+}
+.project-list .project-entry {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 18px 12px 12px;
+}
+.project-list .project-entry img {
+  width: 96px;
+  height: 74px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.project-list .entry-copy {
+  flex: 1;
 }
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(235px, 100%), 1fr));
+  gap: 16px;
 }
-.project-card {
-  padding: 24px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+.project-grid .project-entry {
   display: flex;
   flex-direction: column;
-  min-height: 230px;
 }
-.card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.project-grid .project-entry img {
+  width: 100%;
+  height: 128px;
+  object-fit: cover;
+  border-bottom: 1px solid var(--line);
+}
+.project-grid .entry-copy {
+  padding: 15px 16px 18px;
+}
+.project-grid .entry-title {
+  font-size: 15px;
+}
+.project-grid .entry-arrow {
+  display: none;
+}
+.project-cover {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 7px;
   margin-bottom: 24px;
 }
-.category {
-  color: var(--blue);
-  text-transform: uppercase;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 1px;
+.cover-editor {
+  display: grid;
+  gap: 10px;
 }
-.role {
-  font-size: 10px;
-  color: var(--muted);
-}
-.project-card h2 button {
-  padding: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+.cover-editor img {
   width: 100%;
-  text-align: left;
-  background: none;
-  border: 0;
-  color: var(--text);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.3;
+  height: 125px;
+  object-fit: cover;
+  border-radius: 4px;
 }
-.project-card h2 button:hover {
-  color: var(--blue);
-}
-.card-summary {
-  font-size: 14px;
-  color: var(--muted);
-  white-space: pre-line;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.card-strategy {
-  font-size: 12px;
-  margin-top: auto;
-  padding-top: 20px;
-}
-.card-bottom {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-  font-size: 11px;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--muted);
-  flex-wrap: wrap;
-}
-.card-bottom span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+@media (prefers-reduced-motion: reduce) {
+  .project-entry {
+    transition: none;
+  }
 }
 .empty {
   padding: 64px;
@@ -1256,41 +1453,9 @@ a:focus-visible {
   display: grid;
   gap: 12px;
 }
-.idea-card h2 {
-  font-size: 22px;
-  margin-top: 18px;
-}
-.idea-card p {
-  font-size: 13px;
-}
-.idea-card h3 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--muted);
-}
-.idea-note {
-  border-left: 2px solid var(--line);
-  padding-left: 12px;
-  color: var(--muted);
-  font-size: 11px !important;
-}
-.idea-card a {
-  font-size: 11px;
-  margin-bottom: 20px;
-}
-.idea-card > button {
-  margin-top: auto;
-}
-.idea-grid {
-  align-items: stretch;
-}
 @media (max-width: 1100px) {
   .horde-wrap {
     padding: 24px;
-  }
-  .horde-intro img {
-    width: 230px;
   }
   .detail-grid {
     grid-template-columns: minmax(0, 1fr) 275px;
@@ -1307,9 +1472,6 @@ a:focus-visible {
   .detail-grid {
     grid-template-columns: 1fr;
   }
-  .horde-intro img {
-    display: none;
-  }
   .horde-wrap {
     padding: 20px;
   }
@@ -1325,8 +1487,23 @@ a:focus-visible {
   .pipeline li {
     min-width: 75px;
   }
-  .section-tabs {
-    gap: 18px;
+  .horde-intro {
+    padding: 24px;
+    min-height: 230px;
+  }
+  .project-list .project-entry {
+    gap: 12px;
+    padding: 10px;
+  }
+  .project-list .project-entry img {
+    width: 62px;
+    height: 70px;
+  }
+  .entry-arrow {
+    display: none;
+  }
+  .view-tools {
+    gap: 8px;
   }
   h1 {
     font-size: 30px;

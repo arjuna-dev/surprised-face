@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const renderOnly = process.argv.includes('--render-only');
+const testArgs = process.argv.slice(2).filter(arg => arg !== '--render-only');
 const code = renderOnly ? 0 : await new Promise((resolve, reject) => {
-  const child = spawn(process.execPath, ['node_modules/@playwright/test/cli.js', 'test'], { cwd: appRoot, stdio: 'inherit', env: process.env });
+  const child = spawn(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', ...testArgs], { cwd: appRoot, stdio: 'inherit', env: process.env });
   child.on('error', reject);
   child.on('close', (code) => resolve(code ?? 1));
 });
@@ -26,9 +27,13 @@ const chatSpecs = specs.filter((spec) => !publicSpecs.includes(spec));
 const resultTable = (items) => items.map((spec) => `<tr><th scope="row">${escape(spec.title)}</th><td>${spec.ok ? 'Pass' : 'Fail'}</td></tr>`).join('\n');
 const countResults = (items) => `${items.filter((spec) => spec.ok).length} passed · ${items.filter((spec) => !spec.ok).length} failed`;
 const images = [
-  ['hordes-cards.png', 'Hordes project offering after create, update, budget contribution and restore'],
+  ['hordes-header-contrast.png', 'Updated Horde header with full-strength square artwork and white backgrounds following the text lines'],
+  ['cobalt-red-brand.png', 'Cobalt and red appearance with the matching red and blue brand icon'],
+  ['hordes-list.png', 'Default public project list with compact descriptions and secondary creation'],
+  ['hordes-cards.png', 'Compact project cards with varied Horde covers and summaries capped at 200 characters'],
   ['hordes-project.png', 'Horde project with skills, orchestration, roles, budget and database discussion'],
-  ['hordes-ideas.png', 'Fourteen project concepts with first milestones and distinct orchestration approaches'],
+  ['hordes-narrow.png', 'Responsive Horde directory at a smaller desktop width'],
+  ['hordes-public-mobile.png', 'Public Horde directory at a 390-pixel mobile width'],
   ['harness-owner-attribution.png', 'Two Codex replies labeled with their distinct owners'],
   ['google-auth-gate.png', 'Sign-in gate shown before local project discovery'],
 
@@ -79,14 +84,20 @@ const publicImages = [
 ].filter(([file, , prefix]) => existsSync(path.join(appRoot, '../output/playwright', file)) && publicSpecs.some((spec) => spec.title.startsWith(prefix) && spec.ok))
   .map(([file, title]) => `<figure><img src="output/playwright/${file}" alt="${title}" style="width:100%;height:auto"><figcaption>${title}. Live static website view in Chromium.</figcaption></figure>`).join('\n');
 const hordeWorkflows = [
-  ['Hordes manages', 'Create Earth Commons with a repository and a Blender skill; pledge 250,000 tokens; discuss, rename, delete and restore.', 'The offering, detail, budget and discussion reflect saved bridge responses. Restoring returns the card, and switching app tabs preserves it.'],
-  ['Hordes protects', 'Open a project as Scout and browse the proposal gallery at 1000 by 680.', 'Edit, delete, budget and posting controls are absent. The proposals show concrete milestones without horizontal overflow.'],
+  ['Command-left', 'Open a Hordes project and press Command+Left.', 'Return from project details to the project list while staying in the app.'],
+  ['Hordes header', 'Open Hordes and inspect the project count, listing copy, hero and public-page link.', 'The project count is absent, the listing invites people to join, the hero artwork has no border or opacity reduction, white backgrounds follow each text line, and the public link targets a browser window.'],
+  ['red-blue appearance', 'Switch to Cobalt + red, then back to Mint + charcoal.', 'Each appearance uses its matching brand icon.'],
+  ['Hordes manages', 'Create Earth Commons with a repository and a Blender skill; pledge 250,000 tokens; discuss, rename, replace its cover and delete.', 'Saved project details, custom cover, budget and discussion appear. Deletion removes the project; no Trash tab remains.'],
+  ['Hordes defaults', 'Browse nine projects as a Scout, switch from the default list to cards, and open full details.', 'The directory has no Project Ideas or Trash tab. Descriptions stop at 200 characters including ellipsis, covers vary, full details open separately, and Scout controls remain read-only.'],
+  ['Hordes explains', 'The directory request returns Not found once, then succeeds on Retry.', 'The error identifies the project directory and Retry repeats the request without reloading the app.'],
+  ['public Hordes', 'Browse without an account, open and reload a direct project URL, use browser back/forward and resize to 390 pixels.', 'The public page renders without Electron, direct links and navigation work, and joining points to the signed-in desktop app. Service responses in this UI run are synthetic fixtures.'],
+  ['Hordes uploads', 'Upload an existing WebP illustration, save the project, and reopen its editor.', 'The browser resizes the image to a bounded raster data URL and the saved cover remains available when editing again.'],
   ['a failed Hordes save', 'The mocked bridge rejects project creation with Connection lost.', 'The error is visible and the filled project draft remains available for retry.'],
 ].map(([prefix, input, expected]) => {
   const spec = chatSpecs.find(item => item.title.startsWith(prefix));
   return spec ? `<tr><th scope="row">${escape(input)}</th><td>${escape(expected)}</td><td>${spec.ok ? 'Confirmed by assertions' : 'Not confirmed'}</td><td>${spec.ok ? 'Pass' : 'Fail'}</td></tr>` : '';
 }).join('');
-const command = `${process.env.SURPRISED_FACE_TEST_BROWSER ? `SURPRISED_FACE_TEST_BROWSER=${escape(process.env.SURPRISED_FACE_TEST_BROWSER)} ` : ''}npm run test:ui`;
+const command = `${process.env.SURPRISED_FACE_TEST_BROWSER ? `SURPRISED_FACE_TEST_BROWSER=${escape(process.env.SURPRISED_FACE_TEST_BROWSER)} ` : ''}npm run test:ui${testArgs.length ? ' -- ' + testArgs.map(arg => /^[a-zA-Z0-9_./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`).join(' ') : ''}`;
 const generated = `<h2>Chat interface</h2><p class="run-meta">${escape(data.stats.startTime)} · ${command} · ${countResults(chatSpecs)}</p>
 <p>The actual Vue interface runs in Chromium with mocked Electron IPC. Project names, messages, agent replies, account identity, and invite codes are synthetic. window.prompt throws as it does in Electron. Assertions cover the rendered controls and API calls; hardware clipboard and live model calls are checked separately.</p>
 <table class="route-table"><thead><tr><th scope="col">Workflow</th><th scope="col">Result</th></tr></thead><tbody>${resultTable(chatSpecs)}</tbody></table>
@@ -95,7 +106,7 @@ const generated = `<h2>Chat interface</h2><p class="run-meta">${escape(data.stat
 <details><summary>Settings before automatic saving and account controls</summary><p>Seven new interface checks failed before this change. Appearance required Save settings, account status was not loaded on opening Settings, and no sign-out action or status-check feedback was shown. The current tests exercise debounced serial saving, leaving Settings immediately, retaining preferences after a reload, error and retry feedback, existing and absent Codex accounts, login completion, account changes, and successful and failed sign-out. The synthetic Codex response follows the installed app-server protocol: account identity determines sign-in state; requiresOpenaiAuth describes whether authentication is required.</p><a href="output/playwright/red-settings-account-results.json">Failing settings and account checks</a><figure><img src="output/playwright/red-settings-account.png" alt="Manual Save settings and unchecked Codex status before the fix" style="width:100%;height:auto"></figure></details>
 <details><summary>Sharing dialogs before this change</summary><p>The targeted red run failed in all three themes: Join chat inherited a 60px heading instead of the expected size of at most 20px. The initial invite checks also found no dialog and automatic clipboard copying. The current checks assert code presentation before copying, explicit Copy calls, errors without false confirmation, loading and retry, dismiss and reopen, focus restoration after importing a native chat, keyboard focus containment, a new account joining, 24px padding, and regular headings in every theme.</p><a href="output/playwright/red-sharing-dialog-results.json">Failing dialog typography checks</a> · <a href="output/playwright/red-dialog-focus-results.json">Failing keyboard focus check</a><figure><img src="output/playwright/red-invite-banner.png" alt="Large invite confirmation before the modal" style="width:100%;height:auto"><figcaption>Previous rendered invite banner, with synthetic chat data.</figcaption></figure><figure><img src="output/playwright/red-join-modal.png" alt="Oversized join heading and missing form padding before the fix" style="width:100%;height:auto"><figcaption>Previous rendered join form, with synthetic chat data.</figcaption></figure></details>
 <p>The startup checks delay discovery by five seconds and also simulate a failed refresh. Saved chats remain visible and can load a transcript; successful discovery replaces deleted catalog entries. <a href="output/playwright/startup-red-results.json">Failing startup checks before implementation</a>.</p>
-<h3>Hordes workflows</h3><p>Real Vue UI with synthetic service responses. The separate Worker integration below exercises the real shared SQL database and permissions.</p><table class="route-table"><thead><tr><th>Input</th><th>Expected output</th><th>Observed output</th><th>Result</th></tr></thead><tbody>${hordeWorkflows}</tbody></table>
+<h3>Hordes workflows</h3><details><summary>Before the header and icon fixes</summary><p>The UI assertions reproduced the old copy and the green icon in Cobalt + red.</p><a href="output/playwright/red-hordes-polish-results.json">Failing UI results</a></details><details><summary>Before the directory redesign</summary><p>Three assertions failed before implementation: no cover editor, no default list switch, and an unexplained Not found error.</p><a href="output/playwright/red-hordes-directory-results.json">Failing UI results</a></details><p>Real Vue UI with synthetic service responses. The separate Worker integration below exercises the real shared SQL database and permissions.</p><table class="route-table"><thead><tr><th>Input</th><th>Expected output</th><th>Observed output</th><th>Result</th></tr></thead><tbody>${hordeWorkflows}</tbody></table>
 ${images}<details><summary>Current structured results</summary><a href="output/playwright/results.json">Playwright results</a></details>
 <h2>Public pages</h2><p class="run-meta">${escape(data.stats.startTime)} · ${command} · ${countResults(publicSpecs)}</p>
 <p>Local website pages run in Chromium at 1280 by 800 through the repository's static files. The checks navigate the real Pages selector and Imagery hash panel. The generated illustrations are repository assets; there is no synthetic service data.</p>

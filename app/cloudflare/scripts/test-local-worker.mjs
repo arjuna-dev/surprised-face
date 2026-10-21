@@ -74,6 +74,33 @@ try {
   const health = await api('/health');
   assert.equal(health.body.ok, true, 'local Worker serves health checks');
 
+  const freshDirectory = await api('/v1/hordes');
+  assert.equal(freshDirectory.status, 200);
+  assert.ok(freshDirectory.body.projects.length >= 9, 'the public directory is populated even before the first sign-in');
+  for (const name of ['Super Mario Bros. in 2.5D', 'The Thousand-Voice Symphony', 'The Five-Person Party Problem']) {
+    assert.ok(freshDirectory.body.projects.some((project) => project.name === name), `${name} is a joinable starter project`);
+  }
+  assert.ok(freshDirectory.body.projects.some((project) => project.name === 'Frankenstein: Mary Shelley’s Novel on Film'), 'the film starter identifies the source novel');
+  const earthStarter = freshDirectory.body.projects.find((project) => project.id === 'starter-earth-commons');
+  assert.match(earthStarter.summary, /Turn the whole Earth into a walkable 3D world/);
+  const coralStarter = freshDirectory.body.projects.find((project) => project.id === 'starter-the-coral-cathedral');
+  assert.match(coralStarter.summary, /swim through coral reefs, meet sea life, explore caves/);
+  const frankensteinStarter = freshDirectory.body.projects.find((project) => project.id === 'starter-frankenstein-the-arctic-testimony');
+  assert.match(frankensteinStarter.summary, /Adapt Mary Shelley’s novel into a Gothic film/);
+  assert.match(frankensteinStarter.summary, /human editor chooses and revises the screenplay/);
+  const ramseyStarter = freshDirectory.body.projects.find((project) => project.id === 'starter-ramsey-frontier');
+  assert.match(ramseyStarter.summary, /100,000 to 500,000 model tokens in total/);
+  const symphonyStarter = freshDirectory.body.projects.find((project) => project.name === 'The Thousand-Voice Symphony');
+  assert.match(symphonyStarter.summary, /many-hour symphony woven from hundreds or thousands of voices/);
+  const marioStarter = freshDirectory.body.projects.find((project) => project.name === 'Super Mario Bros. in 2.5D');
+  assert.doesNotMatch(marioStarter.summary, /simulating the original chips/i, 'the Mario project does not propose duplicating existing chip simulators');
+  const publicPage = await fetch(`${baseUrl}/hordes`);
+  assert.equal(publicPage.status, 200, 'the Worker hosts the public project webpage');
+  const publicHtml = await publicPage.text();
+  assert.ok(publicHtml.includes('Horde projects | :o'));
+  const scriptPath = publicHtml.match(/src="([^"]+\.js)"/)[1];
+  assert.equal((await fetch(`${baseUrl}${scriptPath}`)).status, 200, 'public page assets are served');
+  assert.equal((await fetch(`${baseUrl}/hordes/starter-earth-commons`)).status, 200, 'project URLs support direct navigation');
   const boot = await api('/v1/admin/bootstrap', { admin: adminSecret, body: { name: 'Maya' } });
   assert.equal(boot.status, 200, 'owner can initialize the workspace');
   const owner = boot.body.member;
@@ -124,11 +151,31 @@ try {
   const jo = { member: joLogin.member, token: joLogin.token };
   const lee = { member: leeLogin.member, token: leeLogin.token };
 
-  const hordeInput = { name: 'Earth Commons', summary: 'A walkable planet.', category: 'Worlds', repositoryUrl: 'https://github.com/example/earth', strategy: { parallelism: 4 }, skills: [{ name: 'Tile builder', instructions: 'Validate seams.', tools: ['Blender'] }] };
+  const publicDirectory = await api('/v1/hordes');
+  assert.equal(publicDirectory.status, 200, 'the global project directory is public');
+  assert.equal(publicDirectory.body.projects.length, 9, 'the directory has nine persisted starter projects');
+  assert.equal(new Set(publicDirectory.body.projects.map(p => p.id)).size, publicDirectory.body.projects.length);
+  assert.equal((await api('/v1/hordes')).body.projects.length, publicDirectory.body.projects.length, 'seeding is idempotent');
+  const starter = publicDirectory.body.projects.find(p => p.name === 'Earth Commons');
+  assert.equal(starter.createdBy, owner.id, 'the workspace curator can administer starter projects');
+  assert.ok(starter, 'Earth Commons is a real, joinable project');
+  const communitySummary = `${starter.summary}\n\nA community-authored detail.`;
+  assert.equal((await api(`/v1/hordes/${starter.id}`, { token: ownerToken, method: 'PATCH', body: { ...starter, summary: communitySummary, revision: starter.revision } })).status, 200);
+  assert.equal((await api('/v1/hordes')).body.projects.find((project) => project.id === starter.id).summary, communitySummary, 'later public reads preserve community edits to starter projects');
+  assert.equal((await api(`/v1/hordes/${starter.id}/join`, { token: jo.token, body: {} })).status, 200);
+  assert.equal((await api('/v1/hordes', { body: { name: 'Anonymous' } })).status, 401, 'public reading does not grant write access');
+  assert.equal((await api('/v1/hordes?deleted=1')).status, 401);
+  const hordeInput = { name: 'Test planet', summary: 'A walkable planet.', coverImage: 'https://example.com/planet.webp', category: 'Worlds', repositoryUrl: 'https://github.com/example/earth', strategy: { parallelism: 4 }, skills: [{ name: 'Tile builder', instructions: 'Validate seams.', tools: ['Blender'] }] };
   const hc = await api('/v1/hordes', { token: ownerToken, body: hordeInput });
   assert.equal(hc.status, 201, 'horde creation uses shared database');
   const hp = `/v1/hordes/${hc.body.project.id}`;
-  assert.equal((await api('/v1/hordes', { token: jo.token })).body.projects[0].name, 'Earth Commons');
+  assert.ok((await api('/v1/hordes', { token: jo.token })).body.projects.some(p => p.id === hc.body.project.id), 'projects are visible across accounts');
+  assert.equal((await api(hp)).body.project.coverImage, hordeInput.coverImage);
+  const uploadInput = { ...hordeInput, coverImage: 'data:image/webp;base64,UklGRg==' };
+  const uploaded = await api('/v1/hordes', { token: ownerToken, body: uploadInput });
+  assert.equal(uploaded.status, 201, 'raster uploads persist with a project');
+  assert.equal((await api(`/v1/hordes/${uploaded.body.project.id}`)).body.project.coverImage, uploadInput.coverImage);
+  assert.equal((await api('/v1/hordes', { token: ownerToken, body: { ...hordeInput, coverImage: 'javascript:alert(1)' } })).status, 400);
   assert.equal((await api(hp, { token: jo.token, method: 'PATCH', body: { ...hordeInput, revision: 1 } })).status, 403);
   await api(`${hp}/join`, { token: jo.token, body: {} });
   await api(`${hp}/budget`, { token: jo.token, method: 'PUT', body: { amount: 100000, unit: 'tokens' } });
@@ -147,6 +194,12 @@ try {
   assert.equal(hr.body.messages.length, 1);
   assert.ok(Number.isSafeInteger(hr.body.messages[0].messageSeq), 'discussion has a stable database order');
   assert.equal(hr.body.budgets[0].amount, 100000);
+  const publicDetail = await api(hp);
+  assert.deepEqual(publicDetail.body.messages, [], 'public visitors cannot read discussion');
+  assert.deepEqual(publicDetail.body.members, [], 'public visitors cannot list member identities');
+  assert.deepEqual(publicDetail.body.budgets, [], 'public visitors see totals, not individual commitments');
+  assert.equal(publicDetail.body.project.myRole, null);
+  assert.equal(publicDetail.body.project.totals.tokens, 100000);
   await api(`${hp}/members`, { token: ownerToken, method: 'PUT', body: { memberId: jo.member.id, role: 'scout' } });
   assert.equal((await api(`${hp}/messages`, { token: jo.token, body: { clientId: 'scout', text: 'No write' } })).status, 403);
   assert.equal((await api('/v1/hordes', { token: ownerToken, body: { ...hordeInput, repositoryUrl: 'javascript:alert(1)' } })).status, 400);
@@ -155,6 +208,9 @@ try {
   assert.equal((await api('/v1/hordes?deleted=1', { token: ownerToken })).body.projects.length, 1);
   await api(`${hp}/restore`, { token: ownerToken, body: {} });
   assert.equal((await api(hp, { token: ownerToken })).body.messages.length, 1);
+
+  await api(`/v1/hordes/${starter.id}`, { token: ownerToken, method: 'DELETE' });
+  assert.ok(!(await api('/v1/hordes')).body.projects.some(p => p.id === starter.id), 'seeding does not resurrect deleted starter projects');
 
   const joRooms = await api('/v1/rooms', { token: jo.token });
   assert.deepEqual(joRooms.body.rooms.map((room) => room.id), [roomId], 'a code grants access to its chat');
@@ -332,7 +388,7 @@ try {
   assert.equal((await api('/v1/me', { token: niaLogin.token })).status, 401, 'revoked sessions cannot be reused');
 
   const checks = [
-    ['Hordes', 'Real database: project CRUD, roles, revision conflicts, skills, budgets, discussion, deletion and restore.', 'Pass'],
+    ['Hordes', 'Real database: public global directory and direct public URLs, nine idempotent starter projects, updated starter descriptions, joining, cover URLs/uploads, CRUD, roles, revision conflicts, budgets and discussion. Public readers receive no discussion, member identities or individual commitments. Deleted starters stay deleted.', 'Pass'],
     ['Google sign-in', 'A Google authorization code is exchanged by the Worker with its server-side client secret; the verified ID token creates or reuses an account and an existing member links only with its valid legacy session.', 'Pass'],
     ['OAuth code replay protection', 'The local Google token endpoint rejects a second exchange of a consumed authorization code.', 'Pass'],
     ['OAuth token verification', 'Wrong audiences and conflicting account links are rejected after server-side code exchange; one-time OIDC nonces remain bound to their sign-in challenge.', 'Pass'],

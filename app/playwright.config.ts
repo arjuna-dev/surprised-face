@@ -9,6 +9,7 @@ export default defineConfig({
   outputDir: '../output/playwright/test-results',
   use: { baseURL: 'http://127.0.0.1:9017', viewport: { width: 1280, height: 800 }, screenshot: 'only-on-failure', channel: process.env.SURPRISED_FACE_TEST_BROWSER },
   webServer: [
+    { command: 'npx vite --config hordes-web/vite.config.ts --host 127.0.0.1 --port 9019', url: 'http://127.0.0.1:9019/hordes/', reuseExistingServer: false, timeout: 15000 },
     {
       command: 'SURPRISED_FACE_UI_TEST=1 npx quasar dev -p 9017 -H 127.0.0.1',
       url: 'http://127.0.0.1:9017',

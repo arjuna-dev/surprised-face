@@ -7,6 +7,7 @@ export type HordeInput = {
   summary: string;
   category: string;
   repositoryUrl: string;
+  coverImage?: string;
   strategy: HordeStrategy;
   skills: HordeSkill[];
   revision?: number;
@@ -125,3 +126,17 @@ export const canEditHorde = (role: HordeRole | null): boolean =>
   role === 'warchief' || role === 'warlord';
 export const budgetLabel = (unit: BudgetUnit): string =>
   ({ tokens: 'tokens', usd: 'USD', gpu_hours: 'GPU hours' })[unit];
+
+// Built-in cover keys are persisted; URLs and uploaded raster images are also supported.
+export const hordeCoverKeys = [
+  'gathering',
+  'engineering',
+  'space',
+  'builders',
+  'explorers',
+  'assembly',
+] as const;
+export const hordeExcerpt = (text: string): string => {
+  const characters = Array.from(text.trim().replace(/\s+/g, ' '));
+  return characters.length <= 200 ? characters.join('') : characters.slice(0, 197).join('') + '...';
+};

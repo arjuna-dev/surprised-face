@@ -665,8 +665,9 @@ test('a chat owner renames the shared chat from the sidebar or header', async ({
   ]);
 });
 
-test('Hordes manages projects, skills, budgets, discussion and recoverable deletion', async ({ page }) => {
+test('Hordes manages projects, covers, skills, budgets, discussion and deletion', async ({ page }) => {
   await fixture(page);
+  await page.route('https://example.com/earth.webp', route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64') }));
   await page.evaluate(() => {
     const projects: Record<string, unknown>[] = [];
     let detail: Record<string, unknown>;
@@ -687,7 +688,7 @@ test('Hordes manages projects, skills, budgets, discussion and recoverable delet
     };
   });
   await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Horde projects', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Build something big,.*together\./ })).toBeVisible();
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
   await page.getByLabel('Project name', { exact: true }).fill('Earth Commons');
   await page.getByLabel('Project goal', { exact: true }).fill('A walkable planet built district by district.');
@@ -708,41 +709,63 @@ test('Hordes manages projects, skills, budgets, discussion and recoverable delet
   await expect(page.getByText('I can build the first district.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit project', exact: true }).click();
   await page.getByLabel('Project name', { exact: true }).fill('Earth Together');
+  await page.getByLabel('Cover image URL', { exact: true }).fill('https://example.com/earth.webp');
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Earth Together', exact: true })).toBeVisible();
   await page.screenshot({ path: '../output/playwright/hordes-project.png' });
-  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
-  await page.getByRole('button', { name: 'Move to trash', exact: true }).click();
-  await page.getByRole('button', { name: 'Trash', exact: true }).click();
-  await page.getByRole('button', { name: 'Restore Earth Together', exact: true }).click();
-  await page.getByRole('button', { name: 'Projects', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Earth Together', exact: true })).toBeVisible();
-  await page.screenshot({ path: '../output/playwright/hordes-cards.png' });
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
   await page.getByRole('tab', { name: 'Chat', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Earth Together', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open Earth Together', exact: true }).click();
+  await expect(page.locator('.project-cover')).toHaveAttribute('src', 'https://example.com/earth.webp');
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete project', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open Earth Together', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Trash', exact: true })).toHaveCount(0);
 });
 
-test('Hordes protects read-only UI and offers concrete project ideas', async ({ page }) => {
+test('Hordes defaults to a global list and offers compact image cards with separate details', async ({ page }) => {
   await fixture(page);
   await page.evaluate(() => {
-    const project = { id: 'earth', name: 'Earth Commons', summary: 'Build one district.', category: 'Worlds', repositoryUrl: '', strategy: { id: 'spatial', parallelism: 3 }, skills: [], myRole: 'scout', memberCount: 2, totals: { tokens: 0, usd: 0, gpu_hours: 0 } };
-    window.surprisedFace.hordeRequest = async ({action}) => action === 'list' ? { projects: [project] } : { project, members: [{ id:'maya', name:'Maya', role:'scout' }], budgets: [], messages: [] };
+    const projects = Array.from({length: 8}, (_, i) => ({ id: `earth-${i}`, name: `Earth Commons ${i + 1}`, summary: 'A walkable planet. '.repeat(25), category: 'Worlds', repositoryUrl: '', strategy: { id: 'spatial', parallelism: 3 }, skills: [], myRole: 'scout', memberCount: 2, totals: { tokens: 0, usd: 0, gpu_hours: 0 } }));
+    window.surprisedFace.hordeRequest = async ({ action, projectId }) => action === 'list' ? { projects } : { project: projects.find(p => p.id === projectId), members: [{ id:'maya', name:'Maya', role:'scout' }], budgets: [], messages: [] };
   });
-  await page.getByRole('tab', {name:'Hordes',exact:true}).click();
-  await page.getByRole('button', {name:'Open Earth Commons',exact:true}).click();
-  await expect(page.getByRole('button', {name:'Edit project',exact:true})).toHaveCount(0);
-  await expect(page.getByRole('button', {name:'Delete project',exact:true})).toHaveCount(0);
-  await expect(page.getByRole('button', {name:'Set my budget',exact:true})).toHaveCount(0);
-  await expect(page.getByRole('textbox', {name:'Project message',exact:true})).toHaveCount(0);
-  await page.getByRole('button', {name:'All projects',exact:true}).click();
-  await page.getByRole('button', {name:/^Project ideas/}).click();
-  await expect(page.getByRole('heading', {name:'Ramsey Frontier',exact:true})).toBeVisible();
-  await expect(page.getByRole('heading', {name:'Frankenstein: The Arctic Testimony',exact:true})).toBeVisible();
-  await page.setViewportSize({width:1000,height:680});
-  await page.screenshot({path:'../output/playwright/hordes-ideas.png'});
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'List view', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.project-list .project-entry')).toHaveCount(8);
+  await expect(page.getByRole('button', { name: /^Project ideas/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Trash', exact: true })).toHaveCount(0);
+  await expect(page.locator('.horde-intro .primary')).toHaveCount(0);
+  const summaries = await page.locator('.entry-summary').allTextContents();
+  expect(summaries.every(text => Array.from(text).length <= 200 && text.endsWith('...'))).toBe(true);
+  await page.screenshot({ path: '../output/playwright/hordes-list.png' });
+  await page.getByRole('button', { name: 'Card view', exact: true }).click();
+  await expect(page.locator('.project-grid .project-entry')).toHaveCount(8);
+  const images = await page.locator('.project-entry img').evaluateAll(els => els.map(el => (el as HTMLImageElement).src));
+  expect(new Set(images).size).toBeGreaterThan(1);
+  await page.screenshot({ path: '../output/playwright/hordes-cards.png' });
+  await page.getByRole('button', { name: 'Open Earth Commons 1', exact: true }).click();
+  await expect(page.locator('.goal')).toHaveText('A walkable planet. '.repeat(25).trim());
+  for (const name of ['Edit project', 'Delete project', 'Set my budget']) await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Project message', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
+  await page.setViewportSize({width: 680, height: 800});
   expect(await page.locator('.hordes').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: '../output/playwright/hordes-narrow.png' });
+});
+
+test('Hordes explains a missing directory and retries the request without a page reload', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    let requests = 0;
+    window.surprisedFace.hordeRequest = async () => { if (++requests === 1) throw new Error('Not found.'); return { projects: [] }; };
+    (window as unknown as { retryMarker: string }).retryMarker = 'still here';
+  });
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('project directory');
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { retryMarker: string }).retryMarker)).toBe('still here');
 });
 
 test('a failed Hordes save preserves the project draft for retry', async ({ page }) => {
@@ -756,4 +779,95 @@ test('a failed Hordes save preserves the project draft for retry', async ({ page
   await expect(page.getByRole('alert')).toContainText('Connection lost');
   await expect(page.getByLabel('Project name',{exact:true})).toHaveValue('A Billion Worlds');
   await expect(page.getByRole('button',{name:'Save project',exact:true})).toBeEnabled();
+});
+
+test('public Hordes webpage needs no account and supports direct links and browser navigation', async ({ page }) => {
+  const project = { id: 'earth', name: 'Earth Commons', summary: 'Build one district together.', category: 'Worlds', repositoryUrl: '', strategy: { id: 'spatial', parallelism: 3 }, skills: [], myRole: null, memberCount: 2, totals: { tokens: 0, usd: 0, gpu_hours: 0 } };
+  await page.route('**/v1/hordes**', route => route.fulfill({ json: route.request().url().endsWith('/hordes') ? { projects: [project] } : { project, members: [], budgets: [], messages: [] } }));
+  await page.goto('http://127.0.0.1:9019/hordes/');
+  await expect(page.getByRole('button', { name: 'List view', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Open Earth Commons', exact: true }).click();
+  await expect(page).toHaveURL(/\/hordes\/earth$/);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Earth Commons', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Join this horde', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('desktop app');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Earth Commons', exact: true })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole('button', { name: 'Open Earth Commons', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '../output/playwright/hordes-public-mobile.png' });
+});
+
+test('Hordes uploads a raster cover and persists it through a project save', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    window.surprisedFace.hordeRequest = async ({ action, data }) => action === 'list' ? { projects: [] } : { project: { ...(data as Record<string, unknown>), id: 'upload', myRole: 'warchief', revision: 1, totals: { tokens: 0, usd: 0, gpu_hours: 0 }, memberCount: 1 }, members: [], budgets: [], messages: [] };
+  });
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByLabel('Project name', { exact: true }).fill('A new world');
+  await page.getByLabel('Project goal', { exact: true }).fill('Build a shared world.');
+  await page.getByLabel('Upload cover image', { exact: true }).setInputFiles('src/assets/hordes/space.webp');
+  await expect(page.getByRole('img', { name: 'Project cover preview' })).toHaveAttribute('src', /^data:image\/webp;base64,/);
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.locator('.project-cover')).toHaveAttribute('src', /^data:image\/webp;base64,/);
+  await page.getByRole('button', { name: 'Edit project', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Project cover preview' })).toHaveAttribute('src', /^data:image\/webp;base64,/);
+  await expect(page.getByLabel('Cover image URL', { exact: true })).toHaveValue('');
+});
+
+test('Command-left returns from Hordes project details to the project list', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    const project = { id: 'earth', name: 'Earth Commons', summary: 'Explore a shared Earth.', category: 'Worlds', repositoryUrl: '', strategy: { id: 'spatial', parallelism: 3 }, skills: [], myRole: 'scout', memberCount: 2, totals: { tokens: 0, usd: 0, gpu_hours: 0 } };
+    window.surprisedFace.hordeRequest = async ({ action }) => action === 'list' ? { projects: [project] } : { project, members: [], budgets: [], messages: [] };
+  });
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Earth Commons', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Earth Commons', exact: true })).toBeVisible();
+  await page.keyboard.press('Meta+ArrowLeft');
+  await expect(page.getByRole('button', { name: 'Open Earth Commons', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'All projects', exact: true })).toHaveCount(0);
+});
+
+test('Hordes header uses the requested copy, edge-to-edge artwork and line-level text backgrounds', async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => { window.surprisedFace.hordeRequest = async () => ({ projects: [] }); });
+  await page.getByRole('tab', { name: 'Hordes', exact: true }).click();
+  await expect(page.getByText('Find a project you want to be part of. Contribute with your agent. Help build something big.', { exact: true })).toBeVisible();
+  await expect(page.locator('.project-count')).toHaveCount(0);
+  await expect(page.getByText('Open projects from across the :o community. Join one to make your own contribution.', { exact: true })).toBeVisible();
+  await expect(page.locator('.horde-intro')).toHaveCSS('border-radius', '0px');
+  await expect(page.locator('.horde-intro')).toHaveCSS('border-width', '0px');
+  await expect(page.locator('.hero-art')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.hero-copy')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const highlightedText = page.locator('.hero-highlight');
+  await expect(highlightedText).toHaveCount(4);
+  const highlightStyles = await highlightedText.evaluateAll((elements) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    return { backgroundColor: style.backgroundColor, boxDecorationBreak: style.boxDecorationBreak };
+  }));
+  expect(highlightStyles).toEqual(Array.from({ length: 4 }, () => ({
+    backgroundColor: 'rgb(255, 255, 255)',
+    boxDecorationBreak: 'clone',
+  })));
+  const publicLink = page.getByRole('link', { name: 'View public page', exact: true });
+  await expect(publicLink).toHaveAttribute('href', 'https://fixture.invalid/hordes/');
+  await expect(publicLink).toHaveAttribute('target', '_blank');
+  await page.screenshot({ path: '../output/playwright/hordes-header-contrast.png' });
+});
+
+test('red-blue appearance uses the red-blue brand icon and retains the mint icon for green', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: /Cobalt \+ red/ }).click();
+  await expect(page.locator('.brand-art')).toHaveCSS('background-image', /cobalt-red-logo/);
+  await page.screenshot({ path: '../output/playwright/cobalt-red-brand.png' });
+  await page.getByRole('button', { name: /Mint \+ charcoal/ }).click();
+  await expect(page.locator('.brand-art')).toHaveCSS('background-image', /mint-charcoal-logo/);
 });

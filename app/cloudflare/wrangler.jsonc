@@ -6,18 +6,17 @@
   "compatibility_date": "2026-10-04",
   "workers_dev": true,
   "preview_urls": false,
+  "assets": { "directory": "../dist/hordes", "binding": "ASSETS", "run_worker_first": true },
   "observability": { "enabled": true },
   "durable_objects": {
     "bindings": [
       { "name": "DIRECTORY", "class_name": "WorkspaceDirectory" },
-      { "name": "ROOMS", "class_name": "ChatRoom" }
-    ]
+      { "name": "ROOMS", "class_name": "ChatRoom" },
+    ],
   },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["WorkspaceDirectory", "ChatRoom"] }
-  ],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WorkspaceDirectory", "ChatRoom"] }],
   "vars": {
     "APP_ORIGIN": "",
-    "GOOGLE_CLIENT_ID": "1037750208537-h0qmso4dvqihh53bnl1vrk23e49qhgc0.apps.googleusercontent.com"
-  }
+    "GOOGLE_CLIENT_ID": "1037750208537-h0qmso4dvqihh53bnl1vrk23e49qhgc0.apps.googleusercontent.com",
+  },
 }

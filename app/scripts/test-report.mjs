@@ -343,6 +343,24 @@ const checks = [
     result: 'The local copy retains its agent attribution, original time, and native room link.',
   },
   {
+    name: 'External browser links',
+    test: 'desktop external links open HTTP and HTTPS in the system browser',
+    input: 'Public Hordes HTTPS URL and a local development HTTP URL.',
+    result: 'The external-link adapter passes both destinations to the system browser opener.',
+  },
+  {
+    name: 'Electron link handler',
+    test: 'the Electron window handler opens web links externally while denying embedded windows',
+    input: 'Call the same window-open handler registered by Electron, using a mocked browser opener.',
+    result: 'HTTP(S) links go to the external opener, embedded Electron windows remain denied and launch errors are reported.',
+  },
+  {
+    name: 'External link validation',
+    test: 'desktop external links reject non-web URLs and report browser launch failures',
+    input: 'File, script, data, credential-bearing, invalid URLs and a failing browser opener.',
+    result: 'Non-web and credential-bearing URLs never reach the browser opener. Launch failures propagate to app feedback.',
+  },
+  {
     name: 'Window navigation',
     test: 'desktop navigation stays on the app document or its hash routes',
     input: 'Hash route, local file, and external web URL navigation attempts.',

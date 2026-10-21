@@ -20,12 +20,12 @@ Each authenticated account can start at most 100 new chats per UTC calendar day.
 
 ## Deploy
 
-1. Install dependencies with `npm install`.
+1. Install dependencies with `npm install` in both `app` and `app/cloudflare`.
 2. Sign in with `npx wrangler login`.
 3. Set the Google OAuth client secret: `npx wrangler secret put GOOGLE_CLIENT_SECRET` and paste the secret from the Desktop OAuth client when prompted.
 4. Set the signing secret: `openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET`.
 5. Set `GOOGLE_CLIENT_ID` in `wrangler.jsonc` (or an environment-specific Worker variable).
-6. Deploy with `npx wrangler deploy`.
+6. Deploy with `npm run deploy`. The predeploy step builds the public Hordes webpage and its static assets. A direct `npx wrangler deploy` requires first running `npm --prefix .. run build:hordes`.
 
 The optional `ADMIN_SECRET` supports operator-only bootstrap for a fresh, separate Worker. Set it with `npx wrangler secret put ADMIN_SECRET`, call `POST /v1/admin/bootstrap` with `Authorization: Bearer <ADMIN_SECRET>`, then remove the secret. Ordinary users do not enter a Cloudflare key or configure a Worker. The app also supports `SURPRISED_FACE_ROOM_SERVICE_URL` for local development or a separate deployment.
 
@@ -42,3 +42,9 @@ The app does not need `GOOGLE_CLIENT_SECRET` or `SESSION_SECRET`. Do not commit 
 The Worker uses one SQLite Durable Object for identities, hashed sessions, account-link records, quota records, chat membership, invites, and agents, plus one object per chat. Each invite is bound to one chat. Existing members use a code to join another chat. Agent turns are queued in each chat and run by the owning desktop.
 
 For local development, put `SESSION_SECRET`, `ADMIN_SECRET`, and `GOOGLE_CLIENT_SECRET` in an untracked `.dev.vars` file and run `npm run dev`.
+
+## Public Hordes directory
+
+`GET /v1/hordes` and `GET /v1/hordes/:id` allow public reading. `/hordes/` serves the public Vue directory and `/hordes/:id` supports direct links. The page uses the same component as the desktop app. Joining, creating, changing roles, budgets and discussion require a signed-in desktop account. Public reads exclude discussion, member identities and individual commitments.
+
+Stable starter project IDs are seeded idempotently from the repository catalogue. Edits and deletions are preserved. The workspace owner curates starter projects; an empty installation can serve projects before bootstrap and assigns curation when its owner exists. Covers can use a built-in illustration, an HTTPS URL, or a bounded PNG/JPEG/WebP data URL stored in SQLite.

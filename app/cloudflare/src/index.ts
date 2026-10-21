@@ -2,6 +2,7 @@ import { HordeStore } from './hordes';
 import { DurableObject } from 'cloudflare:workers';
 
 interface Env {
+  ASSETS: Fetcher;
   DIRECTORY: DurableObjectNamespace<WorkspaceDirectory>;
   ROOMS: DurableObjectNamespace<ChatRoom>;
   SESSION_SECRET: string;
@@ -41,6 +42,11 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env) });
 
     try {
+      if (/^\/hordes(?:\/|$)/.test(url.pathname) && ['GET', 'HEAD'].includes(request.method)) {
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = url.pathname.startsWith('/hordes/assets/') ? url.pathname.slice('/hordes'.length) : '/';
+        return env.ASSETS.fetch(new Request(assetUrl, request));
+      }
       if (url.pathname === '/health' && request.method === 'GET') return response({ ok: true, service: 'surprised-face-rooms' }, 200, env);
 
       if (url.pathname === '/v1/auth/google/challenge' && request.method === 'POST') {
@@ -88,13 +94,15 @@ export default {
 
       const protocolToken = request.headers.get('sec-websocket-protocol')?.split(',').map((value) => value.trim()).find((value) => value.startsWith('bearer.'))?.slice('bearer.'.length);
       const identity = await authenticate(request, env, protocolToken);
-      if (!identity) return response({ error: 'Sign in with Google to continue.' }, 401, env);
-
       if (/^\/v1\/hordes(?:\/|$)/.test(url.pathname)) {
-        const body = ['POST', 'PUT', 'PATCH'].includes(request.method) ? JSON.stringify(await readJson(request)) : undefined;
-        const result = await directory(env).fetch(`https://directory${url.pathname.slice(3)}${url.search}`, { method: request.method, headers: { 'x-actor-id': identity.id, 'content-type': 'application/json' }, ...(body ? { body } : {}) });
+        const publicRead = request.method === 'GET' && !url.searchParams.has('deleted') && /^\/v1\/hordes(?:\/[^/]+)?$/.test(url.pathname);
+        if (!identity && !publicRead) return response({ error: 'Sign in with Google to contribute.' }, 401, env);
+        const body = ['POST', 'PUT', 'PATCH'].includes(request.method) ? JSON.stringify(await readJson(request, 512 * 1024)) : undefined;
+        const result = await directory(env).fetch(`https://directory${url.pathname.slice(3)}${url.search}`, { method: request.method, headers: { 'x-actor-id': identity?.id || '', 'content-type': 'application/json' }, ...(body ? { body } : {}) });
         return response(await result.json(), result.status, env);
       }
+
+      if (!identity) return response({ error: 'Sign in with Google to continue.' }, 401, env);
 
       if (url.pathname === '/v1/me' && request.method === 'GET') return response(identity, 200, env);
 
@@ -907,7 +915,7 @@ function corsHeaders(env: Env): HeadersInit { return { ...(env.APP_ORIGIN && env
 function now() { return new Date().toISOString(); }
 function cleanName(input: unknown): string { const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : ''; if (!name || name.length > 64) throw new HttpError('Enter a name up to 64 characters.', 400); return name; }
 function cleanRoomName(input: unknown): string { const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : ''; if (!name || name.length > 80) throw new HttpError('Enter a chat name up to 80 characters.', 400); return name; }
-async function readJson<T = Record<string, unknown>>(request: Request): Promise<T> { const length = Number(request.headers.get('content-length') || 0); if (length > MAX_BODY_BYTES) throw new HttpError('Request is too large.', 413); const body = await request.json().catch(() => null); if (!body || typeof body !== 'object') throw new HttpError('Expected a JSON request body.', 400); return body as T; }
+async function readJson<T = Record<string, unknown>>(request: Request, maxBytes = MAX_BODY_BYTES): Promise<T> { const length = Number(request.headers.get('content-length') || 0); if (length > maxBytes) throw new HttpError('Request is too large.', 413); const text = await request.text(); if (new TextEncoder().encode(text).length > maxBytes) throw new HttpError('Request is too large.', 413); const body = (() => { try { return JSON.parse(text); } catch { return null; } })(); if (!body || typeof body !== 'object') throw new HttpError('Expected a JSON request body.', 400); return body as T; }
 function parseObject(value: string): Record<string, unknown> { try { const parsed = JSON.parse(value); return parsed && typeof parsed === 'object' ? parsed : {}; } catch { return {}; } }
 function randomToken(size = 24) { const bytes = crypto.getRandomValues(new Uint8Array(size)); return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
 async function hashText(value: string) { const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
